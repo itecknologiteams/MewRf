@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		android:layout_margin="6dp"
+		android:id="@+id/view_split_main">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:id="@+id/view_split_left">
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/tv_Configration_TagType"/>
+
+				<Spinner
+					android:id="@+id/sp_TagType1"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_TagType"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_TagType"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_orange"
+					android:nextFocusDown="@+id/btn_Configration_Back"
+					android:nextFocusLeft="@+id/btn_Configration_SendCarrier"
+					android:nextFocusRight="@+id/btn_Configration_Back"
+					android:nextFocusUp="@+id/btn_Configration_SendCarrier"
+					android:onClick="Button_TagType_Set"
+					android:text="@string/btn_Set"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_margin="2dp"
+				android:background="#808080"/>
+
+			<!-- 功率设置 -->
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/tv_Configration_Power"/>
+
+
+				<!--android:entries="@array/Array_Power"-->
+				<Spinner
+					android:id="@+id/sp_Configration_Power"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_Power"
+					android:prompt="@string/Clear_Tags"/>
+
+
+				<Button
+					android:id="@+id/btn_Configration_GetPower"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_blue"
+					android:nextFocusDown="@+id/btn_Configration_SetPower"
+					android:nextFocusLeft="@+id/btn_Configration_Back"
+					android:nextFocusRight="@+id/btn_Configration_SetPower"
+					android:nextFocusUp="@+id/btn_Configration_Back"
+					android:onClick="Button_GetFrequency"
+					android:text="@string/btn_Get"/>
+
+			</LinearLayout>
+
+			<!-- View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:background="#808080" /-->
+
+			<!-- 频率设置 -->
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/tv_Configration_Frequency"/>
+
+				<Spinner
+					android:id="@+id/sp_Frequency"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_Frequency"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_Configration_SetFrequency"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_orange"
+					android:nextFocusDown="@+id/btn_Configration_SendCarrier"
+					android:nextFocusLeft="@+id/btn_Configration_SetPingPongStopTime"
+					android:nextFocusRight="@+id/btn_Configration_SendCarrier"
+					android:nextFocusUp="@+id/btn_Configration_SetPingPongStopTime"
+					android:onClick="Button_SetFrequency"
+					android:text="@string/btn_Set"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_margin="2dp"
+				android:background="#808080"/>
+
+			<!-- 基带速率 -->
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/tv_Configration_BaseSpeed"/>
+
+				<Spinner
+					android:id="@+id/sp_BaseSpeedType"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_BaseSpeedType"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_Configration_GetBaseBand"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_blue"
+					android:nextFocusDown="@+id/btn_Configration_SetBaseBand"
+					android:nextFocusLeft="@+id/btn_Configration_SetPower"
+					android:nextFocusRight="@+id/btn_Configration_SetBaseBand"
+					android:nextFocusUp="@+id/btn_Configration_SetPower"
+					android:onClick="Button_GetBaseBand"
+					android:text="@string/btn_Get"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/tv_Configration_QValue"/>
+
+				<Spinner
+					android:id="@+id/sp_BaseSpeedQValue"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_QValue"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_Configration_SetBaseBand"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_orange"
+					android:nextFocusDown="@+id/btn_Configration_SetPingPongReadTime"
+					android:nextFocusLeft="@+id/btn_Configration_GetBaseBand"
+					android:nextFocusRight="@+id/btn_Configration_SetPingPongReadTime"
+					android:nextFocusUp="@+id/btn_Configration_GetBaseBand"
+					android:onClick="Button_SetBaseBand"
+					android:text="@string/btn_Set"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_margin="2dp"
+				android:background="#808080"/>
+
+		</LinearLayout>
+
+		<LinearLayout
+			android:id="@+id/view_split_right"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical">
+			<!-- 读时间比例配置 -->
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/btn_ReadTime"/>
+
+				<Spinner
+					android:id="@+id/sp_PingPongReadTime"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_ReadTime"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_Configration_SetPingPongReadTime"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_orange"
+					android:nextFocusDown="@+id/btn_Configration_SetPingPongStopTime"
+					android:nextFocusLeft="@+id/btn_Configration_SetBaseBand"
+					android:nextFocusRight="@+id/btn_Configration_SetPingPongStopTime"
+					android:nextFocusUp="@+id/btn_Configration_SetBaseBand"
+					android:onClick="Button_SetPingPongReadTime"
+					android:text="@string/btn_Set"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/btn_StopTime"/>
+
+				<Spinner
+					android:id="@+id/sp_PingPongStopTime"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_StopTime"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_Configration_SetPingPongStopTime"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_orange"
+					android:nextFocusDown="@+id/btn_Configration_SetFrequency"
+					android:nextFocusLeft="@+id/btn_Configration_SetPingPongReadTime"
+					android:nextFocusRight="@+id/btn_Configration_SetFrequency"
+					android:nextFocusUp="@+id/btn_Configration_SetPingPongReadTime"
+					android:onClick="Button_SetPingPongStopTime"
+					android:text="@string/btn_Set"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_margin="2dp"
+				android:background="#808080"/>
+
+			<!-- 载波发射 -->
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:layout_marginBottom="0dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/tv_Configration_Ant"/>
+
+				<Spinner
+					android:id="@+id/sp_Carrier"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_Carrier"
+					android:prompt="@string/Clear_Tags"/>
+
+				<Button
+					android:id="@+id/btn_Configration_SendCarrier"
+					android:layout_width="0dp"
+					android:layout_height="40dp"
+					android:layout_margin="2dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_blue"
+					android:nextFocusDown="@+id/btn_Configration_RF"
+					android:nextFocusLeft="@+id/btn_Configration_SetFrequency"
+					android:nextFocusRight="@+id/btn_Configration_RF"
+					android:nextFocusUp="@+id/btn_Configration_SetFrequency"
+					android:onClick="Button_Test"
+					android:text="@string/btn_CARRIER"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_margin="2dp"
+				android:background="#808080"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:layout_marginBottom="0dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+
+				<Button
+					android:id="@+id/btn_Configration_RF"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_margin="5dp"
+					android:layout_weight="0.35"
+					android:background="@drawable/button_orange"
+					android:nextFocusDown="@+id/btn_TagType"
+					android:nextFocusLeft="@+id/btn_Configration_SendCarrier"
+					android:nextFocusRight="@+id/btn_TagType"
+					android:nextFocusUp="@+id/btn_Configration_SendCarrier"
+					android:onClick="Button_Configration_RF"
+					android:text="@string/btn_Restore"/>
+			</LinearLayout>
+		</LinearLayout>
+	</LinearLayout>
+</ScrollView>

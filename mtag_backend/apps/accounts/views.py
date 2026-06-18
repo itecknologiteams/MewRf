@@ -5,12 +5,163 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from utils.response import success_response, error_response
 from utils.pagination import StandardPagination
-from .models import Account, Transaction, TransactionType, TransactionStatus
+from .models import Account, Transaction, TransactionType, TransactionStatus, TransactionSource
 from .serializers import AccountSerializer, TransactionSerializer, TransferSerializer
 from .services import TransferService
 from apps.users.permissions import IsAdmin, IsOperator
 
 logger = logging.getLogger(__name__)
+
+
+def _norm_tid(value: str) -> str:
+    return (value or '').strip().replace(' ', '').upper()
+
+
+class TopupLookupView(APIView):
+    """Scan-then-verify for the cash topup app. Given a chip TID, return the
+    consumer's details if the tag is registered, else found=False (operator will
+    register on topup)."""
+    permission_classes = [IsOperator]
+
+    def post(self, request):
+        from apps.vehicles.models import Tag
+        tid = _norm_tid(request.data.get('tid'))
+        if not tid:
+            return error_response("tid is required")
+        tag = (Tag.objects.select_related('vehicle__owner', 'vehicle__account')
+               .filter(tid=tid).first())
+        if tag and tag.vehicle and getattr(tag.vehicle, 'account', None):
+            v = tag.vehicle
+            o = v.owner
+            a = v.account
+            return success_response(data={
+                'found': True,
+                'tid': tag.tid,
+                'epc': tag.epc,
+                'consumer_name': o.full_name,
+                'cnic': o.cnic or '',
+                'phone': o.phone,
+                'plate': v.plate_number,
+                'balance': str(a.balance),
+            })
+        # Not registered (unknown tag, or unassigned inventory tag) → register flow.
+        return success_response(data={'found': False, 'tid': tid, 'epc': tag.epc if tag else ''})
+
+
+class CashTopupView(APIView):
+    """Cash topup by chip TID.
+
+    - Registered tag  → add `amount` to its balance (records a TOPUP_CASH txn).
+    - New/unassigned  → register the consumer (name/cnic/phone) + a vehicle
+                        (auto plate) + activate the tag, with `amount` as the
+                        opening balance.
+    """
+    permission_classes = [IsOperator]
+
+    def post(self, request):
+        import secrets
+        import string
+        from datetime import date
+        from django.utils import timezone
+        from apps.vehicles.models import Tag, TagStatus, Vehicle
+        from apps.users.models import User
+
+        tid = _norm_tid(request.data.get('tid'))
+        epc = (request.data.get('epc') or '').strip()
+        name = (request.data.get('consumer_name') or '').strip()
+        cnic = (request.data.get('cnic') or '').strip()
+        phone = (request.data.get('phone') or '').strip()
+        plate_raw = (request.data.get('vehicle_reg') or '').strip()
+        if not tid:
+            return error_response("tid is required")
+        try:
+            amount = Decimal(str(request.data.get('amount'))).quantize(Decimal('0.01'))
+        except (InvalidOperation, ValueError, TypeError):
+            return error_response("Invalid amount")
+        if amount <= 0:
+            return error_response("Amount must be greater than zero")
+
+        tag = (Tag.objects.select_related('vehicle__account', 'vehicle__owner')
+               .filter(tid=tid).first())
+
+        with db_transaction.atomic():
+            # ── Existing registered tag → simple topup ──────────────────────
+            if tag and tag.vehicle and getattr(tag.vehicle, 'account', None):
+                account = Account.objects.select_for_update().get(pk=tag.vehicle.account.pk)
+                balance_before = account.balance
+                account.balance += amount
+                account.save(update_fields=['balance', 'balance_updated_at'])
+                Transaction.objects.create(
+                    account=account, tag_serial=tag.tag_serial,
+                    transaction_type=TransactionType.TOPUP, amount=amount,
+                    balance_before=balance_before, balance_after=account.balance,
+                    status=TransactionStatus.SUCCESS, source=TransactionSource.TOPUP_CASH,
+                )
+                logger.info("Cash topup — tid:%s amount:%s new_balance:%s", tid, amount, account.balance)
+                return success_response(data={
+                    'registered': False,
+                    'consumer_name': tag.vehicle.owner.full_name,
+                    'amount_added': str(amount),
+                    'new_balance': str(account.balance),
+                }, message="Cash topup successful")
+
+            # ── New / unassigned tag → register consumer + vehicle + activate ─
+            if not name or not phone:
+                return error_response("consumer_name and phone are required to register a new tag")
+            import re
+            plate = re.sub(r'[\s\-]', '', plate_raw).upper()
+            if not plate:
+                return error_response("vehicle_reg (registration number) is required to register a new tag")
+            if Vehicle.objects.filter(plate_number=plate).exists():
+                return error_response("A vehicle with this registration number already exists", status_code=409)
+
+            owner = User.objects.filter(phone=phone).first()
+            if owner is None:
+                pwd = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                owner = User.objects.create_user(phone=phone, password=pwd, full_name=name, cnic=cnic or None)
+
+            vehicle = Vehicle.objects.create(plate_number=plate, vehicle_type='car', owner=owner)
+
+            if tag:  # inventory tag — assign + activate
+                tag.vehicle = vehicle
+                if epc:
+                    tag.epc = epc
+                tag.status = TagStatus.ACTIVE
+                tag.save()
+            else:    # brand-new tag — create with a generated serial
+                sprefix = timezone.localtime().strftime('%d%m%y%H%M')
+                last = (Tag.objects.filter(tag_serial__startswith=sprefix)
+                        .order_by('-tag_serial').values_list('tag_serial', flat=True).first())
+                s = 1
+                if last:
+                    try:
+                        s = int(last[len(sprefix):]) + 1
+                    except (ValueError, TypeError):
+                        s = Tag.objects.filter(tag_serial__startswith=sprefix).count() + 1
+                serial = f"{sprefix}{s:04d}"
+                while Tag.objects.filter(tag_serial=serial).exists():
+                    s += 1
+                    serial = f"{sprefix}{s:04d}"
+                tag = Tag.objects.create(
+                    tag_serial=serial, tid=tid, epc=epc, vehicle=vehicle,
+                    expiry_date=date(2099, 12, 31), status=TagStatus.ACTIVE,
+                )
+
+            account = Account.objects.create(vehicle=vehicle, user=owner, balance=amount)
+            Transaction.objects.create(
+                account=account, tag_serial=tag.tag_serial,
+                transaction_type=TransactionType.TOPUP, amount=amount,
+                balance_before=Decimal('0.00'), balance_after=amount,
+                status=TransactionStatus.SUCCESS, source=TransactionSource.TOPUP_CASH,
+            )
+            logger.info("Cash topup + register — tid:%s plate:%s amount:%s", tid, plate, amount)
+            return success_response(data={
+                'registered': True,
+                'consumer_name': name,
+                'plate': plate,
+                'amount_added': str(amount),
+                'new_balance': str(amount),
+            }, message="Registered and topped up", status_code=201)
 
 
 class AccountDetailView(APIView):

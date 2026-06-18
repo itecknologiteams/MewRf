@@ -1,0 +1,74 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.hopeland.pda.example">
+
+
+    <uses-permission android:name="android.permission.READ_LOGS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.CAMERA" >
+    </uses-permission>
+
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.camera.autofocus" />
+
+    <uses-permission android:name="android.permission.FLASHLIGHT" >
+    </uses-permission>
+    <uses-permission android:name="android.permission.VIBRATE" >
+    </uses-permission>
+    <uses-permission android:name="android.permission.INTERNET" >
+    </uses-permission>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" >
+    </uses-permission>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" >
+    </uses-permission>
+	<uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"/>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/logo"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        <activity android:name=".uhf.UHFMain" >
+        </activity>
+        <activity android:name=".ItemMainActivity"
+				  android:configChanges="orientation|keyboardHidden|screenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".uhf.ReadEPCActivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".uhf.ReadEPCmatchingActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".uhf.WriteEPCActivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".uhf.ConfigActivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".hf.HFMain"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".hf.ReadISO15693Activity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".hf.ReadISO14443Activity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".hf.ReadMifareActivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".scanner.ScannerActivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".dlt.FreeSendctivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+        <activity android:name=".dlt.MenuActivity"
+                  android:configChanges="orientation|keyboardHidden|screenSize">
+        </activity>
+    </application>
+</manifest>

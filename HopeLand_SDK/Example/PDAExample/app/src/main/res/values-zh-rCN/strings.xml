@@ -1,0 +1,257 @@
+<resources>
+
+    <string name="str_please_waitting">请稍等.&#8230;</string>
+    <string name="str_loading">加载中.&#8230;</string>
+    <string name="str_busy">忙!</string>
+    <string name="str_success">成功</string>
+    <string name="str_faild">失败</string>
+    <string name="str_configure">配置</string>
+    <string name="str_ok">确定</string>
+    <string name="str_cancel">取消</string>
+    <string name="str_confirm">确认</string>
+    <string name="str_back">返回</string>
+    <string name="str_exit">退出</string>
+    <!-- MenuMain -->
+    <string name="tv_MainMenu_Title">PDA Example</string>
+    <string name="btn_MainMenu_UHF">超高频</string>
+    <string name="btn_MainMenu_HF">高频</string>
+    <string name="btn_MainMenu_Psam">PSAM卡</string>
+    <string name="btn_MainMenu_SerialNumber">序列号</string>
+    <string name="btn_MainMenu_Scan">条码</string>
+    <string name="btn_MainMenu_Version">版本</string>
+    <string name="btn_MainMenu_DLT">电力</string>
+    <string name="btn_MainMenu_Exit">退出</string>
+
+    <!-- UHF Menu -->
+    <string name="btn_UHFMenu_Title">超高频示例</string>
+    <string name="btn_UHFMenu_Read">读标签</string>
+    <string name="btn_UHFMenu_Read_Matching">匹配读</string>
+    <string name="btn_UHFMenu_Write">写标签</string>
+    <string name="btn_UHFMenu_Lock">锁标签</string>
+    <string name="btn_UHFMenu_Configration">配置</string>
+    <string name="btn_UHFMenu_Back">返回</string>
+
+    <!-- UHF Read -->
+    <string name="app_name">PDA Example</string>
+    <string name="List_TagID">EPC</string>
+    <string name="List_ReadCount">次数</string>
+    <string name="Tag_Time">Time:0 S </string>
+    <string name="Tag_Count">Total:0</string>
+    <string name="Tag_ReadTotalCount">SP:0 T/S</string>
+    <string name="btn_read">开始</string>
+    <string name="btn_read_stop">停止</string>
+    <string name="Clear_Tags">清空</string>
+    <string name="btn_Back">返回</string>
+    <string name="tv_Read_Title">读EPC</string>
+    <string name="uhf_please_stop">请先停止读标签!</string>
+    <string name="uhf_low_power_info">电量低,请充电!</string>
+    <string name="uhf_low_power_consumption">副电电量低， 是否切换到主电池?</string>
+    <string name="uhf_read_power_over">正在使用主电源供电， 功率不能超过25dBm!</string>
+    <string name="uhf_data_error">数据错误!</string>
+    <string name="uhf_data_len_error">密码长度必须为8位!</string>
+    <string name="uhf_6b_not_support_match_mode">6B标签不支持匹配读!</string>
+    <!-- UHF Write -->
+    <string name="tv_Write_Title">写EPC</string>
+    <string name="tv_Write_MatchTitle">匹配参数:</string>
+    <string name="tv_Write_MatchTID">TID:</string>
+    <string name="tv_Write_AccessPassword">访问密码:</string>
+    <string name="tv_Write_WriteTitle">写数据:</string>
+    <string name="tv_Write_WriteData">数据:</string>
+    <string name="tv_Write_WriteType">类型:</string>
+    <string name="btn_Write_ReadMatch">读标签</string>
+    <string name="btn_Write_WriteData">写标签</string>
+    <!-- UHF Lock -->
+    <string name="tv_Lock_Title">锁标签</string>
+    <string name="tv_Lock_MatchTitle">匹配参数:</string>
+    <string name="tv_Lock_MatchTID">TID:</string>
+    <string name="tv_Lock_AccessPassword">访问密码:</string>
+    <string name="tv_Lock_LockTitle">锁数据:</string>
+    <string name="tv_Lock_LockArea">锁定区域</string>
+    <string name="tv_Lock_LockType">锁定类型:</string>
+    <string name="btn_Lock_ReadMatch">读标签</string>
+    <string name="btn_Lock_LockData">锁标签</string>
+    
+    <!-- Configration -->
+    <string name="tv_Configration_BaseSpeed">基带速率:</string>
+    <string name="tv_Configration_QValue">Q值:</string>
+    <string name="tv_Configration_Frequency">频率:</string>
+    <string name="tv_Configration_Power">功率:</string>
+    <string name="tv_Configration_Ant">天线:</string>
+    <string name="tv_Configration_TagType">标签类型:</string>
+    <string name="btn_Get">获取</string>
+    <string name="btn_Set">设置</string>
+    <string name="btn_ReadTime">读时间(ms):</string>
+    <string name="btn_StopTime">停时间(ms): </string>
+    <string name="btn_Restore">恢复出厂</string>
+    <string name="btn_CARRIER">载波</string>
+    <string name="btn_UpdateBase">UpdateBase</string>
+    <!-- UHF Read_matching -->
+    <string name="uhf_please_input_match_value">请输入匹配值！</string>
+    <string name="List_TagID_matching">EPC</string>
+    <string name="List_ReadCount_matching">Count</string>
+    <string name="Tag_Time_matching">Time:0 S </string>
+    <string name="Tag_Count_matching">Total:0</string>
+    <string name="Tag_ReadTotalCount_matching">SP:0 T/S</string>
+    <string name="btn_read_matching">开始</string>
+    <string name="btn_read_1_matching">停止</string>
+    <string name="Clear_Tags_matching">清空</string>
+    <string name="btn_Back_matching">返回</string>
+    <string name="tv_Read_Title_matching">匹配读</string>
+
+    <!-- HF -->
+    <string name="tv_HF_Title">高频示例</string>
+    <string name="btn_HFMenu_ISO15693">ISO15693</string>
+    <string name="btn_HFMenu_ISO14443A">ISO14443A</string>
+    <string name="btn_HFMenu_Mifare">Mifare卡</string>
+    <string name="btn_HFMenu_Version">版本</string>
+    <string name="btn_HFMenu_Back">返回</string>
+    <string name="btn_Read_UID">扫描标签</string>
+    <string name="LabelBlockNoText">块号:</string>
+    <string name="txtBlockNoDefult">1</string>
+    <string name="LabelKeyText">密码:</string>
+    <string name="txtKeyDefault">FFFFFFFFFFFF</string>
+    <string name="LabelDataAreaText">数据域：</string>
+    <string name="ButtonReadText">读</string>
+    <string name="ButtonWriteText">写</string>
+    <string name="please_input_valid_key">请输入有效密码！</string>
+    <string name="please_input_valid_data">请输入有效数据！</string>
+    <string name="PowerFaild">打开电源失败! 请确认模块已连接！</string>
+    <string name="waiting">请稍等&#8230;</string>
+    <string name="read_waiting">正在读取, 请稍等.&#8230;</string>
+    <string name="read_faild">失败！</string>
+    <string name="read_success">成功！</string>
+    <string name="write_waiting">正在写入,请稍等.&#8230;</string>
+    <string name="write_faild">失败！</string>
+    <string name="write_success">成功！</string>
+
+    <!-- TestPowerUpDown -->
+    <string name="TestPower_Start">开始</string>
+    <string name="TestPower_Stop">停止</string>
+    <string name="com_recv">接收区：</string>
+    <string name="com_send">发送区：</string>
+    <string name="str_btn_com_open">打开</string>
+    <string name="str_btn_com_close">关闭</string>
+    <string name="str_btn_com_send">发送</string>
+    <string name="str_btn_com_work">工作</string>
+    <string name="str_btn_com_stop">停止</string>
+    <string name="text_com_port">端口:</string>
+    <string name="text_com_speed">速率:</string>
+    <string name="text_com_parity">校验:</string>
+    <string name="text_com_mode">模式:</string>
+    <string name="STR_METER_READ">数据读取</string>
+    <string name="STR_METER_SETTING">设置读取电表参数</string>
+    <string name="STR_FREE_SEND">自由收发</string>
+    <string name="MeterAddress">表地址:&#160;</string>
+    <string name="GetAddrByF1">按F1键获取表地址</string>
+    <string name="MeterPort">端口:&#160;</string>
+    <string name="MeterSpeed">通信速度:&#160;</string>
+    <string name="MeterProtocol">协议:&#160;</string>
+    <string name="MeterPasswd">密码:&#160;</string>
+    <string name="MeterOpcode">操作者代码:&#160;</string>
+    <string name="MeterItem">项目:&#160;</string>
+    <string name="MeterValue">值:&#160;</string>
+    <string name="MeterPortIRDA">红外口</string>
+    <string name="MeterPortRS485">RS485</string>
+    <string name="MeterSpeed1200">1200</string>
+    <string name="MeterSpeed2400">2400</string>
+    <string name="MeterSpeed4800">4800</string>
+    <string name="MeterProtocol97">DLT645_1997</string>
+    <string name="MeterProtocol07">DLT645_2007</string>
+    <string name="MeterReadItemPower">电量</string>
+    <string name="MeterReadItemVolt">电压</string>
+    <string name="MeterReadItemVoltA">电压(A)</string>
+    <string name="MeterReadItemVoltB">电压(B)</string>
+    <string name="MeterReadItemVoltC">电压(C)</string>
+    <string name="MeterReadItemAmp">电流</string>
+    <string name="MeterReadItemAmpA">电流(A)</string>
+    <string name="MeterReadItemAmpB">电流(B)</string>
+    <string name="MeterReadItemAmpC">电流(C)</string>
+    <string name="MeterReadItemLastDay">日数据</string>
+    <string name="MeterReadItemLastMonth">月数据</string>
+    <string name="MeterReadItemProgNum">编程次数</string>
+    <string name="MeterReadItemLastProgRec">最近一次编程记录</string>
+    <string name="MeterSettingItemDate">年月日星期</string>
+    <string name="MeterSettingItemTime">时分秒</string>
+    <string name="MeterSettingItemMeterNo">表号</string>
+    <string name="MeterSettingItemAddress">通信地址</string>
+    <string name="MeterSettingItemIRSpeed">红外波特率</string>
+    <string name="ReadMeter">读表</string>
+    <string name="SettingMeter">设置</string>
+    <string name="DefaultMeterAddr">AAAAAAAAAAAA</string>
+    <string name="DefaultMeterOpcode">00000000</string>
+    <string name="DefaultMeterPasswd">00000000</string>
+    <string name="Back">返回</string>
+    <string name="Exit">退出</string>
+    <string name="read_result">读表结果</string>
+    <string name="setting_waiting">正在设置电表,请稍等&#8230;</string>
+    <string name="setting_faild">设置失败， 请重试！</string>
+    <string name="setting_success">设置成功！</string>
+    <string name="setting_result">设置结果</string>
+    <string name="please_input_valid_addr">请输入有效的表地址！</string>
+    <string name="please_input_valid_passwd">请输入有效的密码！</string>
+    <string name="please_input_valid_opcode">请输入有效的操作者代码！</string>
+    <string name="please_input_valid_value">请输入有效的写表数据！</string>
+    <string name="please_select_valid_item">请选择正确的项目!</string>
+    <string name="SendData">发送数据:</string>
+    
+    <string name="uhf_default_access_pwd">00000000</string>
+    <string name="scanner_trigger">触发</string>
+    <string name="scanner_open_power_faild">打开电源失败!</string>
+    <!-- PSAM -->
+    <string name="psam_low_power_info">电量低， 请充电!</string>
+    <string name="text_psam_index">PSAM卡</string>
+    <string name="psam_atr">ATR:</string>
+    <string name="psam_poweron">上电</string>
+    <string name="psam_apdu">APDU:</string>
+    <string name="psam_rpdu">RPDU:</string>
+    <string name="psam_send">发送</string>
+    <string name="psam_please_check_card">请确认已插卡!</string>
+
+    <!-- hf -->
+    <string name="hf_iso15693_title">ISO15693</string>
+    <string name="hf_iso14443A_title">ISO14443A</string>
+    <string name="hf_mifare_title">Mifare</string>
+    
+    <string name="hf_low_power_info">电量低， 请充电!</string>
+    <string name="hf_read_uid_title">读标签序列号:</string>
+    <string name="hf_read_uid">扫描标签</string>
+    <string name="hf_uid">UID</string>
+    <string name="hf_block">块号:</string>
+    <string name="hf_read">读</string>
+    <string name="hf_write">写</string>
+    <string name="hf_suspend">挂起</string>
+    <string name="hf_reset">复位</string>
+    <string name="hf_req_mode">请求模式:</string>
+    <string name="hf_read_faild">读卡失败</string>
+   
+    
+    <string name="hf_iso15693_rwl_title">读/写/锁:</string>
+    <string name="hf_iso15693_get_tag_info">获取标签信息</string>
+    <string name="hf_iso15693_AFI">AFI:</string>
+    <string name="hf_iso15693_read_AFI">读AFI</string>
+    <string name="hf_iso15693_write_AFI">写AFI</string>
+    <string name="hf_iso15693_lock_AFI">锁AFI</string>
+    <string name="hf_iso15693_DSFID">SDFID:</string>
+    <string name="hf_iso15693_read_DSFID">读DSFID</string>
+    <string name="hf_iso15693_write_DSFID">写DSFID</string>
+    <string name="hf_iso15693_lock_DSFID">锁DSFID</string>
+    
+    <string name="hf_iso14443A_op_title">ISO14443A-4卡操作:</string>
+    <string name="hf_iso14443A_tag_id">卡标识符:</string>
+    <string name="hf_iso14443A_ack">应答:</string>
+    <string name="hf_iso14443A_RATS_commond">RATS命令</string>
+    <string name="hf_iso14443A_APDU">APDU:</string>
+    <string name="hf_iso14443A_send_APDU">APDU</string>
+    <string name="hf_iso14443A_deselect">Deselect</string>
+    
+    <string name="hf_mifare_rwl_title">读/写/块值操作:</string>
+    <string name="hf_mifare_positon">位置:</string>
+    <string name="hf_mifare_auth_type">认证:</string>
+    <string name="hf_mifare_key_type">密钥:</string>
+    <string name="hf_mifare_block_op">操作:</string>
+    <string name="hf_mifare_trasmit_block">传输块号:</string>
+    <string name="hf_mifare_key">密钥:</string>
+    <string name="hf_mifare_value">数据:</string>
+    <string name="hf_mifare_do_block_op">块操作</string>
+    <string name="hf_mifare_value_empty">写数据不能为空!</string>
+</resources>

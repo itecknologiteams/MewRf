@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical">
+
+	<LinearLayout
+		android:layout_width="fill_parent"
+		android:layout_height="wrap_content"
+		android:layout_margin="10dp"
+		android:gravity="center"
+		android:orientation="vertical">
+
+		<Button
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+			android:background="@drawable/button_blue"
+
+			android:id="@+id/btn_HFMeum_ISO15693"
+			android:text="@string/btn_HFMenu_ISO15693"
+			android:textSize="22sp"
+			android:onClick="OpenISO15693Activity"/>
+
+		<Button
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+
+			android:background="@drawable/button_blue"
+			android:id="@+id/btn_HFMenu_ISO14443A"
+			android:text="@string/btn_HFMenu_ISO14443A"
+			android:textSize="22sp"
+			android:onClick="OpenISO14443AActivity"/>
+
+		<Button
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+
+			android:background="@drawable/button_blue"
+			android:id="@+id/btn_HFMenu_Mifare"
+			android:text="@string/btn_HFMenu_Mifare"
+			android:textSize="22sp"
+			android:onClick="OpenMifareActivity"/>
+
+		<Button
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+
+			android:background="@drawable/button_orange"
+			android:onClick="OpenVersionActivity"
+			android:textSize="22sp"
+			android:text="@string/btn_HFMenu_Version"/>
+
+	</LinearLayout>
+</ScrollView>

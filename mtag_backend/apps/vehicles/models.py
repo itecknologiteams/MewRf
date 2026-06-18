@@ -68,3 +68,23 @@ class Tag(models.Model):
             self.status == TagStatus.ACTIVE and
             self.expiry_date >= timezone.now().date()
         )
+
+
+class ScanBuffer(models.Model):
+    """Transient per-user buffer for handheld scan sessions.
+
+    A WiFi RFID device POSTs each detected tag here; the bulk-tags web app polls
+    it to show a live list + count, then bulk-inserts the tags. Deduplicated per
+    (user, tid). Cleared after insert (or manually)."""
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='scan_buffer')
+    tid = models.CharField(max_length=24)
+    epc = models.CharField(max_length=24, blank=True, default='')
+    scanned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'scan_buffer'
+        unique_together = ('user', 'tid')
+        ordering = ['-scanned_at']
+
+    def __str__(self):
+        return f"{self.tid} ({self.user_id})"

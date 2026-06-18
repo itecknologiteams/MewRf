@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+			  android:layout_width="match_parent"
+			  android:layout_height="match_parent"
+			  android:orientation="vertical">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		android:layout_margin="6dp"
+		android:id="@+id/view_split_main">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:id="@+id/view_split_left">
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/tv_Lock_MatchTitle"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="vertical">
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="@string/tv_Lock_MatchTID"/>
+
+				<EditText
+					android:id="@+id/tb_Lock_MatchTID"
+					android:layout_width="fill_parent"
+					android:layout_height="wrap_content"
+					android:background="@drawable/view_rectangle_morelist_gray"
+					android:gravity="left|top"
+					android:inputType="textMultiLine"
+					android:focusable="true"
+					android:focusableInTouchMode="true"
+					android:maxLines="2"
+					android:minLines="2"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="vertical">
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="@string/tv_Lock_AccessPassword"/>
+
+				<EditText
+					android:id="@+id/tb_Lock_Access_Password"
+					android:layout_width="match_parent"
+					android:layout_height="match_parent"
+					android:background="@drawable/view_rectangle_morelist_gray"
+					android:text="@string/uhf_default_access_pwd"/>
+
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<Button
+					android:id="@+id/btn_Lock_ReadMacthTag"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:layout_margin="5dp"
+					android:background="@drawable/button_blue"
+					android:onClick="ReadMactchTag"
+					android:text="@string/btn_Lock_ReadMatch"/>
+			</LinearLayout>
+			<!--<View-->
+				<!--android:layout_width="match_parent"-->
+				<!--android:layout_height="1dp"-->
+				<!--android:layout_margin="2dp"-->
+				<!--android:background="#808080"/>-->
+		</LinearLayout>
+
+		<LinearLayout
+			android:id="@+id/view_split_right"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical">
+			<!-- Lock -->
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/tv_Lock_LockTitle"/>
+
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:text="@string/tv_Lock_LockArea"/>
+
+				<Spinner
+					android:id="@+id/sp_Lock_LockArea"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.7"
+					android:entries="@array/Array_LockArea"
+					android:prompt="@string/Clear_Tags"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:text="@string/tv_Lock_LockType"/>
+
+				<Spinner
+					android:id="@+id/sp_Lock_LockType"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.7"
+					android:entries="@array/Array_LockType"
+					android:prompt="@string/Clear_Tags"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="vertical">
+
+				<Button
+					android:id="@+id/btn_Lock_LockData"
+					android:layout_width="fill_parent"
+					android:layout_height="wrap_content"
+					android:layout_margin="5dp"
+					android:background="@drawable/button_orange"
+					android:onClick="LockData"
+					android:text="@string/btn_Lock_LockData"/>
+
+			</LinearLayout>
+		</LinearLayout>
+	</LinearLayout>
+</LinearLayout>

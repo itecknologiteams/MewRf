@@ -1,0 +1,261 @@
+<resources>
+
+    <string name="str_please_waitting">prosze czekac.&#8230;</string>
+    <string name="str_loading">ladowanie.&#8230;</string>
+    <string name="str_busy">zajety!</string>
+    <string name="str_success">sukces</string>
+    <string name="str_faild">blad</string>
+    <string name="str_configure">konfiguruj</string>
+    <string name="str_ok">OK</string>
+    <string name="str_cancel">Anuluj</string>
+    <string name="str_confirm">Potwierdz</string>
+    <string name="str_back">z powrotem</string>
+    <string name="str_exit">wyjście</string>
+
+    <!-- MenuMain -->
+    <string name="tv_MainMenu_Title">PDA Example</string>
+    <string name="btn_MainMenu_UHF">UHF</string>
+    <string name="btn_MainMenu_HF">HF</string>
+    <string name="btn_MainMenu_Psam">PSAM</string>
+    <string name="btn_MainMenu_SerialNumber">Numer seryjny</string>
+    <string name="btn_MainMenu_Scan">Skaner</string>
+    <string name="btn_MainMenu_Version">Wersja</string>
+    <string name="btn_MainMenu_DLT">DLT</string>
+    <string name="btn_MainMenu_Exit">Wyjdz</string>
+
+    <!-- UHF Menu -->
+    <string name="btn_UHFMenu_Title">Demo UHF</string>
+    <string name="btn_UHFMenu_Read">Czytanie</string>
+    <string name="btn_UHFMenu_Read_Matching">Parowanie</string>
+    <string name="btn_UHFMenu_Write">Zapisywanie</string>
+    <string name="btn_UHFMenu_Lock">Blokowanie</string>
+    <string name="btn_UHFMenu_Configration">Konfiguracja</string>
+    <string name="btn_UHFMenu_Back">Cofnij</string>
+
+    <!-- UHF Read -->
+    <string name="app_name">PDA Example</string>
+    <string name="List_TagID">EPC</string>
+    <string name="List_ReadCount">Ilosc</string>
+    <string name="Tag_Time">Czas:0 S </string>
+    <string name="Tag_Count">Lacznie:0</string>
+    <string name="Tag_ReadTotalCount">Szybkosc:0 T/S</string>
+    <string name="btn_read">Start</string>
+    <string name="btn_read_stop">Stop</string>
+    <string name="Clear_Tags">Wyczysc</string>
+    <string name="btn_Back">Cofnij</string>
+    <string name="tv_Read_Title">Czysc EPC</string>
+    <string name="uhf_please_stop">Prosze zatrzymac!</string>
+    <string name="uhf_low_power_info">Niska bateria, prosze naladowac!</string>
+    <string name="uhf_low_power_consumption">Niski pobor mocy, czy uzyc glownego zrodla zasilania?</string>
+    <string name="uhf_read_power_over">moc jest w użyciu i nie więcej niż główne zasilanie 25dBm!</string>
+    <string name="uhf_data_error">Blad danych!</string>
+    <string name="uhf_data_len_error">Haslo dostepu musi miec 8 znakow!</string>
+    <string name="uhf_6b_not_support_match_mode">Tag 6B nie obsluguje parowania!</string>
+    <!-- UHF Write -->
+    <string name="tv_Write_Title">Zapisz EPC</string>
+    <string name="tv_Write_MatchTitle">Parametr parowania:</string>
+    <string name="tv_Write_MatchTID">TID:</string>
+    <string name="tv_Write_AccessPassword">Haslo dostepu:</string>
+    <string name="tv_Write_WriteTitle">Zapisz dane:</string>
+    <string name="tv_Write_WriteData">Dane:</string>
+    <string name="tv_Write_WriteType">Typ:</string>
+    <string name="btn_Write_ReadMatch">Czytaj sparowany tag</string>
+    <string name="btn_Write_WriteData">Zapisz tag</string>
+    <!-- UHF Lock -->
+    <string name="tv_Lock_Title">Zablokuj EPC</string>
+    <string name="tv_Lock_MatchTitle">Parametr parowania:</string>
+    <string name="tv_Lock_MatchTID">TID:</string>
+    <string name="tv_Lock_AccessPassword">Haslo dostepu:</string>
+    <string name="tv_Lock_LockTitle">Zapisz dane:</string>
+    <string name="tv_Lock_LockArea">Zablokuj pole:</string>
+    <string name="tv_Lock_LockType">Zablokuj typ:</string>
+    <string name="btn_Lock_ReadMatch">Czytaj sparowany tag</string>
+    <string name="btn_Lock_LockData">Zablokuj tag</string>
+
+    <!-- Configration -->
+    <string name="tv_Configration_BaseSpeed">Podstawowa predkosc:</string>
+    <string name="tv_Configration_QValue">Wartosc Q:</string>
+    <string name="tv_Configration_Frequency">Czestotliwosc:</string>
+    <string name="tv_Configration_Power">Moc:</string>
+    <string name="tv_Configration_Ant">Antena:</string>
+    <string name="tv_Configration_TagType">Typ tagu:</string>
+    <string name="btn_Get">Pobierz</string>
+    <string name="btn_Set">Ustaw</string> 
+    <string name="btn_ReadTime">Czas czytania(ms):</string>
+    <string name="btn_StopTime">Czas zatrzymania(ms): </string>
+    <string name="btn_Restore">Przywroc</string>
+    <string name="btn_CARRIER">Nosnik</string>
+    <string name="btn_UpdateBase">Aktualizuj baze</string>
+    
+
+    <!-- UHF Read_matching -->
+    <string name="uhf_please_input_match_value">Prosze wstawic wartosc do parowania</string>
+    <string name="List_TagID_matching">EPC</string>
+    <string name="List_ReadCount_matching">Ilosc</string>
+    <string name="Tag_Time_matching">Czas:0 S </string>
+    <string name="Tag_Count_matching">Lacznie:0</string>
+    <string name="Tag_ReadTotalCount_matching">Predkosc:0 T/S</string>
+    <string name="btn_read_matching">Start</string>
+    <string name="btn_read_1_matching">Stop</string>
+    <string name="Clear_Tags_matching">Czysc</string>
+    <string name="btn_Back_matching">Cofnij</string>
+    <string name="tv_Read_Title_matching">Czytaj parowanie</string>
+
+    <!-- HF -->
+    <string name="tv_HF_Title">Demo HF</string>
+    <string name="btn_HFMenu_ISO15693">ISO15693</string>
+    <string name="btn_HFMenu_ISO14443A">ISO14443A</string>
+    <string name="btn_HFMenu_Mifare">Mifare</string>
+    <string name="btn_HFMenu_Version">Version</string>
+    <string name="btn_HFMenu_Back">Cofnij</string>
+    <string name="btn_Read_UID">Skanuj tag</string>
+    <string name="LabelBlockNoText">Blok:</string>
+    <string name="txtBlockNoDefult">1</string>
+    <string name="LabelKeyText">Klucz:</string>
+    <string name="txtKeyDefault">FFFFFFFFFFFF</string>
+    <string name="LabelDataAreaText">Pole danych:</string>
+    <string name="ButtonReadText">Czytaj</string>
+    <string name="ButtonWriteText">Zapisz</string>
+    <string name="please_input_valid_key">Prosze wprowadzic poprawny klucz!</string>
+    <string name="please_input_valid_data">Prosze wprowadzic poprawne dane!</string>
+    <string name="PowerFaild">Blad wlaczenia! Upewnij sie ze modul jest podlaczony i ma zasilanie!</string>
+    <string name="waiting">Czekam&#8230;</string>
+    <string name="read_waiting">Odczyt, prosze czekac.&#8230;</string>
+    <string name="read_faild">Blad!</string>
+    <string name="read_success">Sukces!</string>
+    <string name="write_waiting">Zapis, prosze czekac.&#8230;</string>
+    <string name="write_faild">Blad!</string>
+    <string name="write_success">Sukces!</string>
+
+    <!-- TestPowerUpDown -->
+    <string name="TestPower_Start">Start</string>
+    <string name="TestPower_Stop">Stop</string>
+    <string name="com_recv">Odbierz dane:</string>
+    <string name="com_send">Wyslij dane:</string>
+    <string name="str_btn_com_open">Otworz</string>
+    <string name="str_btn_com_close">Zamknij</string>
+    <string name="str_btn_com_send">Wyslij</string>
+    <string name="str_btn_com_work">Work</string>
+    <string name="str_btn_com_stop">Stop</string>
+    <string name="text_com_port">Port:</string>
+    <string name="text_com_speed">Predkosc:</string>
+    <string name="text_com_parity">Parytet:</string>
+    <string name="text_com_mode">Mode:</string>
+    <string name="STR_METER_READ">Odczyt licznika</string>
+    <string name="STR_METER_SETTING">Ustawienia licznika</string>
+    <string name="STR_FREE_SEND">Wyslij</string>
+    <string name="MeterAddress">Adres:&#160;</string>
+    <string name="GetAddrByF1">Wcisnij "F1" by otrzymac adres</string>
+    <string name="MeterPort">Port:&#160;</string>
+    <string name="MeterSpeed">Predkosc:&#160;</string>
+    <string name="MeterProtocol">Protokol:&#160;</string>
+    <string name="MeterPasswd">Haslo:&#160;</string>
+    <string name="MeterOpcode">Kod:&#160;</string>
+    <string name="MeterItem">Przedmiot:&#160;</string>
+    <string name="MeterValue">Watosc:&#160;</string>
+    <string name="MeterPortIRDA">IRDA</string>
+    <string name="MeterPortRS485">RS485</string>
+    <string name="MeterSpeed1200">1200</string>
+    <string name="MeterSpeed2400">2400</string>
+    <string name="MeterSpeed4800">4800</string>
+    <string name="MeterProtocol97">DLT645_1997</string>
+    <string name="MeterProtocol07">DLT645_2007</string>
+    <string name="MeterReadItemPower">Moc</string>
+    <string name="MeterReadItemVolt">Napiecie</string>
+    <string name="MeterReadItemVoltA">Napiecie(A)</string>
+    <string name="MeterReadItemVoltB">Napiecie(B)</string>
+    <string name="MeterReadItemVoltC">Napiecie(C)</string>
+    <string name="MeterReadItemAmp">Prad</string>
+    <string name="MeterReadItemAmpA">Prad(A)</string>
+    <string name="MeterReadItemAmpB">Prad(B)</string>
+    <string name="MeterReadItemAmpC">Prad(C)</string>
+    <string name="MeterReadItemLastDay">Moc dzienna</string>
+    <string name="MeterReadItemLastMonth">Moc miesieczna</string>
+    <string name="MeterReadItemProgNum">Licznik programu</string>
+    <string name="MeterReadItemLastProgRec">Ostatni zapis programu</string>
+    <string name="MeterSettingItemDate">Data</string>
+    <string name="MeterSettingItemTime">Licznik</string>
+    <string name="MeterSettingItemMeterNo">Numer licznika</string>
+    <string name="MeterSettingItemAddress">Adres licznika</string>
+    <string name="MeterSettingItemIRSpeed">IRDA Baudrate</string>
+    <string name="ReadMeter">Czytaj</string>
+    <string name="SettingMeter">Ustaw</string>
+    <string name="DefaultMeterAddr">AAAAAAAAAAAA</string>
+    <string name="DefaultMeterOpcode">00000000</string>
+    <string name="DefaultMeterPasswd">00000000</string>
+    <string name="Back">Cofnij</string>
+    <string name="Exit">Wyjdz</string>
+    <string name="read_result">Wynik:</string>
+    <string name="setting_waiting">Ustawianie, prosze czekac&#8230;</string>
+    <string name="setting_faild">Bledne ustawienie, prosze sprobowac ponownie!</string>
+    <string name="setting_success">Poprawne ustawienie!</string>
+    <string name="setting_result">Wynik ustawienie</string>
+    <string name="please_input_valid_addr">Prosze wprowadzic poprawny adres!</string>
+    <string name="please_input_valid_passwd">Prosze wprowadzic poprawne haslo!</string>
+    <string name="please_input_valid_opcode">Prosze wprowadzic poprawny kod!</string>
+    <string name="please_input_valid_value">Prosze wprowadzic poprawne dane!</string>
+    <string name="please_select_valid_item">Prosze wybrac poprawny obiekt!</string>
+    <string name="SendData">Wyslij dane:</string>
+    
+    <string name="uhf_default_access_pwd">00000000</string>
+    <string name="scanner_trigger">Spust</string>
+    <string name="scanner_open_power_faild">Blad zalaczenia!</string>
+    
+    <!-- PSAM -->
+    <string name="psam_low_power_info">Niska bateria, prosze naladowac!</string>
+    <string name="text_psam_index">Index</string>
+    <string name="psam_atr">ATR:</string>
+    <string name="psam_poweron">Wlacz</string>
+    <string name="psam_apdu">APDU:</string>
+    <string name="psam_rpdu">RPDU:</string>
+    <string name="psam_send">Wyslij</string>
+    <string name="psam_please_check_card">Prosze sprawdzic wsadzona karte!</string>
+
+    <!-- hf -->
+    <string name="hf_iso15693_title">ISO15693</string>
+    <string name="hf_iso14443A_title">ISO14443A</string>
+    <string name="hf_mifare_title">Mifare</string>
+    
+    <string name="hf_low_power_info">Niska bateria, prosze naladowac!</string>
+    <string name="hf_read_uid_title">Czytaj UID:</string>
+    <string name="hf_read_uid">Czytaj UID</string>
+    <string name="hf_uid">UID</string>
+    <string name="hf_block">Blok:</string>
+    <string name="hf_read">Czytaj</string>
+    <string name="hf_write">Zapisz</string>
+    <string name="hf_suspend">Zatrzymaj</string>
+    <string name="hf_reset">Resetuj</string>
+    <string name="hf_req_mode">Tryb pytania:</string>
+    <string name="hf_read_faild">Blad odczytu</string>
+   
+    
+    <string name="hf_iso15693_rwl_title">czytaj/zapisz/zablokuj:</string>
+    <string name="hf_iso15693_get_tag_info">Pobierz informacje o tagu</string>
+    <string name="hf_iso15693_AFI">AFI:</string>
+    <string name="hf_iso15693_read_AFI">Czytaj AFI</string>
+    <string name="hf_iso15693_write_AFI">Zapisz AFI</string>
+    <string name="hf_iso15693_lock_AFI">Zablokuj AFI</string>
+    <string name="hf_iso15693_DSFID">SDFID:</string>
+    <string name="hf_iso15693_read_DSFID">Czytaj DSFID</string>
+    <string name="hf_iso15693_write_DSFID">Zapisz DSFID</string>
+    <string name="hf_iso15693_lock_DSFID">Zablokuj DSFID</string>
+    
+    <string name="hf_iso14443A_op_title">Operacja ISO14443A-4:</string>
+    <string name="hf_iso14443A_tag_id">Numer tagu:</string>
+    <string name="hf_iso14443A_ack">Ack:</string>
+    <string name="hf_iso14443A_RATS_commond">RATS Commond</string>
+    <string name="hf_iso14443A_APDU">APDU:</string>
+    <string name="hf_iso14443A_send_APDU">APDU</string>
+    <string name="hf_iso14443A_deselect">Odznacz</string>
+    
+    <string name="hf_mifare_rwl_title">czytaj/zapisz/zablokuj:</string>
+    <string name="hf_mifare_positon">Pozycja:</string>
+    <string name="hf_mifare_auth_type">Autoryzacja:</string>
+    <string name="hf_mifare_key_type">Klucz:</string>
+    <string name="hf_mifare_block_op">Blok:</string>
+    <string name="hf_mifare_trasmit_block">Wyslij blok:</string>
+    <string name="hf_mifare_key">Klucz:</string>
+    <string name="hf_mifare_value">Wartosc:</string>
+    <string name="hf_mifare_do_block_op">Blok</string>
+    <string name="hf_mifare_value_empty">Zapisywane dane nie mogą być puste!</string>
+</resources>

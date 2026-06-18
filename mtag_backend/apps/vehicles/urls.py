@@ -1,5 +1,9 @@
 from django.urls import path
-from .views import VehicleListCreateView, VehicleDetailView, VehicleByPlateView, TagReissueView, AvailableTagsView, TagInventoryUploadView, TagCreateView, VehicleSuspendView
+from .views import (
+    VehicleListCreateView, VehicleDetailView, VehicleByPlateView, TagReissueView,
+    AvailableTagsView, TagInventoryUploadView, TagCreateView, TagBulkCreateView,
+    TagExistsCheckView, TagScanBufferView, ScanDebugView, VehicleSuspendView,
+)
 
 urlpatterns = [
     path('', VehicleListCreateView.as_view(), name='vehicle-list'),
@@ -7,6 +11,10 @@ urlpatterns = [
     path('<uuid:pk>/suspend/', VehicleSuspendView.as_view(), name='vehicle-suspend'),
     path('plate/<str:plate_number>/', VehicleByPlateView.as_view(), name='vehicle-by-plate'),
     path('tags/', TagCreateView.as_view(), name='tag-create'),
+    path('tags/bulk/', TagBulkCreateView.as_view(), name='tag-bulk-create'),
+    path('tags/check/', TagExistsCheckView.as_view(), name='tag-exists-check'),
+    path('tags/scan/', TagScanBufferView.as_view(), name='tag-scan-buffer'),
+    path('tags/scan-debug/', ScanDebugView.as_view(), name='tag-scan-debug'),
     path('tags/available/', AvailableTagsView.as_view(), name='available-tags'),
     path('tags/upload/', TagInventoryUploadView.as_view(), name='tag-upload'),
     path('tags/<uuid:vehicle_id>/reissue/', TagReissueView.as_view(), name='tag-reissue'),

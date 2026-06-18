@@ -2,8 +2,10 @@ import csv
 import io
 import logging
 from datetime import date
+from django.db import IntegrityError
+from django.utils import timezone
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser
 from utils.response import success_response, error_response
 from .models import Vehicle, Tag, TagStatus
@@ -153,6 +155,163 @@ class TagCreateView(APIView):
             message="Tag added to inventory",
             status_code=201,
         )
+
+
+class TagBulkCreateView(APIView):
+    """Bulk-insert inventory tags directly to the DB.
+
+    Each tag: tid (required, unique) + epc (optional), status = DEACTIVATED,
+    not assigned to any vehicle. tag_serial is auto-generated as
+    DDMMYYHHMM + 4-digit sequence (per-minute), unique.
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        rows = request.data.get('tags', [])
+        if not isinstance(rows, list) or not rows:
+            return error_response("'tags' must be a non-empty list of {tid, epc}")
+
+        prefix = timezone.localtime().strftime('%d%m%y%H%M')
+        # Continue the sequence after the highest existing serial for this minute.
+        last = (
+            Tag.objects.filter(tag_serial__startswith=prefix)
+            .order_by('-tag_serial').values_list('tag_serial', flat=True).first()
+        )
+        seq = 1
+        if last:
+            try:
+                seq = int(last[len(prefix):]) + 1
+            except (ValueError, TypeError):
+                seq = Tag.objects.filter(tag_serial__startswith=prefix).count() + 1
+
+        added, skipped, errors, results = [], [], [], []
+        seen = set()
+
+        for i, row in enumerate(rows, start=1):
+            if not isinstance(row, dict):
+                errors.append({'row': i, 'error': 'invalid row'})
+                continue
+            tid = (row.get('tid') or '').strip().replace(' ', '').upper()
+            epc = (row.get('epc') or '').strip()
+            if not tid:
+                errors.append({'row': i, 'error': 'tid is required'})
+                continue
+            if tid in seen or Tag.objects.filter(tid=tid).exists():
+                skipped.append(tid)
+                continue
+            seen.add(tid)
+
+            # Find a free serial for this minute.
+            serial = f"{prefix}{seq:04d}"
+            seq += 1
+            while Tag.objects.filter(tag_serial=serial).exists():
+                serial = f"{prefix}{seq:04d}"
+                seq += 1
+
+            try:
+                Tag.objects.create(
+                    tag_serial=serial,
+                    tid=tid,
+                    epc=epc,
+                    vehicle=None,
+                    expiry_date=date(2099, 12, 31),
+                    status=TagStatus.DEACTIVATED,
+                )
+                added.append(tid)
+                results.append({'tid': tid, 'tag_serial': serial, 'epc': epc, 'status': 'deactivated'})
+            except IntegrityError:
+                skipped.append(tid)
+
+        logger.info("Bulk tag insert: %d added, %d skipped, %d errors", len(added), len(skipped), len(errors))
+        return success_response(
+            data={'added': len(added), 'skipped': len(skipped), 'errors': errors, 'results': results},
+            message=f"{len(added)} tag(s) added",
+            status_code=201,
+        )
+
+
+class ScanDebugView(APIView):
+    """TEMPORARY: logs whatever the device/AppCenter app sends, so we can learn
+    its exact payload format + headers. Point the device's upload URL here, scan
+    one tag, then check the server console. Remove after the format is known."""
+    permission_classes = [AllowAny]
+
+    def _log(self, request):
+        try:
+            raw = request.body.decode('utf-8', errors='replace')
+        except Exception:
+            raw = '<unreadable>'
+        hdrs = {k[5:]: v for k, v in request.META.items() if k.startswith('HTTP_')}
+        logger.warning(
+            "[scan-debug] %s %s\n  content-type: %s\n  query: %s\n  headers: %s\n  body: %s",
+            request.method, request.get_full_path(),
+            request.content_type, dict(request.query_params), hdrs, raw,
+        )
+
+    def post(self, request):
+        self._log(request)
+        return success_response(data={'received': True}, message="logged")
+
+    def get(self, request):
+        self._log(request)
+        return success_response(data={'received': True}, message="logged")
+
+
+class TagExistsCheckView(APIView):
+    """Given a list of TIDs, return which ones already exist in the DB.
+    Used by the scanner app to validate before bulk-insert."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        tids = request.data.get('tids', [])
+        if not isinstance(tids, list):
+            return error_response("'tids' must be a list")
+        norm = [(t or '').strip().replace(' ', '').upper() for t in tids]
+        norm = [t for t in norm if t]
+        existing = list(
+            Tag.objects.filter(tid__in=norm).values_list('tid', flat=True)
+        )
+        return success_response(data={'existing': existing})
+
+
+class TagScanBufferView(APIView):
+    """Transient scan buffer for handheld scanning sessions (per admin user).
+
+    POST   {tid, epc}  → add a detected tag to the buffer (dedup by tid)
+    GET                → current buffer { count, tags:[{tid, epc, scanned_at}] }
+    DELETE             → clear the buffer
+
+    The WiFi RFID device posts each scan to POST; the web app polls GET to show
+    a live list + count, then bulk-inserts. (Device-side auth for POST is handled
+    separately once the device is known — for now it uses the same admin auth.)
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from .models import ScanBuffer
+        tid = (request.data.get('tid') or '').strip().replace(' ', '').upper()
+        epc = (request.data.get('epc') or '').strip()
+        if not tid:
+            return error_response("tid is required")
+        ScanBuffer.objects.update_or_create(
+            user=request.user, tid=tid, defaults={'epc': epc}
+        )
+        count = ScanBuffer.objects.filter(user=request.user).count()
+        return success_response(data={'tid': tid, 'count': count}, message="scanned")
+
+    def get(self, request):
+        from .models import ScanBuffer
+        qs = ScanBuffer.objects.filter(user=request.user)
+        tags = [
+            {'tid': s.tid, 'epc': s.epc, 'scanned_at': s.scanned_at.isoformat()}
+            for s in qs
+        ]
+        return success_response(data={'count': len(tags), 'tags': tags})
+
+    def delete(self, request):
+        from .models import ScanBuffer
+        deleted, _ = ScanBuffer.objects.filter(user=request.user).delete()
+        return success_response(data={'cleared': deleted}, message="buffer cleared")
 
 
 class VehicleSuspendView(APIView):

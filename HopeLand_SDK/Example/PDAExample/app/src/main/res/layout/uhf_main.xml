@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+	<LinearLayout
+		android:layout_width="fill_parent"
+		android:layout_height="wrap_content"
+		android:layout_margin="10dp"
+		android:gravity="center"
+		android:orientation="vertical">
+
+
+		<Button
+			android:id="@+id/btn_Main_Read"
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+			android:background="@drawable/button_blue"
+			android:onClick="OpenReadActivity"
+			android:text="@string/btn_UHFMenu_Read"
+			android:textSize="22sp"/>
+		<Button
+			android:id="@+id/btn_Main_Read_Matching"
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+			android:background="@drawable/button_blue"
+			android:onClick="OpenReadMatchingActivity"
+			android:text="@string/btn_UHFMenu_Read_Matching"
+			android:textSize="22sp"/>
+		<Button
+			android:id="@+id/btn_Main_Write"
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+			android:background="@drawable/button_blue"
+
+			android:onClick="OpenWriteActivity"
+			android:text="@string/btn_UHFMenu_Write"
+			android:textSize="22sp"/>
+
+		<Button
+			android:id="@+id/btn_Main_Config"
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+			android:background="@drawable/button_blue"
+
+			android:onClick="OpenConfigActivity"
+			android:text="@string/btn_UHFMenu_Configration"
+			android:textSize="22sp"/>
+
+		<Button
+			android:id="@+id/btn_Item_Main_Version"
+			android:layout_width="fill_parent"
+			android:layout_height="wrap_content"
+			android:layout_margin="5dp"
+			android:background="@drawable/button_orange"
+
+			android:onClick="GetVersion"
+			android:text="@string/btn_MainMenu_Version"
+			android:textSize="22sp"/>
+
+		<!-- android:text="Back_Home" @string/btn_Back -->
+	</LinearLayout>
+</ScrollView>

@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+			  android:layout_width="match_parent"
+			  android:layout_height="match_parent"
+			  android:orientation="vertical">
+
+	<!-- Mifare标题 -->
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		android:layout_margin="6dp"
+		android:id="@+id/view_split_main">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:id="@+id/view_split_left">
+
+			<TextView
+				android:layout_width="fill_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/hf_mifare_rwl_title"
+				android:textSize="14sp"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:layout_margin="2dp">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.2"
+					android:gravity="right"
+					android:text="@string/hf_mifare_positon"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_Type"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:entries="@array/Array_mifareType"
+					/>
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.2"
+					android:gravity="right"
+					android:text="@string/hf_block"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_Block"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:entries="@array/Array_Block"
+					/>
+
+
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:layout_margin="2dp">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.2"
+					android:gravity="right"
+					android:text="@string/hf_mifare_auth_type"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_CompareType"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:entries="@array/Array_CompareType"
+					/>
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.2"
+					android:gravity="right"
+					android:text="@string/hf_mifare_key_type"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_KeyType"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:entries="@array/Array_KeyType"
+					/>
+
+			</LinearLayout>
+
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:layout_margin="2dp">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.2"
+					android:gravity="right"
+					android:text="@string/hf_mifare_block_op"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_Mode"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.2"
+					android:entries="@array/Array_Mode"
+					/>
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.3"
+					android:gravity="right"
+					android:text="@string/hf_mifare_trasmit_block"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_TransBlock"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.3"
+					android:entries="@array/Array_Block"
+					/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:layout_margin="2dp">
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:focusable="true"
+					android:focusableInTouchMode="true"
+					android:text="@string/hf_mifare_key"/>
+
+				<EditText
+					android:id="@+id/tb_mifare_key"
+					android:layout_width="fill_parent"
+					android:layout_height="wrap_content"
+					android:background="@drawable/view_rectangle_morelist_gray"
+					android:gravity="left|top"
+					android:hint="FFFFFFFFFFFF"
+					android:inputType="textMultiLine"
+					android:maxLines="1"
+					android:minLines="1"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:layout_margin="2dp">
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:focusable="true"
+					android:focusableInTouchMode="true"
+					android:text="@string/hf_mifare_value"/>
+
+				<EditText
+					android:id="@+id/tb_mifare_Data"
+					android:layout_width="fill_parent"
+					android:layout_height="wrap_content"
+
+					android:background="@drawable/view_rectangle_morelist_gray"
+					android:gravity="left|top"
+					android:inputType="textMultiLine"
+					android:maxLines="2"
+					android:minLines="2"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="fill_parent"
+				android:layout_height="1px"
+				android:layout_margin="2dp"
+				android:background="?android:attr/listDivider"/>
+		</LinearLayout>
+
+		<LinearLayout
+			android:id="@+id/view_split_right"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical">
+
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/hf_read_uid_title"
+				android:textSize="14sp"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="2dp"
+					android:layout_weight="0.4"
+					android:text="@string/hf_req_mode"/>
+
+				<Spinner
+					android:id="@+id/sp_mifare_Model"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="0.4"
+					android:entries="@array/Array_iso14443a_Model"
+					/>
+
+				<View
+					android:layout_width="0dp"
+					android:layout_height="match_parent"
+					android:layout_weight="0.4"/>
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="@string/hf_uid"/>
+
+				<EditText
+					android:id="@+id/tb_mifare_Uid"
+					android:layout_width="fill_parent"
+					android:layout_height="wrap_content"
+					android:background="@drawable/view_rectangle_morelist_gray"
+					android:focusable="true"
+					android:focusableInTouchMode="true"
+					android:inputType="text"/>
+
+			</LinearLayout>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="45dp"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<Button
+					android:id="@+id/btn_mifare_UID"
+					android:layout_height="wrap_content"
+					android:layout_width="match_parent"
+					android:layout_margin="5dp"
+					android:background="@drawable/button_orange"
+					android:onClick="ReadmifareUID"
+					android:text="@string/hf_read_uid">
+					<requestFocus/>
+				</Button>
+			</LinearLayout>
+
+			<View
+				android:layout_width="fill_parent"
+				android:layout_height="1px"
+				android:layout_margin="1dp"
+				android:background="?android:attr/listDivider"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="45dp"
+				android:layout_margin="2dp"
+				android:orientation="horizontal">
+
+				<Button
+					android:id="@+id/btn_mifare_read"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_margin="5dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_blue"
+					android:onClick="mifareRead"
+					android:text="@string/hf_read"/>
+
+				<Button
+					android:id="@+id/btn_mifare_write"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_margin="5dp"
+					android:layout_weight="0.3"
+					android:background="@drawable/button_blue"
+					android:onClick="mifareWrite"
+					android:text="@string/hf_write"/>
+
+				<Button
+					android:id="@+id/btn_mifare_BlockValue"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_margin="5dp"
+					android:layout_weight="0.4"
+					android:background="@drawable/button_orange"
+					android:onClick="mifareBlockValue"
+					android:text="@string/hf_mifare_do_block_op"/>
+			</LinearLayout>
+		</LinearLayout>
+	</LinearLayout>
+
+</LinearLayout>

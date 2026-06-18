@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright (c) 2016.  www.clouiotech.com
+  -->
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+			  android:layout_width="match_parent"
+			  android:layout_height="match_parent"
+			  android:orientation="vertical">
+
+	<FrameLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		>
+
+		<LinearLayout
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center"
+			android:orientation="vertical">
+
+			<TextView
+				android:id="@+id/actionBarTitle"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_gravity="center"
+				android:layout_weight="1"
+				android:gravity="center"
+				android:text="Title"
+				android:textSize="22dp"/>
+
+			<TextView
+				android:id="@+id/actionBarSubTitle"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_gravity="center"
+				android:layout_weight="1"
+				android:gravity="center"
+				android:text="SubTitle"
+				android:textSize="16dp"/>
+		</LinearLayout>
+
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:weightSum="1">
+
+			<Button
+				android:id="@+id/actionBarLeft"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_gravity="center"
+				android:layout_marginBottom="6dp"
+				android:layout_marginLeft="6dp"
+				android:layout_marginRight="2dp"
+				android:layout_marginTop="6dp"
+				android:background="#00000000"
+				android:gravity="center"
+				android:text="Left"
+				android:textSize="18dp"/>
+
+			<View
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_gravity="center"
+				android:layout_weight="1"
+				android:gravity="center"
+				android:textSize="20dp"/>
+
+			<Button
+				android:id="@+id/actionBarRight"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_gravity="center|right"
+				android:layout_marginBottom="6dp"
+				android:layout_marginLeft="2dp"
+				android:layout_marginRight="6dp"
+				android:layout_marginTop="6dp"
+				android:background="#00000000"
+				android:gravity="center"
+				android:text="Right"
+				android:textSize="18dp"/>
+		</LinearLayout>
+	</FrameLayout>
+
+</LinearLayout>
