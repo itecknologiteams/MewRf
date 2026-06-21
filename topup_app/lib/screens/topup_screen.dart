@@ -176,6 +176,12 @@ class _TopupScreenState extends State<TopupScreen> {
   void dispose() {
     _sub?.cancel();
     RfidService.instance.disconnect();
+    _tidCtl.dispose();
+    _nameCtl.dispose();
+    _cnicCtl.dispose();
+    _phoneCtl.dispose();
+    _plateCtl.dispose();
+    _amountCtl.dispose();
     super.dispose();
   }
 

@@ -42,6 +42,12 @@ class _ScanScreenState extends State<ScanScreen> {
 
   void _addTag(TagRead tag) {
     if (tag.tid.isEmpty) return;
+    // Repeat read of an already-listed tag → refresh value silently (no rebuild).
+    // Only a genuinely NEW tag triggers setState → no per-read rebuild storm.
+    if (_tags.containsKey(tag.tid)) {
+      _tags[tag.tid] = tag;
+      return;
+    }
     setState(() => _tags[tag.tid] = tag);
   }
 
@@ -127,6 +133,8 @@ class _ScanScreenState extends State<ScanScreen> {
   void dispose() {
     _sub?.cancel();
     RfidService.instance.disconnect();
+    _tidCtl.dispose();
+    _epcCtl.dispose();
     super.dispose();
   }
 
@@ -277,7 +285,8 @@ class _ScanScreenState extends State<ScanScreen> {
       itemBuilder: (_, i) {
         final t = tags[i];
         final isDup = _dupTids.contains(t.tid);
-        return Dismissible(
+        return RepaintBoundary(
+          child: Dismissible(
           key: ValueKey(t.tid),
           direction: DismissDirection.endToStart,
           onDismissed: (_) => _remove(t.tid),
@@ -336,6 +345,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 ),
               ],
             ),
+          ),
           ),
         );
       },

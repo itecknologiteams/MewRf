@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>QTag — JazzCash Topup API (v1)</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    color: #000000;
+    font-size: 11.5pt;
+    line-height: 1.5;
+    margin: 0;
+  }
+  h1 { font-size: 24pt; margin: 0 0 2pt; letter-spacing: -0.3pt; }
+  h2 {
+    font-size: 15pt; margin: 22pt 0 8pt; padding-bottom: 4pt;
+    border-bottom: 1.5pt solid #000;
+  }
+  h3 { font-size: 12.5pt; margin: 14pt 0 6pt; }
+  p { margin: 6pt 0; }
+  ul, ol { margin: 6pt 0; padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10pt; background: #f2f2f2; padding: 1pt 3pt; border-radius: 2pt;
+  }
+  pre {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9.5pt; background: #f6f6f6; border: 0.5pt solid #d9d9d9;
+    border-radius: 3pt; padding: 8pt 10pt; white-space: pre-wrap;
+    word-break: break-word; line-height: 1.4; margin: 6pt 0;
+  }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8pt 0; font-size: 10pt; }
+  th, td { border: 0.5pt solid #bfbfbf; padding: 5pt 7pt; text-align: left; vertical-align: top; }
+  th { background: #ededed; font-weight: 700; }
+  tr { page-break-inside: avoid; }
+  h2, h3 { page-break-after: avoid; }
+  pre, table { page-break-inside: avoid; }
+  .cover { border-bottom: 2.5pt solid #000; padding-bottom: 12pt; margin-bottom: 14pt; }
+  .meta { font-size: 10pt; color: #000; margin-top: 6pt; }
+  .meta b { font-weight: 700; }
+  .lead { font-size: 11.5pt; margin-top: 10pt; }
+  .note { border-left: 3pt solid #000; padding: 4pt 0 4pt 10pt; margin: 8pt 0; }
+  .small { font-size: 9.5pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>QTag — JazzCash Topup API</h1>
+  <div class="meta">
+    <b>Version:</b> v1 (draft for integration review)&nbsp;&nbsp;·&nbsp;&nbsp;
+    <b>Date:</b> 2026-06-19<br>
+    <b>Audience:</b> JazzCash integration team&nbsp;&nbsp;·&nbsp;&nbsp;
+    <b>Owner:</b> iTecknologi / Malir Expressway (QTag)
+  </div>
+</div>
+
+<p class="lead">This document describes the two HTTP endpoints QTag exposes for the JazzCash
+tag-topup flow:</p>
+<ol>
+  <li><b>Tag Inquiry</b> — JazzCash looks up a tag (by chip <b>TID</b>) and shows the
+      consumer their details before payment.</li>
+  <li><b>Payment Notification</b> — after the customer pays in the JazzCash app, JazzCash
+      notifies QTag, which credits the tag's balance and records the transaction.</li>
+</ol>
+
+<h2>1. Flow overview</h2>
+<pre>Customer enters TID in JazzCash app
+        |
+        v
+(1) POST /payments/jazzcash/inquiry/      -> QTag returns consumer details
+        |
+   Customer reviews + pays in JazzCash app
+        |
+        v
+(2) POST /payments/jazzcash/payment/      -> QTag credits balance, returns new balance</pre>
+<ul>
+  <li>(1) is <b>read-only</b> (no state change).</li>
+  <li>(2) is the <b>only</b> state-changing call and is <b>idempotent</b> (safe to retry).</li>
+</ul>
+
+<h2>2. Base URL &amp; environment</h2>
+<table>
+  <tr><th>Environment</th><th>Base URL</th></tr>
+  <tr><td>Production</td><td><code>https://&lt;qtag-host&gt;/api/v1</code> <span class="small">(to be provided)</span></td></tr>
+  <tr><td>Test (LAN)</td><td><code>http://&lt;server-ip&gt;:8000/api/v1</code></td></tr>
+</table>
+<p>All endpoint paths below are relative to the base URL.</p>
+<div class="note"><b>Production must use HTTPS.</b> The test environment runs on a LAN over HTTP.</div>
+
+<h2>3. Conventions</h2>
+<ul>
+  <li><b>Method/Body:</b> <code>POST</code> with <code>Content-Type: application/json</code>. UTF-8.</li>
+  <li><b>Response envelope:</b> every response is JSON in this shape:</li>
+</ul>
+<pre>{ "success": true,  "message": "OK",            "data": { ... } }
+{ "success": false, "message": "Tag not found", "errors": { ... } }</pre>
+<ul>
+  <li><code>success</code> (boolean) — overall result. Check this first.</li>
+  <li><code>message</code> (string) — human-readable status / error.</li>
+  <li><code>data</code> (object) — present on success.</li>
+  <li><code>errors</code> (object, optional) — present on validation errors.</li>
+</ul>
+<p><b>HTTP status codes:</b></p>
+<table>
+  <tr><th>Code</th><th>Meaning</th></tr>
+  <tr><td>200</td><td>OK (inquiry found / payment processed / duplicate ignored)</td></tr>
+  <tr><td>400</td><td>Bad request (missing/invalid field, amount &le; 0)</td></tr>
+  <tr><td>401</td><td>Invalid signature (<code>pp_SecureHash</code> check failed)</td></tr>
+  <tr><td>404</td><td>Tag not found / not registered</td></tr>
+  <tr><td>500</td><td>Server error</td></tr>
+</table>
+
+<h2>4. Authentication — pp_SecureHash</h2>
+<p>Each request <b>should</b> include a <code>pp_SecureHash</code> for integrity/authentication.</p>
+<p><b>Algorithm (HMAC-SHA256, uppercase hex):</b></p>
+<ol>
+  <li>Take all request fields <b>except</b> <code>pp_SecureHash</code>.</li>
+  <li>Drop empty values; sort the remaining by key (ascending).</li>
+  <li>Build the string: <code>SALT&amp;key1=value1&amp;key2=value2&amp;…</code></li>
+  <li><code>HMAC_SHA256( key = SALT, message = string )</code> → hex → <b>UPPERCASE</b>.</li>
+</ol>
+<pre>pp_SecureHash = UPPER( HMAC_SHA256( SALT, "SALT&amp;amount=500&amp;jazzcash_txn_id=JC123&amp;tid=E2801105..." ) )</pre>
+<ul>
+  <li><code>SALT</code> = the shared <b>integrity salt</b> exchanged out-of-band.</li>
+  <li>On QTag, enforcement is controlled by a server flag. During initial integration it may be
+      <b>disabled</b> (any request accepted); for production it is <b>enabled</b> and
+      unsigned/invalid requests get <b>401</b>.</li>
+</ul>
+<div class="note"><b>Action item:</b> confirm the exact hashing scheme JazzCash uses for
+<code>pp_SecureHash</code>. If it differs, QTag will align to JazzCash's documented standard
+before go-live.</div>
+
+<h2>5. Endpoint 1 — Tag Inquiry</h2>
+<p>Look up a tag by chip TID and return the consumer's details. Read-only.</p>
+<pre>POST /payments/jazzcash/inquiry/</pre>
+<h3>Request</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>tid</code></td><td>string</td><td>yes</td><td>RFID chip TID (24 hex chars). Normalized server-side (spaces removed, uppercased).</td></tr>
+  <tr><td><code>pp_SecureHash</code></td><td>string</td><td>prod</td><td>Integrity hash (see §4).</td></tr>
+</table>
+<pre>{ "tid": "E28011052000704A8F9F0AE3", "pp_SecureHash": "9F3C…" }</pre>
+<h3>Success — 200</h3>
+<pre>{
+  "success": true,
+  "message": "OK",
+  "data": {
+    "consumer_id": "4f754655-5b4a-4f32-a7d2-0d508533822a",
+    "vehicle_registration": "BP-3641",
+    "customer_name": "Kashif Mughal",
+    "tid": "E28011052000704A8F9F0AE3",
+    "current_balance": "1500.00",
+    "status": "active"
+  }
+}</pre>
+<table>
+  <tr><th>data field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>consumer_id</code></td><td>string (UUID)</td><td>QTag's stable consumer identifier (owner UUID).</td></tr>
+  <tr><td><code>vehicle_registration</code></td><td>string</td><td>Vehicle plate number.</td></tr>
+  <tr><td><code>customer_name</code></td><td>string</td><td>Registered consumer name.</td></tr>
+  <tr><td><code>tid</code></td><td>string</td><td>Echoed (normalized) TID.</td></tr>
+  <tr><td><code>current_balance</code></td><td>string (decimal)</td><td>Current wallet balance, in <b>PKR</b>.</td></tr>
+  <tr><td><code>status</code></td><td>string</td><td><code>active</code>.</td></tr>
+</table>
+<h3>Not found / not registered — 404</h3>
+<pre>{ "success": false, "message": "Tag not found" }</pre>
+<p class="small">Other reasons: <code>Tag not assigned to any vehicle</code>, <code>Tag is &lt;status&gt;</code>, <code>No account found for this vehicle</code>.</p>
+<h3>Invalid signature — 401</h3>
+<pre>{ "success": false, "message": "Invalid signature" }</pre>
+
+<h2>6. Endpoint 2 — Payment Notification</h2>
+<p>Credit the tag's balance after the customer has paid. <b>Idempotent</b> on <code>jazzcash_txn_id</code>.</p>
+<pre>POST /payments/jazzcash/payment/</pre>
+<h3>Request</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>tid</code></td><td>string</td><td>yes</td><td>RFID chip TID.</td></tr>
+  <tr><td><code>amount</code></td><td>string | number</td><td>yes</td><td>Amount to credit, in <b>PKR</b> (e.g. <code>"500.00"</code>). Must be &gt; 0. <span class="small">(unit: see action item)</span></td></tr>
+  <tr><td><code>jazzcash_txn_id</code></td><td>string</td><td>yes</td><td>JazzCash's unique transaction id. Used as the <b>idempotency key</b>. (<code>pp_TxnRefNo</code> also accepted.)</td></tr>
+  <tr><td><code>pp_SecureHash</code></td><td>string</td><td>prod</td><td>Integrity hash (see §4).</td></tr>
+</table>
+<pre>{
+  "tid": "E28011052000704A8F9F0AE3",
+  "amount": "500.00",
+  "jazzcash_txn_id": "JC1234567890",
+  "pp_SecureHash": "A7B1…"
+}</pre>
+<h3>Success — 200</h3>
+<pre>{
+  "success": true,
+  "message": "Balance updated",
+  "data": {
+    "jazzcash_txn_id": "JC1234567890",
+    "new_balance": "2000.00",
+    "topup_id": "36ac6d87-7940-4425-8726-ed849dc9c97b"
+  }
+}</pre>
+<table>
+  <tr><th>data field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>jazzcash_txn_id</code></td><td>string</td><td>Echoed transaction id.</td></tr>
+  <tr><td><code>new_balance</code></td><td>string (decimal)</td><td>Balance after crediting, PKR.</td></tr>
+  <tr><td><code>topup_id</code></td><td>string (UUID)</td><td>QTag's topup record id.</td></tr>
+</table>
+<h3>Duplicate (already processed) — 200</h3>
+<p>A repeated <code>jazzcash_txn_id</code> does <b>not</b> credit again; QTag returns success with
+<code>already_processed: true</code> and the current balance:</p>
+<pre>{
+  "success": true,
+  "message": "Balance updated",
+  "data": {
+    "already_processed": true,
+    "jazzcash_txn_id": "JC1234567890",
+    "new_balance": "2000.00"
+  }
+}</pre>
+<h3>Errors — 400 / 401 / 404</h3>
+<pre>{ "success": false, "message": "Amount must be greater than zero" }</pre>
+<p class="small">Other reasons: <code>tid is required</code>, <code>jazzcash_txn_id is required</code>,
+<code>Invalid amount</code>, <code>Tag not found</code>, <code>Tag not assigned to any vehicle</code>,
+<code>No account found for this vehicle</code>, <code>Invalid signature</code> (401).</p>
+
+<h2>7. Idempotency (important)</h2>
+<ul>
+  <li><code>jazzcash_txn_id</code> is <b>unique</b> in QTag. If JazzCash retries the payment call
+      (timeout, network), QTag detects the duplicate and returns <code>200</code> with
+      <code>already_processed: true</code> — the balance is credited <b>exactly once</b>.</li>
+  <li><b>Recommendation:</b> JazzCash should retry the payment call until it receives a
+      <code>200</code> with <code>success: true</code>. Retries are safe.</li>
+</ul>
+
+<h2>8. Error catalogue</h2>
+<table>
+  <tr><th>message</th><th>HTTP</th><th>Endpoint</th><th>Cause</th></tr>
+  <tr><td><code>Invalid signature</code></td><td>401</td><td>both</td><td><code>pp_SecureHash</code> invalid (when enforced)</td></tr>
+  <tr><td><code>tid is required</code></td><td>400</td><td>both</td><td>Missing <code>tid</code></td></tr>
+  <tr><td><code>Tag not found</code></td><td>404 / 400</td><td>inquiry / payment</td><td>TID not registered</td></tr>
+  <tr><td><code>Tag not assigned to any vehicle</code></td><td>404 / 400</td><td>both</td><td>Tag exists but unassigned</td></tr>
+  <tr><td><code>Tag is &lt;status&gt;</code></td><td>404</td><td>inquiry</td><td>Tag not active</td></tr>
+  <tr><td><code>No account found for this vehicle</code></td><td>404 / 400</td><td>both</td><td>No wallet for the tag</td></tr>
+  <tr><td><code>jazzcash_txn_id is required</code></td><td>400</td><td>payment</td><td>Missing txn id</td></tr>
+  <tr><td><code>Invalid amount</code></td><td>400</td><td>payment</td><td>Non-numeric amount</td></tr>
+  <tr><td><code>Amount must be greater than zero</code></td><td>400</td><td>payment</td><td>amount &le; 0</td></tr>
+</table>
+
+<h2>9. Action items to confirm with JazzCash</h2>
+<ol>
+  <li><b>pp_SecureHash algorithm</b> — confirm JazzCash's exact scheme; QTag will match it. Exchange the shared <code>SALT</code> securely.</li>
+  <li><b>Amount unit</b> — PKR rupees (e.g. <code>500.00</code>) or paisa (<code>50000</code>)? Plus any <b>min/max</b> topup limits.</li>
+  <li><b>Field names</b> — confirm JazzCash's request field names (<code>tid</code>, <code>amount</code>, <code>jazzcash_txn_id</code>) or provide their standard; QTag can map.</li>
+  <li><b>Response codes</b> — does JazzCash expect a specific <code>responseCode</code> (e.g. <code>000</code>) in the body? QTag can add a mapping.</li>
+  <li><b>Source IPs</b> — provide JazzCash server IP range for an <b>allowlist</b>.</li>
+  <li><b>HTTPS</b> — production endpoint will be HTTPS; confirm TLS requirements.</li>
+</ol>
+
+<h2>10. Changelog</h2>
+<table>
+  <tr><th>Version</th><th>Date</th><th>Notes</th></tr>
+  <tr><td>v1 (draft)</td><td>2026-06-19</td><td>Initial inquiry + payment endpoints.</td></tr>
+</table>
+
+</body>
+</html>

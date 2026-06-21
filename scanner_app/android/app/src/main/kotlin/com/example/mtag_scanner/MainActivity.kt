@@ -44,6 +44,10 @@ class MainActivity : FlutterActivity(), IAsynchronousMessage {
                             val r = UHFReader.getUHFInstance().OpenConnect(this)
                             if (r) {
                                 try { UHFReader._Config.Stop() } catch (_: Exception) {}
+                                // Perf: throttle duplicate tag uploads — the same tag
+                                // re-reports at most ~every 500ms (new tags still report
+                                // immediately, so no accuracy loss), cutting callback flood.
+                                try { UHFReader._Config.SetTagUpdateParam(500, 0) } catch (_: Exception) {}
                             }
                             connected = r
                             r
