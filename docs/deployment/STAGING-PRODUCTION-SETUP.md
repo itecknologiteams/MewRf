@@ -186,7 +186,7 @@ pp_SecureHash = UPPER(HMAC_SHA256(...))
 
 ## Contact
 
-**Backend Support:** [your-team-contact]  
-**Infrastructure:** [ops-contact]  
+**Backend Support:** ali.asif@itecknologi.com  
+**Infrastructure:** shaneel@itecknologi.com  
 **Last Updated:** 2026-06-27
 

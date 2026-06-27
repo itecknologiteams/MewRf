@@ -1,0 +1,255 @@
+{
+  "info": {
+    "name": "QTag JazzCash TopUp API - Personal Testing",
+    "description": "Personal development & testing collection for QTag JazzCash integration. Supports local, staging, and production environments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1️⃣ TAG INQUIRY",
+      "item": [
+        {
+          "name": "Inquiry - Existing Tag (Kashif)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E28011052000704A8F9F0AE3\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/inquiry/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "inquiry", ""]
+            },
+            "description": "Look up existing tag: Kashif Mughal, BP-3641, Balance: 1500 PKR"
+          }
+        },
+        {
+          "name": "Inquiry - Another Existing Tag (Ahmed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E2801105200070D4FB330A36\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/inquiry/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "inquiry", ""]
+            },
+            "description": "Look up existing tag: Ahmed Khan, KR-5890, Balance: 3000 PKR"
+          }
+        },
+        {
+          "name": "Inquiry - Tag Not Found (Error Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"INVALID_TID_XXXXXXXX\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/inquiry/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "inquiry", ""]
+            },
+            "description": "Expected: 404 Tag not found"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2️⃣ PAYMENT NOTIFICATION",
+      "item": [
+        {
+          "name": "Payment - First Time (500 PKR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E28011052000704A8F9F0AE3\",\n  \"amount\": \"500.00\",\n  \"jazzcash_txn_id\": \"JC001\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/payment/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "payment", ""]
+            },
+            "description": "First payment: 500 PKR added. Expected new balance: 2000 PKR"
+          }
+        },
+        {
+          "name": "Payment - Duplicate (Idempotency Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E28011052000704A8F9F0AE3\",\n  \"amount\": \"500.00\",\n  \"jazzcash_txn_id\": \"JC001\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/payment/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "payment", ""]
+            },
+            "description": "SAME jazzcash_txn_id (JC001) as above. Expected: 200 with already_processed=true. Balance should NOT double-credit."
+          }
+        },
+        {
+          "name": "Payment - Different Amount (1000 PKR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E2801105200070D4FB330A36\",\n  \"amount\": \"1000.00\",\n  \"jazzcash_txn_id\": \"JC002\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/payment/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "payment", ""]
+            },
+            "description": "Different tag & txn_id: Ahmed Khan. 1000 PKR topup. Expected new balance: 4000 PKR"
+          }
+        },
+        {
+          "name": "Payment - Invalid Amount (Error Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E28011052000704A8F9F0AE3\",\n  \"amount\": \"-500\",\n  \"jazzcash_txn_id\": \"JC999\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/payment/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "payment", ""]
+            },
+            "description": "Negative amount. Expected: 400 Amount must be greater than zero"
+          }
+        },
+        {
+          "name": "Payment - Zero Amount (Error Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tid\": \"E28011052000704A8F9F0AE3\",\n  \"amount\": \"0.00\",\n  \"jazzcash_txn_id\": \"JC998\",\n  \"pp_SecureHash\": \"{{pp_SecureHash}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/jazzcash/payment/",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "jazzcash", "payment", ""]
+            },
+            "description": "Zero amount. Expected: 400 Amount must be greater than zero"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔧 HELPER - Generate pp_SecureHash",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"salt\": \"{{jazzcash_salt}}\",\n  \"tid\": \"E28011052000704A8F9F0AE3\",\n  \"amount\": \"500.00\",\n  \"jazzcash_txn_id\": \"JC001\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/debug/compute-hash/",
+          "protocol": "http",
+          "host": ["{{base_url}}"],
+          "path": ["debug", "compute-hash", ""]
+        },
+        "description": "Helper endpoint to compute pp_SecureHash. Only available in staging with JAZZCASH_VERIFY_HASH=False"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string",
+      "description": "Backend base URL. Options: http://localhost:8000 (local dev), http://192.168.78.13:8000 (staging)"
+    },
+    {
+      "key": "jazzcash_salt",
+      "value": "your_shared_salt_here",
+      "type": "string",
+      "description": "Shared SALT for HMAC-SHA256. Ask JazzCash team or use 'TEST_SALT' for local testing"
+    },
+    {
+      "key": "pp_SecureHash",
+      "value": "",
+      "type": "string",
+      "description": "HMAC-SHA256 signature. Computed as: UPPER(HMAC_SHA256(key=salt, message='SALT&field1=val1&field2=val2...'))"
+    }
+  ]
+}
