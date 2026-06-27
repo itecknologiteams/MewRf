@@ -1,0 +1,134 @@
+SUBJECT: QTag JazzCash TopUp Integration — Staging Credentials & Test Inventory
+
+---
+
+Dear JazzCash Integration Team,
+
+We are pleased to share the QTag JazzCash TopUp API integration package for staging testing and pre-production validation.
+
+Please find attached the following documentation:
+
+1. **JazzCash-TopUp-API-Collection.json**
+   - Complete Postman collection with all API endpoints
+   - Request/response examples
+   - Error scenarios
+   - Environment variables pre-configured
+
+2. **STAGING-PRODUCTION-SETUP.md**
+   - API endpoint URLs (staging + production)
+   - Complete authentication & signature documentation
+   - HMAC-SHA256 algorithm specification
+   - Test credentials
+   - Important implementation notes
+
+3. **TESTING-INVENTORY-TEMPLATE.md**
+   - Staging test inventory (5 pre-configured tags)
+   - 5 comprehensive test cases (inquiry, payment, idempotency, error handling)
+   - Expected responses for each test
+   - Test reporting template
+
+---
+
+## Quick Start
+
+**Staging Environment URL:**
+```
+http://192.168.78.13:8000/api/v1
+```
+
+**Test Credentials:**
+- Username: `operator_test`
+- Password: `Operator@1234`
+- Role: Operator
+
+**Available Test Tags:**
+- E28011052000704A8F9F0AE3 (Kashif Mughal, BP-3641, Balance: 1500.00 PKR)
+- E2801105200070D4FB330A36 (Ahmed Khan, KR-5890, Balance: 3000.00 PKR)
+- E28011052000708A1B2C3D4E (Fatima Ali, LS-1234, Balance: 500.00 PKR)
+
+**To Test:**
+1. Import the Postman collection
+2. Set `base_url = http://192.168.78.13:8000/api/v1`
+3. Execute test cases from TESTING-INVENTORY-TEMPLATE.md
+4. Report results using the provided reporting table
+
+---
+
+## Action Items (From Your Side)
+
+1. **Confirm HMAC-SHA256 Algorithm**
+   - Please verify the pp_SecureHash algorithm matches your standard
+   - We are ready to align if needed
+
+2. **Provide Shared SALT**
+   - Exchange the `JAZZCASH_INTEGRITY_SALT` securely
+   - We will update our environment accordingly
+
+3. **Confirm Amount Unit**
+   - Are amounts in PKR rupees (e.g., 500.00) or paisa (e.g., 50000)?
+   - Please confirm any min/max topup limits
+
+4. **Staging Testing**
+   - Execute the 5 test cases provided
+   - Share results using the reporting template
+   - Note any issues or edge cases
+
+5. **Production URL & TLS**
+   - Provide production backend URL
+   - Confirm TLS certificate requirements
+   - Provide production SALT and credentials
+
+6. **IP Allowlist (Production)**
+   - Provide your server IP range for firewall allowlist
+
+---
+
+## API Summary
+
+### Two Endpoints:
+
+**1. Tag Inquiry (Read-Only)**
+- POST `/payments/jazzcash/inquiry/`
+- Input: TID + signature
+- Output: Consumer details, balance, status
+
+**2. Payment Notification (Idempotent)**
+- POST `/payments/jazzcash/payment/`
+- Input: TID, amount, jazzcash_txn_id, signature
+- Output: New balance, topup transaction ID
+- Duplicate txn_id returns 200 with `already_processed: true` (no double-credit)
+
+**Both endpoints support:**
+- Best-effort operation (no blocking)
+- Consistent response envelope: `{ success, message, data/errors }`
+- HTTP status codes: 200, 400, 401, 404, 500
+
+---
+
+## Support
+
+If you have any questions or encounter any issues during testing, please reach out:
+
+- **Technical Questions:** [backend-team@itecknologi.com]
+- **Infrastructure Support:** [ops-team@itecknologi.com]
+- **JazzCash Liaison:** [jazzcash-contact@itecknologi.com]
+
+We are committed to a smooth integration and are available for any clarifications needed.
+
+Thank you for partnering with us on this integration.
+
+Best regards,
+
+**[Your Name]**
+**QTag Development Team**
+**iTecknologi Group**
+**Date:** 2026-06-27
+
+---
+
+## Attachments
+
+1. JazzCash-TopUp-API-Collection.json (Postman collection)
+2. STAGING-PRODUCTION-SETUP.md (Complete setup guide)
+3. TESTING-INVENTORY-TEMPLATE.md (Test cases & inventory)
+
