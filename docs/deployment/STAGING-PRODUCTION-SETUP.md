@@ -8,8 +8,10 @@
 
 | Environment | Backend URL | Status |
 |-------------|------------|--------|
-| **Staging (LAN)** | `http://192.168.78.13:8000/api/v1` | Active |
-| **Production** | `https://<to-be-provided>/api/v1` | Pending TLS setup |
+| **Staging** | `https://<staging-domain>/api/v1` | ⏳ TBD |
+| **Production** | `https://<production-domain>/api/v1` | ⏳ TBD |
+
+> **Note:** URLs will be shared once deployment infrastructure is ready. Currently internal testing only.
 
 ---
 

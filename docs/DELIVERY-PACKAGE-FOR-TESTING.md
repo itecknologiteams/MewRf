@@ -53,9 +53,11 @@ Contains:
 ### **Step 2: Configure Environment (1 min)**
 ```
 In Postman, set these variables:
-- base_url = http://192.168.78.13:8000/api/v1
+- base_url = https://<staging-url> (will be provided)
 - jazzcash_salt = (will be provided)
 ```
+
+⚠️ **URLs TBD** — Staging URL will be shared once deployment is ready
 
 ### **Step 3: Run Test Cases (30 min)**
 ```
