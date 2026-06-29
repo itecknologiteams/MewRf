@@ -16,22 +16,24 @@
             line-height: 1.8;
             color: #1f2937;
             background: #ffffff;
-            padding: 50px 20px;
+            padding: 0;
+            margin: 0;
         }
 
         .container {
-            max-width: 950px;
+            max-width: 100%;
             margin: 0 auto;
             background: white;
             border-radius: 0;
             box-shadow: none;
-            overflow: hidden;
-            border-top: 1px solid #e5e7eb;
+            overflow: visible;
+            border-top: none;
+            padding: 40px 50px;
         }
 
         h1 {
             color: #111827;
-            margin-bottom: 25px;
+            margin: 0 0 20px 0;
             font-size: 38px;
             font-weight: 700;
             letter-spacing: -0.8px;
@@ -39,20 +41,18 @@
 
         h2 {
             color: #111827;
-            margin-top: 45px;
-            margin-bottom: 20px;
+            margin: 35px 0 15px 0;
             font-size: 22px;
             font-weight: 700;
             border-left: 0;
             padding-left: 0;
             border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 12px;
+            padding-bottom: 10px;
         }
 
         h3 {
             color: #1a5490;
-            margin-top: 25px;
-            margin-bottom: 12px;
+            margin: 20px 0 10px 0;
             font-size: 18px;
             font-weight: 600;
         }
@@ -182,24 +182,25 @@
         .header-section {
             background: #ffffff;
             color: #111827;
-            padding: 50px 40px;
-            margin: 0 0 40px 0;
+            padding: 40px 50px;
+            margin: 0;
             border-radius: 0;
             text-align: center;
             border-bottom: 1px solid #e5e7eb;
+            width: 100%;
         }
 
         .header-section h1 {
             color: #111827;
             border: none;
-            margin-bottom: 12px;
+            margin: 15px 0;
             font-size: 42px;
             font-weight: 700;
         }
 
         .header-section p {
             color: #6b7280;
-            margin-bottom: 8px;
+            margin: 8px 0;
             font-size: 14px;
             letter-spacing: 0;
             font-weight: 500;
@@ -254,9 +255,10 @@
         .powered-by {
             text-align: center;
             margin-top: 60px;
-            padding: 40px 20px;
+            padding: 40px 50px;
             border-top: 1px solid #e5e7eb;
             background: #ffffff;
+            width: 100%;
         }
 
         .powered-by-text {
@@ -292,31 +294,66 @@
         }
 
         @media print {
+            * {
+                margin: 0;
+                padding: 0;
+            }
             body {
                 padding: 0;
                 background: white;
+                margin: 0;
             }
             .container {
                 max-width: 100%;
                 box-shadow: none;
                 border-radius: 0;
+                padding: 40px 50px;
+                margin: 0;
             }
             .header-section {
                 margin: 0;
-                padding: 40px 30px;
+                padding: 40px 50px;
+                width: 100%;
+            }
+            .logo-container {
+                margin: 20px 0;
+            }
+            h1 {
+                page-break-after: avoid;
+                margin: 15px 0;
             }
             h2 {
                 page-break-after: avoid;
                 margin-top: 30px;
+                margin-bottom: 15px;
             }
             h3 {
                 page-break-after: avoid;
             }
+            p {
+                page-break-after: avoid;
+                orphans: 2;
+                widows: 2;
+            }
             .page-break {
                 page-break-after: always;
+                margin: 0;
+                padding: 0;
             }
             .powered-by {
                 background: white;
+                width: 100%;
+                margin: 0;
+                padding: 40px 50px;
+            }
+            table {
+                page-break-inside: avoid;
+            }
+            .quick-start,
+            .info-box,
+            .code-block,
+            .json-example {
+                page-break-inside: avoid;
             }
         }
     </style>
@@ -518,7 +555,8 @@ URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
             <div class="checklist-item">☐ All responses follow envelope format</div>
             <div class="checklist-item">☐ All response times &lt; 1 second</div>
         </div>
-
+        <br>
+        <br><br><br>
         <h2>❌ Error Handling</h2>
         <table>
             <tr>
