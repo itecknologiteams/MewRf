@@ -182,14 +182,19 @@
 
         .logo-container {
             text-align: center;
-            margin: 20px 0;
+            margin: 15px 0;
         }
 
         .logo {
-            display: inline-flex;
-            align-items: center;
-            gap: 15px;
-            padding: 10px 20px;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .logo img {
+            max-width: 400px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
         }
 
         .logo-blocks {
@@ -214,19 +219,6 @@
         .block-orange { background: #FF9500; }
         .block-lime { background: #76EE00; }
         .block-navy { background: #1A1A2E; }
-
-        .logo-text {
-            font-weight: bold;
-            font-size: 24px;
-            color: #0077B6;
-            letter-spacing: 0.5px;
-        }
-
-        .logo-text {
-            margin-top: 5px;
-            font-size: 12px;
-            color: #666;
-        }
 
         .powered-by {
             text-align: center;
@@ -285,19 +277,7 @@
     <div class="header-section">
         <div class="logo-container">
             <div class="logo">
-                <div class="logo-blocks">
-                    <div class="block block-pink"></div>
-                    <div class="block block-red"></div>
-                    <div class="block block-green"></div>
-                    <div class="block block-teal"></div>
-                    <div class="block block-blue"></div>
-                    <div class="block block-purple"></div>
-                    <div class="block block-orange"></div>
-                    <div class="block block-blue"></div>
-                    <div class="block block-lime"></div>
-                    <div class="block block-navy"></div>
-                </div>
-                <div class="logo-text">Tecknologi</div>
+                <img src="1.png" alt="iTecknologi Logo">
             </div>
         </div>
         <h1>📘 QTag JazzCash TopUp API</h1>
@@ -533,19 +513,7 @@ URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
 
         <div class="powered-by">
             <div class="logo" style="margin-bottom: 10px;">
-                <div class="logo-blocks" style="grid-template-columns: repeat(3, 15px); grid-template-rows: repeat(3, 15px);">
-                    <div class="block block-pink" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-red" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-green" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-teal" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-blue" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-purple" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-orange" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-blue" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-lime" style="width: 15px; height: 15px;"></div>
-                    <div class="block block-navy" style="width: 15px; height: 15px;"></div>
-                </div>
-                <div class="logo-text" style="font-size: 18px;">Tecknologi</div>
+                <img src="1.png" alt="iTecknologi Logo" style="max-width: 200px; height: auto;">
             </div>
             <div class="powered-by-text">Powered By iTecknologi Group</div>
             <div class="powered-by-text" style="margin-top: 8px; font-size: 10px; color: #bbb;">
