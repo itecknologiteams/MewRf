@@ -186,15 +186,40 @@
         }
 
         .logo {
-            display: inline-block;
-            background: linear-gradient(135deg, #1a73e8 0%, #2d5aa8 100%);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px 20px;
+        }
+
+        .logo-blocks {
+            display: grid;
+            grid-template-columns: repeat(3, 20px);
+            grid-template-rows: repeat(3, 20px);
+            gap: 3px;
+        }
+
+        .block {
+            width: 20px;
+            height: 20px;
+            border-radius: 2px;
+        }
+
+        .block-red { background: #E63946; }
+        .block-pink { background: #FF006E; }
+        .block-green { background: #2A9D8F; }
+        .block-teal { background: #00B4D8; }
+        .block-blue { background: #0077B6; }
+        .block-purple { background: #9D4EDD; }
+        .block-orange { background: #FF9500; }
+        .block-lime { background: #76EE00; }
+        .block-navy { background: #1A1A2E; }
+
+        .logo-text {
             font-weight: bold;
-            font-size: 18px;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+            font-size: 24px;
+            color: #0077B6;
+            letter-spacing: 0.5px;
         }
 
         .logo-text {
@@ -259,8 +284,21 @@
 <body>
     <div class="header-section">
         <div class="logo-container">
-            <div class="logo">iTecknologi</div>
-            <div class="logo-text">Technology Solutions</div>
+            <div class="logo">
+                <div class="logo-blocks">
+                    <div class="block block-pink"></div>
+                    <div class="block block-red"></div>
+                    <div class="block block-green"></div>
+                    <div class="block block-teal"></div>
+                    <div class="block block-blue"></div>
+                    <div class="block block-purple"></div>
+                    <div class="block block-orange"></div>
+                    <div class="block block-blue"></div>
+                    <div class="block block-lime"></div>
+                    <div class="block block-navy"></div>
+                </div>
+                <div class="logo-text">Tecknologi</div>
+            </div>
         </div>
         <h1>📘 QTag JazzCash TopUp API</h1>
         <p>Complete Documentation | Testing Guide | Setup Instructions</p>
@@ -494,7 +532,21 @@ URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
         </div>
 
         <div class="powered-by">
-            <div class="powered-by-logo">iTecknologi</div>
+            <div class="logo" style="margin-bottom: 10px;">
+                <div class="logo-blocks" style="grid-template-columns: repeat(3, 15px); grid-template-rows: repeat(3, 15px);">
+                    <div class="block block-pink" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-red" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-green" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-teal" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-blue" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-purple" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-orange" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-blue" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-lime" style="width: 15px; height: 15px;"></div>
+                    <div class="block block-navy" style="width: 15px; height: 15px;"></div>
+                </div>
+                <div class="logo-text" style="font-size: 18px;">Tecknologi</div>
+            </div>
             <div class="powered-by-text">Powered By iTecknologi Group</div>
             <div class="powered-by-text" style="margin-top: 8px; font-size: 10px; color: #bbb;">
                 Building Technology Solutions for Pakistan
