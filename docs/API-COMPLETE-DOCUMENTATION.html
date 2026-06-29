@@ -277,8 +277,12 @@
             font-weight: 500;
         }
 
+        .main-content {
+            min-height: calc(100vh - 300px);
+        }
+
         .footer {
-            margin-top: 50px;
+            margin-top: auto;
             padding-top: 25px;
             border-top: 1px solid #e5e7eb;
             text-align: center;
@@ -306,6 +310,9 @@
                 margin: 0;
                 padding: 0;
             }
+            html, body {
+                height: 100%;
+            }
             body {
                 padding: 0;
                 background: white;
@@ -317,6 +324,11 @@
                 border-radius: 0;
                 padding: 0;
                 margin: 0;
+            }
+            .main-content {
+                min-height: auto;
+                display: flex;
+                flex-direction: column;
             }
             .content-wrapper {
                 padding: 0 40px;
@@ -351,11 +363,16 @@
                 margin: 0;
                 padding: 0;
             }
+            .footer {
+                margin-top: auto;
+                page-break-before: avoid;
+            }
             .powered-by {
                 background: white;
                 width: 100%;
                 margin: 0;
                 padding: 30px 40px;
+                page-break-before: auto;
             }
             table {
                 page-break-inside: avoid;
@@ -377,10 +394,9 @@
             </div>
         </div>
         <h1>📘 QTag JazzCash TopUp API</h1>
-        <p>Complete Documentation | Testing Guide | Setup Instructions</p>
     </div>
 
-    <div class="container">
+    <div class="container main-content">
         <h2>🚀 Quick Start</h2>
         <div class="quick-start">
             <h3>In 3 Minutes:</h3>
@@ -599,13 +615,11 @@ URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
 
         <h2>📞 Support</h2>
         <p>
-            <strong>Technical Issues:</strong> ali.asif@itecknologi.com<br/>
-            <strong>Server Issues:</strong> shaneel@itecknologi.com
+            <strong>Technical & Server Issues:</strong> ali.asif@itecknologi.com / shahneel.musharraf@itecknologi.com<br/>
         </p>
 
         <div class="footer">
             <p>QTag JazzCash TopUp API — Complete Documentation</p>
-            <p>Version 1.0 | Generated 2026-06-29 | Ready for Testing ✓</p>
         </div>
 
         <div class="powered-by">
@@ -613,9 +627,7 @@ URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
                 <img src="1.png" alt="iTecknologi Logo" style="max-width: 200px; height: auto;">
             </div>
             <div class="powered-by-text">Powered By iTecknologi Group</div>
-            <div class="powered-by-text" style="margin-top: 8px; font-size: 10px; color: #bbb;">
-                Building Technology Solutions for Pakistan
-            </div>
+
         </div>
     </div>
 </body>
