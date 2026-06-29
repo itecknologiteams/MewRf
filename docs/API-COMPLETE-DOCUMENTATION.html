@@ -180,6 +180,54 @@
             font-size: 13px;
         }
 
+        .logo-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .logo {
+            display: inline-block;
+            background: linear-gradient(135deg, #1a73e8 0%, #2d5aa8 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 18px;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+        }
+
+        .logo-text {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .powered-by {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+        }
+
+        .powered-by-logo {
+            display: inline-block;
+            background: linear-gradient(135deg, #1a73e8 0%, #2d5aa8 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+        }
+
+        .powered-by-text {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+        }
+
         .footer {
             margin-top: 50px;
             padding-top: 20px;
@@ -210,6 +258,10 @@
 </head>
 <body>
     <div class="header-section">
+        <div class="logo-container">
+            <div class="logo">iTecknologi</div>
+            <div class="logo-text">Technology Solutions</div>
+        </div>
         <h1>📘 QTag JazzCash TopUp API</h1>
         <p>Complete Documentation | Testing Guide | Setup Instructions</p>
     </div>
@@ -236,10 +288,7 @@
         <div class="tag-box">
             <strong>Server Details:</strong><br/>
             Machine: Testing Server (QTag Backend)<br/>
-            Internal IP: 192.168.20.69:8000/api/v1<br/>
             External IP: 221.120.248.114:8000/api/v1<br/>
-            Database: PostgreSQL on 192.168.21.31:6632<br/>
-            Status: ✅ Running
         </div>
 
         <h2>🗄️ Test Inventory</h2>
@@ -442,6 +491,14 @@ URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
         <div class="footer">
             <p>QTag JazzCash TopUp API — Complete Documentation</p>
             <p>Version 1.0 | Generated 2026-06-29 | Ready for Testing ✓</p>
+        </div>
+
+        <div class="powered-by">
+            <div class="powered-by-logo">iTecknologi</div>
+            <div class="powered-by-text">Powered By iTecknologi Group</div>
+            <div class="powered-by-text" style="margin-top: 8px; font-size: 10px; color: #bbb;">
+                Building Technology Solutions for Pakistan
+            </div>
         </div>
     </div>
 </body>
