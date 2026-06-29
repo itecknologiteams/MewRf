@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QTag JazzCash TopUp API - Complete Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+        }
+
+        h1 {
+            color: #1a73e8;
+            border-bottom: 3px solid #1a73e8;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #1a73e8;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-left: 4px solid #1a73e8;
+            padding-left: 10px;
+        }
+
+        h3 {
+            color: #2d5aa8;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        p {
+            margin-bottom: 10px;
+            text-align: justify;
+        }
+
+        .quick-start {
+            background: #e8f0fe;
+            border-left: 4px solid #1a73e8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .code-block {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+
+        th {
+            background: #1a73e8;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        li {
+            margin-bottom: 5px;
+        }
+
+        .success {
+            color: #0d652d;
+            font-weight: bold;
+        }
+
+        .error {
+            color: #d33b27;
+            font-weight: bold;
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .json-example {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+        }
+
+        .page-break {
+            page-break-after: always;
+            margin-bottom: 30px;
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, #1a73e8 0%, #2d5aa8 100%);
+            color: white;
+            padding: 30px;
+            margin: -20px -20px 30px -20px;
+            border-radius: 0 0 4px 4px;
+        }
+
+        .header-section h1 {
+            color: white;
+            border-bottom: 3px solid white;
+            margin-bottom: 5px;
+        }
+
+        .header-section p {
+            color: #e8f0fe;
+            margin-bottom: 0;
+        }
+
+        .tag-box {
+            background: #f0f4fc;
+            border: 1px solid #1a73e8;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .checklist {
+            margin: 15px 0;
+        }
+
+        .checklist-item {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+            }
+            .container {
+                max-width: 100%;
+            }
+            h2 {
+                page-break-after: avoid;
+            }
+            h3 {
+                page-break-after: avoid;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-section">
+        <h1>📘 QTag JazzCash TopUp API</h1>
+        <p>Complete Documentation | Testing Guide | Setup Instructions</p>
+    </div>
+
+    <div class="container">
+        <h2>🚀 Quick Start</h2>
+        <div class="quick-start">
+            <h3>In 3 Minutes:</h3>
+            <ol>
+                <li><strong>Import Postman Collection</strong><br/>
+                    File → Import → JazzCash-TopUp-API-Collection.json
+                </li>
+                <li><strong>Set API URL</strong><br/>
+                    base_url = http://221.120.248.114:8000/api/v1
+                </li>
+                <li><strong>Run First Test</strong><br/>
+                    Click: "Kashif Mughal (1500 PKR)" → Send<br/>
+                    Expected: 200 OK with consumer details
+                </li>
+            </ol>
+        </div>
+
+        <h2>🖥️ Testing Environment</h2>
+        <div class="tag-box">
+            <strong>Server Details:</strong><br/>
+            Machine: Testing Server (QTag Backend)<br/>
+            Internal IP: 192.168.20.69:8000/api/v1<br/>
+            External IP: 221.120.248.114:8000/api/v1<br/>
+            Database: PostgreSQL on 192.168.21.31:6632<br/>
+            Status: ✅ Running
+        </div>
+
+        <h2>🗄️ Test Inventory</h2>
+        <p><strong>3 Consumer Profiles (Ready to Use):</strong></p>
+
+        <table>
+            <tr>
+                <th>Consumer</th>
+                <th>Tag ID (TID)</th>
+                <th>Vehicle Plate</th>
+                <th>Balance</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td>Kashif Mughal</td>
+                <td style="font-family: monospace; font-size: 11px;">E28011052000704A8F9F0AE3</td>
+                <td>ABC-8123</td>
+                <td>1500.00 PKR</td>
+                <td><span class="success">active</span></td>
+            </tr>
+            <tr>
+                <td>Ahmed Khan</td>
+                <td style="font-family: monospace; font-size: 11px;">E2801105200070D4FB330A36</td>
+                <td>MNP-5890</td>
+                <td>3000.00 PKR</td>
+                <td><span class="success">active</span></td>
+            </tr>
+            <tr>
+                <td>Fatima Ali</td>
+                <td style="font-family: monospace; font-size: 11px;">E28011052000708A1B2C3D4E</td>
+                <td>BMQ-4532</td>
+                <td>500.00 PKR</td>
+                <td><span class="success">active</span></td>
+            </tr>
+        </table>
+
+        <h2>🔌 API Endpoints</h2>
+
+        <h3>Endpoint 1: Tag Inquiry (Read-Only)</h3>
+        <p><strong>Purpose:</strong> Look up a tag and get consumer details</p>
+
+        <div class="code-block">POST /payments/jazzcash/inquiry/
+URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/inquiry/</div>
+
+        <p><strong>Request Body:</strong></p>
+        <div class="json-example">{
+  "tid": "E28011052000704A8F9F0AE3",
+  "pp_SecureHash": ""
+}</div>
+
+        <p><strong>Success Response (200):</strong></p>
+        <div class="json-example">{
+  "success": true,
+  "message": "OK",
+  "data": {
+    "consumer_id": "62dbf8b8-e08a-487f-b4c9-ea886a5e930c",
+    "vehicle_registration": "ABC-8123",
+    "customer_name": "Kashif Mughal",
+    "tid": "E28011052000704A8F9F0AE3",
+    "current_balance": "1500.00",
+    "status": "active"
+  }
+}</div>
+
+        <h3>Endpoint 2: Payment Notification (Idempotent)</h3>
+        <p><strong>Purpose:</strong> Credit balance after payment confirmation</p>
+
+        <div class="code-block">POST /payments/jazzcash/payment/
+URL: http://221.120.248.114:8000/api/v1/payments/jazzcash/payment/</div>
+
+        <p><strong>Request Body:</strong></p>
+        <div class="json-example">{
+  "tid": "E28011052000704A8F9F0AE3",
+  "amount": "500.00",
+  "jazzcash_txn_id": "JC_KASHIF_001",
+  "pp_SecureHash": ""
+}</div>
+
+        <p><strong>Success Response (200):</strong></p>
+        <div class="json-example">{
+  "success": true,
+  "message": "Balance updated",
+  "data": {
+    "jazzcash_txn_id": "JC_KASHIF_001",
+    "new_balance": "2000.00",
+    "topup_id": "36ac6d87-7940-4425-8726-ed849dc9c97b"
+  }
+}</div>
+
+        <div class="info-box">
+            <strong>🔑 Key Feature - Idempotency:</strong> If you send the SAME jazzcash_txn_id twice, the first request credits the balance, and the second request returns already_processed=true with no additional credit. This is safe to retry on network failures!
+        </div>
+
+        <div class="page-break"></div>
+
+        <h2>🧪 Test Cases</h2>
+
+        <h3>TC-1: Existing Tag Inquiry</h3>
+        <p><strong>Goal:</strong> Verify tag lookup returns consumer details</p>
+        <p><strong>Expected:</strong> Status 200, consumer details returned</p>
+        <table>
+            <tr>
+                <th>Field</th>
+                <th>Expected Value</th>
+            </tr>
+            <tr>
+                <td>status</td>
+                <td><span class="success">200</span></td>
+            </tr>
+            <tr>
+                <td>success</td>
+                <td><span class="success">true</span></td>
+            </tr>
+            <tr>
+                <td>consumer_name</td>
+                <td>Kashif Mughal</td>
+            </tr>
+            <tr>
+                <td>current_balance</td>
+                <td>1500.00</td>
+            </tr>
+        </table>
+
+        <h3>TC-2: Invalid Tag Error</h3>
+        <p><strong>Goal:</strong> Verify error handling for non-existent tags</p>
+        <p><strong>Expected:</strong> Status 404, error message</p>
+
+        <h3>TC-3: Payment Processing</h3>
+        <p><strong>Goal:</strong> Process topup and verify balance update</p>
+        <p><strong>Expected:</strong> Status 200, balance increased</p>
+
+        <h3>TC-4: Idempotency Test</h3>
+        <p><strong>Goal:</strong> Verify duplicate requests don't double-credit</p>
+        <p><strong>Key Verification:</strong></p>
+        <ul>
+            <li>First request: Balance increases ✓</li>
+            <li>Second request (same txn_id): Returns <span class="success">already_processed=true</span></li>
+            <li>Balance: UNCHANGED (no double-credit) ✓</li>
+        </ul>
+
+        <h3>TC-5: Validation Test (Zero Amount)</h3>
+        <p><strong>Goal:</strong> Verify validation rejects zero amounts</p>
+        <p><strong>Expected:</strong> Status 400, error message</p>
+
+        <h3>TC-6: Validation Test (Negative Amount)</h3>
+        <p><strong>Goal:</strong> Verify validation rejects negative amounts</p>
+        <p><strong>Expected:</strong> Status 400, error message</p>
+
+        <h2>✅ Test Checklist</h2>
+        <div class="checklist">
+            <div class="checklist-item">☐ Postman installed</div>
+            <div class="checklist-item">☐ Collection imported</div>
+            <div class="checklist-item">☐ Environment set (base_url, jazzcash_salt)</div>
+            <div class="checklist-item">☐ Can reach 221.120.248.114:8000</div>
+            <div class="checklist-item">☐ TC-1: Tag Inquiry (200)</div>
+            <div class="checklist-item">☐ TC-2: Invalid Tag (404)</div>
+            <div class="checklist-item">☐ TC-3: Payment Processing (200)</div>
+            <div class="checklist-item">☐ TC-4: Idempotency Test (already_processed=true)</div>
+            <div class="checklist-item">☐ TC-5: Zero Amount Validation (400)</div>
+            <div class="checklist-item">☐ TC-6: Negative Amount Validation (400)</div>
+            <div class="checklist-item">☐ All responses follow envelope format</div>
+            <div class="checklist-item">☐ All response times &lt; 1 second</div>
+        </div>
+
+        <h2>❌ Error Handling</h2>
+        <table>
+            <tr>
+                <th>HTTP Code</th>
+                <th>Meaning</th>
+                <th>Example</th>
+            </tr>
+            <tr>
+                <td>200</td>
+                <td>OK</td>
+                <td>Inquiry/payment succeeded</td>
+            </tr>
+            <tr>
+                <td>400</td>
+                <td>Bad Request</td>
+                <td>Invalid amount, missing field</td>
+            </tr>
+            <tr>
+                <td>404</td>
+                <td>Not Found</td>
+                <td>Tag doesn't exist</td>
+            </tr>
+            <tr>
+                <td>500</td>
+                <td>Server Error</td>
+                <td>Database issue</td>
+            </tr>
+        </table>
+
+        <h2>📞 Support</h2>
+        <p>
+            <strong>Technical Issues:</strong> ali.asif@itecknologi.com<br/>
+            <strong>Server Issues:</strong> shaneel@itecknologi.com
+        </p>
+
+        <div class="footer">
+            <p>QTag JazzCash TopUp API — Complete Documentation</p>
+            <p>Version 1.0 | Generated 2026-06-29 | Ready for Testing ✓</p>
+        </div>
+    </div>
+</body>
+</html>
