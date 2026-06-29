@@ -236,15 +236,15 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://192.168.78.13:8000/api/v1",
+      "value": "http://221.120.248.114:8000/api/v1",
       "type": "string",
-      "description": "QTag backend base URL (update for production)"
+      "description": "QTag backend base URL (Testing Machine - External IP)"
     },
     {
       "key": "jazzcash_salt",
-      "value": "",
+      "value": "TEST_SALT_DEV",
       "type": "string",
-      "description": "Shared integrity salt for pp_SecureHash (to be provided by JazzCash)"
+      "description": "Shared integrity salt for pp_SecureHash (development: TEST_SALT_DEV)"
     }
   ]
 }

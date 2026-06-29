@@ -235,15 +235,15 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:8000/api/v1",
+      "value": "http://221.120.248.114:8000/api/v1",
       "type": "string",
-      "description": "Backend base URL. Options: http://localhost:8000 (local dev), http://192.168.78.13:8000 (staging)"
+      "description": "Backend base URL. Options: http://localhost:8000 (local), http://192.168.20.69:8000 (testing machine internal), http://221.120.248.114:8000 (testing machine external)"
     },
     {
       "key": "jazzcash_salt",
-      "value": "your_shared_salt_here",
+      "value": "TEST_SALT_DEV",
       "type": "string",
-      "description": "Shared SALT for HMAC-SHA256. Ask JazzCash team or use 'TEST_SALT' for local testing"
+      "description": "Shared SALT for HMAC-SHA256. Development: TEST_SALT_DEV"
     },
     {
       "key": "pp_SecureHash",
