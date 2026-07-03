@@ -74,7 +74,7 @@ def _logo_escpos():
 
     try:
         img = Image.open(path).convert('L')  # grayscale
-        target_w = 384  # ~80mm printable width in dots
+        target_w = 256  # ~32mm POS logo width (proper thermal receipt size)
         if img.width != target_w:
             target_h = max(1, round(img.height * target_w / img.width))
             img = img.resize((target_w, target_h))
