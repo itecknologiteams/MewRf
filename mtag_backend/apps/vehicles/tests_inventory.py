@@ -1,0 +1,222 @@
+import csv
+import io
+from decimal import Decimal
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+from rest_framework import status
+from .models import UnregisteredInventory, UnregisteredInventoryStatus, TagActivation
+from apps.accounts.models import Account
+from apps.users.models import UserRole
+
+User = get_user_model()
+
+
+class InventoryUploadAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin_user = User.objects.create_user(
+            phone='03001234567', password='testpass123', full_name='Admin', user_role=UserRole.ADMIN, is_staff=True
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+    def test_inventory_upload_csv(self):
+        csv_content = """tag_serial,tid,epc,vehicle_plate,vehicle_type,vehicle_color
+SER001,TID001,EPC001,LHR1234,car,white
+SER002,TID002,EPC002,LHR5678,truck,blue
+SER003,TID003,EPC003,LHR9012,bus,red"""
+
+        file = io.StringIO(csv_content)
+        file.name = 'inventory.csv'
+
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/upload/',
+            {'file': file},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.json()['data']
+        self.assertEqual(data['added'], 3)
+        self.assertEqual(data['skipped'], 0)
+
+        inv = UnregisteredInventory.objects.get(tag_serial='SER001')
+        self.assertEqual(inv.status, UnregisteredInventoryStatus.UNREGISTERED)
+        self.assertEqual(inv.vehicle_plate, 'LHR1234')
+
+    def test_inventory_upload_duplicates(self):
+        UnregisteredInventory.objects.create(
+            tag_serial='SER001',
+            tid='TID001',
+            vehicle_type='car'
+        )
+
+        csv_content = """tag_serial,tid,epc,vehicle_plate,vehicle_type,vehicle_color
+SER001,TID001,EPC001,LHR1234,car,white
+SER002,TID002,EPC002,LHR5678,truck,blue"""
+
+        file = io.StringIO(csv_content)
+        file.name = 'inventory.csv'
+
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/upload/',
+            {'file': file},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.json()['data']
+        self.assertEqual(data['added'], 1)
+        self.assertEqual(data['skipped'], 1)
+
+
+class InventoryListAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.operator_user = User.objects.create_user(
+            phone='03001234567', password='testpass123', full_name='Operator', user_role=UserRole.OPERATOR
+        )
+        self.client.force_authenticate(user=self.operator_user)
+
+        UnregisteredInventory.objects.create(
+            tag_serial='SER001', tid='TID001', status=UnregisteredInventoryStatus.UNREGISTERED
+        )
+        UnregisteredInventory.objects.create(
+            tag_serial='SER002', tid='TID002', status=UnregisteredInventoryStatus.BOOTH_ASSIGNED,
+            booth_assigned_id=1
+        )
+        UnregisteredInventory.objects.create(
+            tag_serial='SER003', tid='TID003', status=UnregisteredInventoryStatus.ACTIVATED,
+            first_activated_booth_id=2
+        )
+
+    def test_list_all_inventory(self):
+        response = self.client.get('/api/v1/vehicles/inventory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertEqual(data['total'], 3)
+        self.assertEqual(len(data['items']), 3)
+
+    def test_filter_by_status(self):
+        response = self.client.get('/api/v1/vehicles/inventory/?status=unregistered')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['items'][0]['tag_serial'], 'SER001')
+
+    def test_filter_by_booth(self):
+        response = self.client.get('/api/v1/vehicles/inventory/?booth_assigned_id=1')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['items'][0]['booth_assigned_id'], 1)
+
+    def test_search_by_tag_serial(self):
+        response = self.client.get('/api/v1/vehicles/inventory/?search=SER002')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertEqual(data['total'], 1)
+
+
+class BoothAssignmentAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin_user = User.objects.create_user(
+            phone='03001234567', password='testpass123', full_name='Admin', user_role=UserRole.ADMIN, is_staff=True
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
+        self.inv1 = UnregisteredInventory.objects.create(
+            tag_serial='SER001', tid='TID001', status=UnregisteredInventoryStatus.UNREGISTERED
+        )
+        self.inv2 = UnregisteredInventory.objects.create(
+            tag_serial='SER002', tid='TID002', status=UnregisteredInventoryStatus.UNREGISTERED
+        )
+
+    def test_assign_to_booth(self):
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/assign-booth/',
+            {
+                'inventory_ids': [str(self.inv1.id), str(self.inv2.id)],
+                'booth_id': 3,
+                'assigned_by': 'admin@test.com'
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertEqual(data['assigned'], 2)
+
+        self.inv1.refresh_from_db()
+        self.assertEqual(self.inv1.booth_assigned_id, 3)
+        self.assertEqual(self.inv1.status, UnregisteredInventoryStatus.BOOTH_ASSIGNED)
+
+
+class TagActivationAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.operator_user = User.objects.create_user(
+            phone='03001234567', password='testpass123', full_name='Operator', user_role=UserRole.OPERATOR
+        )
+        self.client.force_authenticate(user=self.operator_user)
+
+        self.inv = UnregisteredInventory.objects.create(
+            tag_serial='SER001',
+            tid='TID001',
+            status=UnregisteredInventoryStatus.BOOTH_ASSIGNED,
+            booth_assigned_id=2
+        )
+
+    def test_activate_quick_create(self):
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/activate/',
+            {
+                'tag_serial': 'SER001',
+                'tid': 'TID001',
+                'customer_name': 'John Doe',
+                'customer_phone': '03001234567',
+                'initial_topup': 1000,
+                'payment_method': 'CASH',
+                'activation_booth_id': 2
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.json()['data']
+        self.assertEqual(data['status'], UnregisteredInventoryStatus.ACTIVATED)
+        self.assertEqual(data['first_activated_booth_id'], 2)
+
+        self.inv.refresh_from_db()
+        self.assertIsNotNone(self.inv.activated_for_account)
+
+    def test_activate_link_existing(self):
+        from .models import Vehicle
+        user = User.objects.create_user(
+            phone='03009876543', password='testpass123', full_name='Customer', user_role=UserRole.USER
+        )
+        vehicle = Vehicle.objects.create(
+            owner=user,
+            plate_number='TEST1234',
+            vehicle_type='car',
+        )
+        account = Account.objects.create(user=user, vehicle=vehicle, balance=500)
+
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/activate-existing/',
+            {
+                'tag_serial': 'SER001',
+                'tid': 'TID001',
+                'account_id': str(account.id),
+                'activation_booth_id': 2
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertEqual(data['status'], UnregisteredInventoryStatus.ACTIVATED)
+
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.activated_for_account_id, account.id)

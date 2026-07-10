@@ -534,7 +534,7 @@ class BoothAssignmentView(APIView):
 
         inventory_ids = serializer.validated_data['inventory_ids']
         booth_id = serializer.validated_data['booth_id']
-        assigned_by = serializer.validated_data.get('assigned_by', request.user.email or 'system')
+        assigned_by = serializer.validated_data.get('assigned_by', request.user.phone or 'system')
 
         try:
             inventories = UnregisteredInventory.objects.filter(id__in=inventory_ids)
@@ -576,7 +576,7 @@ class TagActivationQuickCreateView(APIView):
     def post(self, request):
         from .serializers import TagActivationQuickCreateSerializer
         from apps.users.models import User
-        from apps.accounts.models import Account, TopUp, TopUpStatus
+        from apps.accounts.models import Account
         serializer = TagActivationQuickCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return error_response(serializer.errors, status_code=400)
@@ -613,19 +613,15 @@ class TagActivationQuickCreateView(APIView):
                     user = User.objects.create_user(
                         phone=customer_phone,
                         full_name=customer_name,
-                        username=f"user_{tag_serial}_{timezone.now().timestamp()}",
                     )
 
-                account = Account.objects.create(user=user, balance=initial_topup)
+                vehicle = Vehicle.objects.create(
+                    owner=user,
+                    plate_number=f"{tag_serial}",
+                    vehicle_type=inv.vehicle_type or 'car',
+                )
 
-                if initial_topup > 0:
-                    TopUp.objects.create(
-                        account=account,
-                        amount=initial_topup,
-                        status=TopUpStatus.SUCCESS,
-                        payment_method=payment_method,
-                        txn_id=f"MANUAL_{tag_serial}_{timezone.now().timestamp()}",
-                    )
+                account = Account.objects.create(user=user, vehicle=vehicle, balance=initial_topup)
 
                 inv.status = UnregisteredInventoryStatus.ACTIVATED
                 inv.activated_for_account = account
