@@ -8,8 +8,12 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser
 from utils.response import success_response, error_response
-from .models import Vehicle, Tag, TagStatus
-from .serializers import VehicleSerializer, VehicleCreateSerializer, TagSerializer, TagReissueSerializer, normalize_plate
+from .models import Vehicle, Tag, TagStatus, UnregisteredInventory, UnregisteredInventoryStatus, TagActivation
+from .serializers import (
+    VehicleSerializer, VehicleCreateSerializer, TagSerializer, TagReissueSerializer, normalize_plate,
+    UnregisteredInventorySerializer, UnregisteredInventoryListSerializer, BoothAssignmentSerializer,
+    TagActivationQuickCreateSerializer, TagActivationLinkExistingSerializer, TagActivationSerializer
+)
 from apps.users.permissions import IsOperator, IsAdmin
 
 logger = logging.getLogger(__name__)
@@ -398,3 +402,323 @@ class TagInventoryUploadView(APIView):
             message=f"{len(added)} tag(s) added, {len(skipped)} already existed.",
             status_code=201,
         )
+
+
+# ============= Inventory Management API Views =============
+
+class InventoryUploadView(APIView):
+    """Bulk upload unregistered inventory from CSV."""
+    permission_classes = [IsAdmin]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return error_response("No file uploaded.", status_code=400)
+        if not file.name.lower().endswith('.csv'):
+            return error_response("File must be a CSV.", status_code=400)
+
+        try:
+            content = file.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            return error_response("File encoding not supported. Use UTF-8.", status_code=400)
+
+        reader = csv.DictReader(io.StringIO(content))
+        existing_serials = set(UnregisteredInventory.objects.values_list('tag_serial', flat=True))
+        existing_tids = set(UnregisteredInventory.objects.values_list('tid', flat=True))
+        to_create, added, skipped, row_errors = [], [], [], []
+
+        for i, row in enumerate(reader, start=2):
+            tag_serial = (row.get('tag_serial') or '').strip()
+            tid = (row.get('tid') or '').strip()
+            epc = (row.get('epc') or '').strip()
+            vehicle_plate = (row.get('vehicle_plate') or '').strip()
+            vehicle_type = (row.get('vehicle_type') or 'car').strip()
+            vehicle_color = (row.get('vehicle_color') or '').strip()
+
+            if not tag_serial:
+                row_errors.append(f"Row {i}: missing tag_serial")
+                continue
+            if not tid:
+                row_errors.append(f"Row {i}: missing tid")
+                continue
+
+            if tag_serial in existing_serials or tid in existing_tids:
+                skipped.append(tag_serial)
+                continue
+
+            existing_serials.add(tag_serial)
+            existing_tids.add(tid)
+
+            to_create.append(UnregisteredInventory(
+                tag_serial=tag_serial,
+                tid=tid,
+                epc=epc,
+                vehicle_plate=vehicle_plate,
+                vehicle_type=vehicle_type,
+                vehicle_color=vehicle_color,
+                status=UnregisteredInventoryStatus.UNREGISTERED,
+            ))
+            added.append(tag_serial)
+
+        UnregisteredInventory.objects.bulk_create(to_create, batch_size=500)
+        logger.info("Inventory CSV upload: %d added, %d skipped", len(added), len(skipped))
+
+        return success_response(
+            data={
+                'added': len(added),
+                'skipped': len(skipped),
+                'errors': row_errors,
+                'skipped_serials': skipped,
+            },
+            message=f"{len(added)} tag(s) added, {len(skipped)} duplicates.",
+            status_code=201,
+        )
+
+
+class InventoryListView(APIView):
+    """List unregistered inventory with filtering."""
+    permission_classes = [IsOperator]
+
+    def get(self, request):
+        from .serializers import UnregisteredInventoryListSerializer
+        qs = UnregisteredInventory.objects.all()
+
+        status = request.query_params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+
+        booth_id = request.query_params.get('booth_assigned_id')
+        if booth_id:
+            try:
+                qs = qs.filter(booth_assigned_id=int(booth_id))
+            except (ValueError, TypeError):
+                pass
+
+        vehicle_type = request.query_params.get('vehicle_type')
+        if vehicle_type:
+            qs = qs.filter(vehicle_type=vehicle_type)
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(tag_serial__icontains=search) | qs.filter(tid__icontains=search)
+
+        page = int(request.query_params.get('page', 1))
+        per_page = int(request.query_params.get('per_page', 100))
+        start = (page - 1) * per_page
+        end = start + per_page
+
+        total = qs.count()
+        items = qs[start:end]
+
+        return success_response(
+            data={
+                'items': UnregisteredInventoryListSerializer(items, many=True).data,
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'pages': (total + per_page - 1) // per_page,
+            }
+        )
+
+
+class BoothAssignmentView(APIView):
+    """Assign unregistered inventory to a specific booth."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from .serializers import BoothAssignmentSerializer, BoothInventoryAssignment
+        serializer = BoothAssignmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(serializer.errors, status_code=400)
+
+        inventory_ids = serializer.validated_data['inventory_ids']
+        booth_id = serializer.validated_data['booth_id']
+        assigned_by = serializer.validated_data.get('assigned_by', request.user.email or 'system')
+
+        try:
+            inventories = UnregisteredInventory.objects.filter(id__in=inventory_ids)
+            if not inventories.exists():
+                return error_response("No inventory found for given IDs.", status_code=404)
+
+            assigned_count = 0
+            for inv in inventories:
+                inv.booth_assigned_id = booth_id
+                inv.booth_assigned_at = timezone.now()
+                inv.status = UnregisteredInventoryStatus.BOOTH_ASSIGNED
+                inv.save()
+
+                BoothInventoryAssignment.objects.create(
+                    inventory=inv,
+                    booth_id=booth_id,
+                    assigned_by=assigned_by,
+                )
+                assigned_count += 1
+
+            logger.info("Assigned %d inventory items to booth %d", assigned_count, booth_id)
+            return success_response(
+                data={
+                    'assigned': assigned_count,
+                    'booth_id': booth_id,
+                },
+                message=f"{assigned_count} tag(s) assigned to Booth {booth_id}.",
+                status_code=200,
+            )
+        except Exception as e:
+            logger.error("Error assigning inventory: %s", str(e))
+            return error_response(f"Assignment failed: {str(e)}", status_code=500)
+
+
+class TagActivationQuickCreateView(APIView):
+    """Quick activation: create new account and activate tag."""
+    permission_classes = [IsOperator]
+
+    def post(self, request):
+        from .serializers import TagActivationQuickCreateSerializer
+        from apps.users.models import User
+        from apps.accounts.models import Account, TopUp, TopUpStatus
+        serializer = TagActivationQuickCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(serializer.errors, status_code=400)
+
+        tag_serial = serializer.validated_data['tag_serial']
+        tid = serializer.validated_data['tid']
+        customer_name = serializer.validated_data['customer_name']
+        customer_phone = serializer.validated_data['customer_phone']
+        initial_topup = serializer.validated_data.get('initial_topup', 0)
+        payment_method = serializer.validated_data.get('payment_method', 'CASH')
+        activation_booth_id = serializer.validated_data['activation_booth_id']
+
+        try:
+            from django.db import transaction
+
+            with transaction.atomic():
+                inv = UnregisteredInventory.objects.get(tag_serial=tag_serial, tid=tid)
+
+                if inv.status == UnregisteredInventoryStatus.ACTIVATED:
+                    return error_response("Tag already activated.", status_code=400)
+
+                if inv.booth_assigned_id and inv.booth_assigned_id != activation_booth_id:
+                    return error_response(
+                        f"Tag assigned to Booth {inv.booth_assigned_id}, not Booth {activation_booth_id}.",
+                        status_code=400
+                    )
+
+                phone_parts = customer_phone.replace('+', '').replace(' ', '')
+                user_or_none = User.objects.filter(phone__in=[customer_phone, phone_parts[-10:] if len(phone_parts) > 10 else phone_parts]).first()
+
+                if user_or_none:
+                    user = user_or_none
+                else:
+                    user = User.objects.create_user(
+                        phone=customer_phone,
+                        full_name=customer_name,
+                        username=f"user_{tag_serial}_{timezone.now().timestamp()}",
+                    )
+
+                account = Account.objects.create(user=user, balance=initial_topup)
+
+                if initial_topup > 0:
+                    TopUp.objects.create(
+                        account=account,
+                        amount=initial_topup,
+                        status=TopUpStatus.SUCCESS,
+                        payment_method=payment_method,
+                        txn_id=f"MANUAL_{tag_serial}_{timezone.now().timestamp()}",
+                    )
+
+                inv.status = UnregisteredInventoryStatus.ACTIVATED
+                inv.activated_for_account = account
+                inv.first_activated_booth_id = activation_booth_id
+                inv.first_activated_at = timezone.now()
+                inv.save()
+
+                TagActivation.objects.create(
+                    tag_serial=tag_serial,
+                    tid=tid,
+                    first_scan_booth_id=activation_booth_id,
+                    first_scan_at=timezone.now(),
+                    created_account=account,
+                    activation_type='auto_created',
+                )
+
+                logger.info("Tag %s activated at Booth %d, account created for %s", tag_serial, activation_booth_id, customer_name)
+
+                from .serializers import UnregisteredInventorySerializer
+                return success_response(
+                    data=UnregisteredInventorySerializer(inv).data,
+                    message=f"Tag activated for {customer_name}",
+                    status_code=201,
+                )
+
+        except UnregisteredInventory.DoesNotExist:
+            return error_response(f"Tag {tag_serial} not found in inventory.", status_code=404)
+        except Exception as e:
+            logger.error("Error activating tag: %s", str(e))
+            return error_response(f"Activation failed: {str(e)}", status_code=500)
+
+
+class TagActivationLinkExistingView(APIView):
+    """Link tag to existing account."""
+    permission_classes = [IsOperator]
+
+    def post(self, request):
+        from .serializers import TagActivationLinkExistingSerializer
+        from apps.accounts.models import Account
+        serializer = TagActivationLinkExistingSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(serializer.errors, status_code=400)
+
+        tag_serial = serializer.validated_data['tag_serial']
+        tid = serializer.validated_data['tid']
+        account_id = serializer.validated_data['account_id']
+        activation_booth_id = serializer.validated_data['activation_booth_id']
+
+        try:
+            from django.db import transaction
+
+            with transaction.atomic():
+                inv = UnregisteredInventory.objects.get(tag_serial=tag_serial, tid=tid)
+
+                if inv.status == UnregisteredInventoryStatus.ACTIVATED:
+                    return error_response("Tag already activated.", status_code=400)
+
+                if inv.booth_assigned_id and inv.booth_assigned_id != activation_booth_id:
+                    return error_response(
+                        f"Tag assigned to Booth {inv.booth_assigned_id}, not Booth {activation_booth_id}.",
+                        status_code=400
+                    )
+
+                account = Account.objects.get(id=account_id)
+
+                inv.status = UnregisteredInventoryStatus.ACTIVATED
+                inv.activated_for_account = account
+                inv.first_activated_booth_id = activation_booth_id
+                inv.first_activated_at = timezone.now()
+                inv.save()
+
+                TagActivation.objects.create(
+                    tag_serial=tag_serial,
+                    tid=tid,
+                    first_scan_booth_id=activation_booth_id,
+                    first_scan_at=timezone.now(),
+                    created_account=account,
+                    activation_type='linked',
+                )
+
+                logger.info("Tag %s linked to account %s at Booth %d", tag_serial, account_id, activation_booth_id)
+
+                from .serializers import UnregisteredInventorySerializer
+                return success_response(
+                    data=UnregisteredInventorySerializer(inv).data,
+                    message="Tag linked to existing account",
+                    status_code=200,
+                )
+
+        except UnregisteredInventory.DoesNotExist:
+            return error_response(f"Tag {tag_serial} not found in inventory.", status_code=404)
+        except Account.DoesNotExist:
+            return error_response(f"Account {account_id} not found.", status_code=404)
+        except Exception as e:
+            logger.error("Error linking tag: %s", str(e))
+            return error_response(f"Linking failed: {str(e)}", status_code=500)
