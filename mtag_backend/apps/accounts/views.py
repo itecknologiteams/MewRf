@@ -8,6 +8,7 @@ from utils.pagination import StandardPagination
 from .models import Account, Transaction, TransactionType, TransactionStatus, TransactionSource
 from .serializers import AccountSerializer, TransactionSerializer, TransferSerializer
 from .services import TransferService
+from .printing import print_topup_receipt
 from apps.users.permissions import IsAdmin, IsOperator
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 def _norm_tid(value: str) -> str:
     return (value or '').strip().replace(' ', '').upper()
+
+
+def _receipt_no(txn) -> str:
+    """Short, human-readable receipt number derived from the topup transaction."""
+    return 'TX-' + str(txn.pk).replace('-', '')[:6].upper()
 
 
 class TopupLookupView(APIView):
@@ -84,6 +90,8 @@ class CashTopupView(APIView):
         tag = (Tag.objects.select_related('vehicle__account', 'vehicle__owner')
                .filter(tid=tid).first())
 
+        operator_name = getattr(request.user, 'full_name', '') or getattr(request.user, 'phone', '')
+
         with db_transaction.atomic():
             # ── Existing registered tag → simple topup ──────────────────────
             if tag and tag.vehicle and getattr(tag.vehicle, 'account', None):
@@ -91,77 +99,109 @@ class CashTopupView(APIView):
                 balance_before = account.balance
                 account.balance += amount
                 account.save(update_fields=['balance', 'balance_updated_at'])
-                Transaction.objects.create(
+                txn = Transaction.objects.create(
                     account=account, tag_serial=tag.tag_serial,
                     transaction_type=TransactionType.TOPUP, amount=amount,
                     balance_before=balance_before, balance_after=account.balance,
                     status=TransactionStatus.SUCCESS, source=TransactionSource.TOPUP_CASH,
                 )
                 logger.info("Cash topup — tid:%s amount:%s new_balance:%s", tid, amount, account.balance)
-                return success_response(data={
+                resp_data = {
                     'registered': False,
                     'consumer_name': tag.vehicle.owner.full_name,
                     'amount_added': str(amount),
                     'new_balance': str(account.balance),
-                }, message="Cash topup successful")
+                }
+                resp_msg, resp_status = "Cash topup successful", 200
+                receipt = {
+                    'receipt_no': _receipt_no(txn),
+                    'datetime': timezone.localtime(txn.processed_at).strftime('%d/%m/%Y %H:%M:%S')
+                    if getattr(txn, 'processed_at', None) else timezone.localtime().strftime('%d/%m/%Y %H:%M:%S'),
+                    'consumer_name': tag.vehicle.owner.full_name,
+                    'vehicle_reg': tag.vehicle.plate_number,
+                    'tid': tag.tid or tid,
+                    'amount': str(amount),
+                    'balance_before': str(balance_before),
+                    'balance_after': str(account.balance),
+                    'payment': 'CASH',
+                    'operator': operator_name,
+                }
+            else:
+                # ── New / unassigned tag → register consumer + vehicle + activate ─
+                if not name or not phone:
+                    return error_response("consumer_name and phone are required to register a new tag")
+                import re
+                plate = re.sub(r'[\s\-]', '', plate_raw).upper()
+                if not plate:
+                    return error_response("vehicle_reg (registration number) is required to register a new tag")
+                if Vehicle.objects.filter(plate_number=plate).exists():
+                    return error_response("A vehicle with this registration number already exists", status_code=409)
 
-            # ── New / unassigned tag → register consumer + vehicle + activate ─
-            if not name or not phone:
-                return error_response("consumer_name and phone are required to register a new tag")
-            import re
-            plate = re.sub(r'[\s\-]', '', plate_raw).upper()
-            if not plate:
-                return error_response("vehicle_reg (registration number) is required to register a new tag")
-            if Vehicle.objects.filter(plate_number=plate).exists():
-                return error_response("A vehicle with this registration number already exists", status_code=409)
+                owner = User.objects.filter(phone=phone).first()
+                if owner is None:
+                    pwd = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                    owner = User.objects.create_user(phone=phone, password=pwd, full_name=name, cnic=cnic or None)
 
-            owner = User.objects.filter(phone=phone).first()
-            if owner is None:
-                pwd = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-                owner = User.objects.create_user(phone=phone, password=pwd, full_name=name, cnic=cnic or None)
+                vehicle = Vehicle.objects.create(plate_number=plate, vehicle_type='car', owner=owner)
 
-            vehicle = Vehicle.objects.create(plate_number=plate, vehicle_type='car', owner=owner)
-
-            if tag:  # inventory tag — assign + activate
-                tag.vehicle = vehicle
-                if epc:
-                    tag.epc = epc
-                tag.status = TagStatus.ACTIVE
-                tag.save()
-            else:    # brand-new tag — create with a generated serial
-                sprefix = timezone.localtime().strftime('%d%m%y%H%M')
-                last = (Tag.objects.filter(tag_serial__startswith=sprefix)
-                        .order_by('-tag_serial').values_list('tag_serial', flat=True).first())
-                s = 1
-                if last:
-                    try:
-                        s = int(last[len(sprefix):]) + 1
-                    except (ValueError, TypeError):
-                        s = Tag.objects.filter(tag_serial__startswith=sprefix).count() + 1
-                serial = f"{sprefix}{s:04d}"
-                while Tag.objects.filter(tag_serial=serial).exists():
-                    s += 1
+                if tag:  # inventory tag — assign + activate
+                    tag.vehicle = vehicle
+                    if epc:
+                        tag.epc = epc
+                    tag.status = TagStatus.ACTIVE
+                    tag.save()
+                else:    # brand-new tag — create with a generated serial
+                    sprefix = timezone.localtime().strftime('%d%m%y%H%M')
+                    last = (Tag.objects.filter(tag_serial__startswith=sprefix)
+                            .order_by('-tag_serial').values_list('tag_serial', flat=True).first())
+                    s = 1
+                    if last:
+                        try:
+                            s = int(last[len(sprefix):]) + 1
+                        except (ValueError, TypeError):
+                            s = Tag.objects.filter(tag_serial__startswith=sprefix).count() + 1
                     serial = f"{sprefix}{s:04d}"
-                tag = Tag.objects.create(
-                    tag_serial=serial, tid=tid, epc=epc, vehicle=vehicle,
-                    expiry_date=date(2099, 12, 31), status=TagStatus.ACTIVE,
-                )
+                    while Tag.objects.filter(tag_serial=serial).exists():
+                        s += 1
+                        serial = f"{sprefix}{s:04d}"
+                    tag = Tag.objects.create(
+                        tag_serial=serial, tid=tid, epc=epc, vehicle=vehicle,
+                        expiry_date=date(2099, 12, 31), status=TagStatus.ACTIVE,
+                    )
 
-            account = Account.objects.create(vehicle=vehicle, user=owner, balance=amount)
-            Transaction.objects.create(
-                account=account, tag_serial=tag.tag_serial,
-                transaction_type=TransactionType.TOPUP, amount=amount,
-                balance_before=Decimal('0.00'), balance_after=amount,
-                status=TransactionStatus.SUCCESS, source=TransactionSource.TOPUP_CASH,
-            )
-            logger.info("Cash topup + register — tid:%s plate:%s amount:%s", tid, plate, amount)
-            return success_response(data={
-                'registered': True,
-                'consumer_name': name,
-                'plate': plate,
-                'amount_added': str(amount),
-                'new_balance': str(amount),
-            }, message="Registered and topped up", status_code=201)
+                account = Account.objects.create(vehicle=vehicle, user=owner, balance=amount)
+                txn = Transaction.objects.create(
+                    account=account, tag_serial=tag.tag_serial,
+                    transaction_type=TransactionType.TOPUP, amount=amount,
+                    balance_before=Decimal('0.00'), balance_after=amount,
+                    status=TransactionStatus.SUCCESS, source=TransactionSource.TOPUP_CASH,
+                )
+                logger.info("Cash topup + register — tid:%s plate:%s amount:%s", tid, plate, amount)
+                resp_data = {
+                    'registered': True,
+                    'consumer_name': name,
+                    'plate': plate,
+                    'amount_added': str(amount),
+                    'new_balance': str(amount),
+                }
+                resp_msg, resp_status = "Registered and topped up", 201
+                receipt = {
+                    'receipt_no': _receipt_no(txn),
+                    'datetime': timezone.localtime(txn.processed_at).strftime('%d/%m/%Y %H:%M:%S')
+                    if getattr(txn, 'processed_at', None) else timezone.localtime().strftime('%d/%m/%Y %H:%M:%S'),
+                    'consumer_name': name,
+                    'vehicle_reg': plate,
+                    'tid': tag.tid or tid,
+                    'amount': str(amount),
+                    'balance_before': '0.00',
+                    'balance_after': str(amount),
+                    'payment': 'CASH',
+                    'operator': operator_name,
+                }
+
+        # ── Topup committed. Print receipt best-effort (never fails the topup). ─
+        resp_data['printed'] = print_topup_receipt(receipt)
+        return success_response(data=resp_data, message=resp_msg, status_code=resp_status)
 
 
 class AccountDetailView(APIView):

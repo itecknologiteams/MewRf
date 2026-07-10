@@ -1,7 +1,12 @@
 # Design: Topup Receipt Printing (POS / ESC-POS)
 
 Date: 2026-06-18
-Status: Approach decided — **Option B** (MewRf prints directly via CUPS `lp`)
+Status: **IMPLEMENTED** (2026-06-22) — Option B. `apps/accounts/printing.py`
+(`print_topup_receipt` + Pillow logo raster), hooked into `CashTopupView` (both
+paths, best-effort after commit, returns `printed` in the response). Settings:
+`TOPUP_RECEIPT_PRINT_ENABLED` (default False), `POS_PRINTER_NAME` (POS80),
+`RECEIPT_LOGO_PATH` (`apps/accounts/receipt_logo.png`). Pillow added to
+requirements. Enable on the gate PC by setting `TOPUP_RECEIPT_PRINT_ENABLED=True`.
 
 ## Problem
 

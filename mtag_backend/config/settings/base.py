@@ -211,6 +211,15 @@ JAZZCASH_VERIFY_HASH = env.bool('JAZZCASH_VERIFY_HASH', default=False)
 
 MINIMUM_ACCOUNT_BALANCE = 50
 
+# ── Topup receipt printing (POS / ESC-POS via CUPS `lp`) ──────────────────────
+# After a successful cash topup the backend prints a TOPUP receipt on the same
+# POS80 thermal printer the toll system uses (`lp -d POS80 -o raw`). Best-effort:
+# a print failure never fails the topup. Disabled by default so dev/Windows
+# machines (no printer) don't error; the gate PC (Linux/CUPS) sets it True.
+TOPUP_RECEIPT_PRINT_ENABLED = env.bool('TOPUP_RECEIPT_PRINT_ENABLED', default=False)
+POS_PRINTER_NAME = env('POS_PRINTER_NAME', default='POS80')
+RECEIPT_LOGO_PATH = env('RECEIPT_LOGO_PATH', default=str(BASE_DIR / 'apps' / 'accounts' / 'receipt_logo.png'))
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

@@ -1,7 +1,7 @@
 import re
 from datetime import date
 from rest_framework import serializers
-from .models import Vehicle, Tag
+from .models import Vehicle, Tag, UnregisteredInventory, BoothInventoryAssignment, TagActivation
 
 
 def normalize_plate(value: str) -> str:
@@ -110,3 +110,78 @@ class TagReissueSerializer(serializers.Serializer):
                 raise serializers.ValidationError("This tag is already assigned to a vehicle.")
             raise serializers.ValidationError("Tag not found in inventory.")
         return value
+
+
+# ============= Inventory Management Serializers =============
+
+class UnregisteredInventorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnregisteredInventory
+        fields = [
+            'id', 'tag_serial', 'tid', 'epc',
+            'vehicle_plate', 'vehicle_type', 'vehicle_color',
+            'status', 'notes',
+            'booth_assigned_id', 'booth_assigned_at',
+            'first_activated_booth_id', 'first_activated_at',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class UnregisteredInventoryListSerializer(serializers.ModelSerializer):
+    """Simplified list view for inventory."""
+    class Meta:
+        model = UnregisteredInventory
+        fields = [
+            'id', 'tag_serial', 'tid', 'vehicle_plate', 'vehicle_type',
+            'status', 'booth_assigned_id', 'first_activated_booth_id', 'created_at'
+        ]
+
+
+class BoothAssignmentSerializer(serializers.Serializer):
+    """Serializer for booth assignment operation."""
+    inventory_ids = serializers.ListField(child=serializers.CharField())
+    booth_id = serializers.IntegerField(min_value=1, max_value=7)
+    assigned_by = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_inventory_ids(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one inventory ID required.")
+        if len(value) > 1000:
+            raise serializers.ValidationError("Cannot assign more than 1000 tags at once.")
+        return value
+
+
+class TagActivationQuickCreateSerializer(serializers.Serializer):
+    """Quick activation - create new account and vehicle."""
+    tag_serial = serializers.CharField(max_length=50)
+    tid = serializers.CharField(max_length=50)
+    customer_name = serializers.CharField(max_length=100)
+    customer_phone = serializers.CharField(max_length=20)
+    initial_topup = serializers.DecimalField(
+        max_digits=12, decimal_places=2,
+        required=False, default=0,
+        min_value=0
+    )
+    payment_method = serializers.CharField(max_length=50, default='CASH')
+    activation_booth_id = serializers.IntegerField(min_value=1, max_value=7)
+
+
+class TagActivationLinkExistingSerializer(serializers.Serializer):
+    """Activation - link to existing account."""
+    tag_serial = serializers.CharField(max_length=50)
+    tid = serializers.CharField(max_length=50)
+    account_id = serializers.CharField()  # UUID as string
+    activation_booth_id = serializers.IntegerField(min_value=1, max_value=7)
+
+
+class TagActivationSerializer(serializers.ModelSerializer):
+    """Read-only serializer for tag activation records."""
+    class Meta:
+        model = TagActivation
+        fields = [
+            'id', 'tag_serial', 'tid',
+            'first_scan_booth_id', 'first_scan_at',
+            'activation_type', 'created_at'
+        ]
+        read_only_fields = fields
