@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { tollsApi, accountsApi, ApiError } from '@/services/api';
+import { inventoryApi } from '@/services/inventoryApi';
 import type { Plaza, TollTrip } from '@/types';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router';
+import InventoryActivationModal from '@/components/InventoryActivationModal';
+import InventoryCheckWarning from '@/components/InventoryCheckWarning';
 import {
   ArrowRight,
   ArrowLeft,
@@ -86,6 +89,21 @@ export default function TollOperations() {
   const [loadingGateEvents, setLoadingGateEvents] = useState(false);
   const [showGateEvents, setShowGateEvents] = useState(false);
 
+  // Inventory integration
+  const [inventoryCheckWarning, setInventoryCheckWarning] = useState<{
+    type: 'booth_mismatch' | 'not_assigned' | 'activation_required';
+    boothAssignedId?: number;
+    mode: 'entry' | 'exit';
+    tagSerial: string;
+  } | null>(null);
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [pendingActivationTag, setPendingActivationTag] = useState<{
+    tag_serial: string;
+    tid: string;
+    booth_id: number;
+    mode: 'entry' | 'exit';
+  } | null>(null);
+
   useEffect(() => {
     if (!isAllowed) return;
     const fetchPlazas = async () => {
@@ -141,6 +159,72 @@ export default function TollOperations() {
     setOpLogs((prev) => [log, ...prev].slice(0, 10));
   };
 
+  // Convert plaza ID to booth number (e.g., plaza_1 -> booth 1)
+  const getBoothIdFromPlazaId = (plazaId: string): number => {
+    const match = plazaId.match(/\d+/);
+    return match ? parseInt(match[0]) : 1;
+  };
+
+  const checkInventoryAndProceed = async (
+    tagSerial: string,
+    plazaId: string,
+    mode: 'entry' | 'exit'
+  ) => {
+    try {
+      const boothId = getBoothIdFromPlazaId(plazaId);
+      const status = await inventoryApi.checkStatus(tagSerial);
+
+      // Tag not in inventory - proceed with normal toll operation
+      if (!status.found) {
+        return { proceed: true };
+      }
+
+      // Tag is in inventory - handle based on status
+      if (status.status === 'activated' || status.status === 'not_in_inventory') {
+        // Already activated or not in inventory - proceed normally
+        return { proceed: true };
+      }
+
+      if (status.status === 'unregistered') {
+        // Unregistered - tag needs to be assigned first
+        setInventoryCheckWarning({
+          type: 'not_assigned',
+          mode,
+          tagSerial,
+        });
+        return { proceed: false };
+      }
+
+      if (status.status === 'booth_assigned') {
+        // Check if assigned to this booth
+        if (status.booth_assigned_id !== boothId) {
+          setInventoryCheckWarning({
+            type: 'booth_mismatch',
+            boothAssignedId: status.booth_assigned_id,
+            mode,
+            tagSerial,
+          });
+          return { proceed: false };
+        }
+
+        // Assigned to this booth - show activation modal
+        setPendingActivationTag({
+          tag_serial: tagSerial,
+          tid: '', // Will be filled from API response
+          booth_id: boothId,
+          mode,
+        });
+        setShowActivationModal(true);
+        return { proceed: false, requiresActivation: true };
+      }
+
+      return { proceed: true };
+    } catch (err) {
+      // If inventory check fails, proceed with normal operation
+      return { proceed: true };
+    }
+  };
+
   const handleEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!entryTag.trim() || !entryPlaza) {
@@ -149,7 +233,18 @@ export default function TollOperations() {
     }
     setProcessingEntry(true);
     setLowBalance(null);
+    setInventoryCheckWarning(null);
+
     try {
+      // Check inventory first
+      const inventoryCheck = await checkInventoryAndProceed(entryTag, entryPlaza, 'entry');
+
+      if (!inventoryCheck.proceed) {
+        setProcessingEntry(false);
+        return;
+      }
+
+      // Proceed with normal toll operation
       const trip = await tollsApi.entry({
         tag_serial: entryTag,
         plaza_id: entryPlaza,
@@ -187,7 +282,18 @@ export default function TollOperations() {
     }
     setProcessingExit(true);
     setLowBalance(null);
+    setInventoryCheckWarning(null);
+
     try {
+      // Check inventory first
+      const inventoryCheck = await checkInventoryAndProceed(exitTag, exitPlaza, 'exit');
+
+      if (!inventoryCheck.proceed) {
+        setProcessingExit(false);
+        return;
+      }
+
+      // Proceed with normal toll operation
       const trip = await tollsApi.exit({
         tag_serial: exitTag,
         plaza_id: exitPlaza,
@@ -666,6 +772,77 @@ export default function TollOperations() {
             )}
           </div>
         </>
+      )}
+
+      {/* Inventory Check Warning */}
+      {inventoryCheckWarning && (
+        <div className="fixed bottom-6 right-6 z-40 max-w-md">
+          <InventoryCheckWarning
+            status={inventoryCheckWarning.type}
+            boothAssignedId={inventoryCheckWarning.boothAssignedId}
+            currentBoothId={getBoothIdFromPlazaId(
+              inventoryCheckWarning.mode === 'entry' ? entryPlaza : exitPlaza
+            )}
+          />
+        </div>
+      )}
+
+      {/* Inventory Activation Modal */}
+      {showActivationModal && pendingActivationTag && (
+        <InventoryActivationModal
+          tag={{
+            tag_serial: pendingActivationTag.tag_serial,
+            tid: pendingActivationTag.tid,
+          }}
+          activationBoothId={pendingActivationTag.booth_id}
+          onSuccess={async () => {
+            setShowActivationModal(false);
+            // Auto-proceed with toll operation after activation
+            if (pendingActivationTag.mode === 'entry') {
+              setEntryTag(pendingActivationTag.tag_serial);
+              try {
+                const trip = await tollsApi.entry({
+                  tag_serial: pendingActivationTag.tag_serial,
+                  plaza_id: entryPlaza,
+                  ...(entryLane ? { lane_id: entryLane } : {}),
+                });
+                const result: OperationResult = { success: true, trip, message: 'Entry recorded after activation', type: 'entry' };
+                addLog('entry', pendingActivationTag.tag_serial, entryPlaza, result);
+                addToast({ type: 'success', title: 'Entry Recorded', message: `Vehicle entered at ${plazas.find((p) => p.id === entryPlaza)?.name}` });
+                setEntryTag('');
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Entry failed';
+                const result: OperationResult = { success: false, message, type: 'entry' };
+                addLog('entry', pendingActivationTag.tag_serial, entryPlaza, result);
+                addToast({ type: 'error', title: 'Entry Failed', message });
+              }
+            } else {
+              setExitTag(pendingActivationTag.tag_serial);
+              try {
+                const trip = await tollsApi.exit({
+                  tag_serial: pendingActivationTag.tag_serial,
+                  plaza_id: exitPlaza,
+                  ...(exitLane ? { lane_id: exitLane } : {}),
+                });
+                const result: OperationResult = { success: true, trip, message: 'Exit processed after activation', type: 'exit' };
+                addLog('exit', pendingActivationTag.tag_serial, exitPlaza, result);
+                const charge = trip.charge_amount ? `PKR ${parseFloat(trip.charge_amount).toLocaleString()} charged` : '';
+                addToast({ type: 'success', title: 'Exit Processed', message: charge || 'Vehicle exited successfully' });
+                setExitTag('');
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Exit failed';
+                const result: OperationResult = { success: false, message, type: 'exit' };
+                addLog('exit', pendingActivationTag.tag_serial, exitPlaza, result);
+                addToast({ type: 'error', title: 'Exit Failed', message });
+              }
+            }
+            setPendingActivationTag(null);
+          }}
+          onClose={() => {
+            setShowActivationModal(false);
+            setPendingActivationTag(null);
+          }}
+        />
       )}
     </div>
   );
