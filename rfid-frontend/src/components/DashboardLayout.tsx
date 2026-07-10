@@ -22,6 +22,8 @@ import {
   Gauge,
   ArrowRightLeft,
   Wallet,
+  Package,
+  Tags,
 } from 'lucide-react';
 
 interface NavItem {
@@ -44,6 +46,8 @@ const navItems: NavItem[] = [
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/profile', label: 'Profile', icon: User },
   { path: '/admin/users', label: 'User Management', icon: Users, adminOnly: true },
+  { path: '/admin/inventory', label: 'Inventory Management', icon: Package, adminOnly: true },
+  { path: '/admin/booth-assignment', label: 'Booth Assignment', icon: Tags, adminOnly: true },
 ];
 
 export default function DashboardLayout() {

@@ -18,6 +18,8 @@ import TripsPage from '@/pages/TripsPage';
 import AdminUsersPage from '@/pages/AdminUsersPage';
 import BalanceTransfer from '@/pages/BalanceTransfer';
 import TopupPage from '@/pages/TopupPage';
+import InventoryManagement from '@/pages/InventoryManagement';
+import BoothAssignmentPage from '@/pages/BoothAssignmentPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -54,6 +56,8 @@ function AppRoutes() {
         <Route path="plazas" element={<PlazasPage />} />
         <Route path="trips" element={<TripsPage />} />
         <Route path="admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+        <Route path="admin/inventory" element={<AdminRoute><InventoryManagement /></AdminRoute>} />
+        <Route path="admin/booth-assignment" element={<AdminRoute><BoothAssignmentPage /></AdminRoute>} />
         <Route path="transfer" element={<BalanceTransfer />} />
         <Route path="topup" element={<TopupPage />} />
       </Route>
