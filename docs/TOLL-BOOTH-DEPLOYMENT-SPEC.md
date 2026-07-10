@@ -15,16 +15,17 @@
 1. ✅ Inventory + TopUp Master DB
    └─ Central database for all master data
 
-2. ✅ Dual Write (Local + Master)
+2. ✅ Dual Write (Local + Master) - BOTH MUST SUCCEED
    ├─ Entry transactions → Both local & master
    ├─ Exit transactions → Both local & master
-   └─ Simultaneous writes
+   ├─ Simultaneous writes
+   └─ ⚠️ ONLINE ONLY - If either fails, transaction fails
 
-3. ✅ Booth Local DB Sync
-   ├─ Fare matrix synced from master
-   ├─ Inventory tables synced from master
-   ├─ Offline operation capable
-   └─ Auto-sync on connectivity
+3. ✅ Booth Local DB (Read-only Cache)
+   ├─ Fare matrix (read-only cache from master)
+   ├─ Inventory (read-only cache from master)
+   ├─ Transaction log (for receipts)
+   └─ No offline operation - Must stay online
 
 4. ✅ No Lane ID
    └─ Only Plaza ID (1-7)
@@ -35,9 +36,34 @@
    └─ Version control
 
 6. ✅ Bi-directional Sync
-   ├─ Master → Local (fare, inventory)
-   ├─ Local → Master (transactions)
-   └─ Conflict resolution
+   ├─ Master → Local (fare, inventory) - Periodic
+   ├─ Transactions → Master (real-time, dual-write)
+   └─ No fallback - Online-only operation
+```
+
+---
+
+## ⚠️ CRITICAL: ONLINE-ONLY SYSTEM
+
+```
+No Offline Mode Allowed ❌
+
+Entry/Exit MUST be processed:
+├─ Connected to master DB ✅
+├─ Both writes succeed ✅
+└─ Or transaction rejected ❌
+
+Booth Requirements:
+├─ Always-on internet connection
+├─ WiFi or dedicated line
+├─ Backup connectivity (4G modem)
+└─ Connection monitoring
+
+If Connection Lost:
+├─ Cannot process entries ❌
+├─ Cannot process exits ❌
+├─ Error message displayed
+└─ Manual override (with manager approval)
 ```
 
 ---
@@ -80,52 +106,61 @@ Tables (Synced from Master):
 
 ## 🏗️ Complete Architecture
 
-### System Diagram
+### System Diagram (ONLINE-ONLY)
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  MASTER DATABASE                     │
-│              (Central Server - Online)               │
-├─────────────────────────────────────────────────────┤
-│                                                      │
-│  accounts          inventory       fare_matrix      │
-│  ├─ UUID           ├─ vehicle_id   ├─ plaza_from   │
-│  ├─ name           ├─ plate        ├─ plaza_to     │
-│  ├─ balance        ├─ owner        └─ fare         │
-│  └─ topup_records  └─ tags                          │
-│                                                      │
-│  entry_transactions        exit_transactions       │
-│  ├─ tid                    ├─ tid                   │
-│  ├─ entry_plaza            ├─ exit_plaza           │
-│  ├─ entry_time             ├─ exit_time            │
-│  ├─ balance_before         ├─ fare_deducted        │
-│  └─ synced_from_booth      └─ synced_from_booth    │
-│                                                      │
-│  sync_log                  topup_master            │
-│  ├─ booth_id               ├─ customer_id          │
-│  ├─ last_sync_time         ├─ amount               │
-│  ├─ entries_synced         ├─ payment_method       │
-│  └─ exits_synced           └─ timestamp            │
-│                                                      │
-└──────┬──────────────────────────────────────────────┘
-       │
-       │ Bi-directional Sync
-       │ (HTTP/REST API)
-       │
-   ┌───┴────────────────────────────────────────────┐
-   │                                                │
-   ▼                                                ▼
-┌──────────────┐                              ┌──────────────┐
-│  BOOTH 1     │                              │  BOOTH 2-7   │
-│ (Main Plaza) │                              │ (Remote)     │
-│   Online     │                              │  Offline-OK  │
-├──────────────┤                              ├──────────────┤
-│  SQLite      │                              │  SQLite      │
-├──────────────┤                              ├──────────────┤
-│Entry/Exit TX │  ◄─────────────────────────  │Entry/Exit TX │
-│Fare Matrix   │────────────────────────────► │Fare Matrix   │
-│Inventory     │  (Sync every 5 min)         │Inventory     │
-└──────────────┘                              └──────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                   MASTER DATABASE                         │
+│               (Central Server - Online)                   │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  accounts          inventory       fare_matrix           │
+│  ├─ UUID           ├─ vehicle_id   ├─ plaza_from        │
+│  ├─ name           ├─ plate        ├─ plaza_to          │
+│  ├─ balance        ├─ owner        └─ fare              │
+│  └─ topup_records  └─ tags                               │
+│                                                           │
+│  entry_transactions        exit_transactions            │
+│  ├─ tid                    ├─ tid                        │
+│  ├─ entry_plaza            ├─ exit_plaza                │
+│  ├─ entry_time             ├─ exit_time                 │
+│  ├─ balance_before         ├─ fare_deducted             │
+│  └─ synced_from_booth      └─ synced_from_booth         │
+│                                                           │
+│  topup_master              sync_log                      │
+│  ├─ customer_id            ├─ booth_id                  │
+│  ├─ amount                 ├─ sync_time                 │
+│  └─ payment_method         └─ status                    │
+│                                                           │
+└──────────┬───────────────────────────────────────────────┘
+           │
+           │ ⚠️ REAL-TIME DUAL-WRITE (ONLINE ONLY)
+           │ Entry/Exit → Both DBs immediately
+           │ NO queue, NO pending, NO async
+           │
+    ┌──────┴──────────────────────────────────────────┐
+    │                                                  │
+    ▼                                                  ▼
+┌──────────────────┐                          ┌──────────────────┐
+│  BOOTH 1         │                          │  BOOTH 2-7       │
+│ (Main Plaza)     │                          │ (Remote Plazas)  │
+│                  │                          │                  │
+│ MUST be ONLINE ✅ │                          │ MUST be ONLINE ✅ │
+│ - Fiber/DSL      │                          │ - WiFi           │
+│ - Dedicated Line │                          │ - 4G Backup      │
+│ - Continuous     │  ◄──────────────────────► │ - Monitored      │
+└──────────────────┘   Real-time Sync          └──────────────────┘
+                      (Dual-write)
+       
+Local SQLite (Cache only):
+├─ fare_matrix_local (read-only)
+├─ inventory_local (read-only)
+├─ transactions_log (for receipts)
+└─ sync_status (monitor health)
+
+⚠️ NO offline operation
+⚠️ Connection loss = Cannot process
+⚠️ Immediate rollback if either DB fails
 ```
 
 ---
@@ -346,13 +381,18 @@ def process_entry(tid, booth_id):
         return {'success': False, 'error': str(e)}
 ```
 
-### Exit at Booth (Booth 2-7 - May be Offline)
+### Exit at Booth (Booth 2-7 - MUST be Online)
 
 ```python
 def process_exit(tid, booth_id):
     """
-    Process exit at booth - DUAL WRITE if online, LOCAL only if offline
+    Process exit at booth - DUAL WRITE to BOTH databases
+    ⚠️ ONLINE ONLY - Both writes must succeed or transaction fails
     """
+    
+    # 0. VERIFY CONNECTIVITY
+    if not is_connected_to_master():
+        return {'success': False, 'reason': 'No connection to master - Cannot process exit'}
     
     # 1. Read entry data from RFID tag
     entry_data = read_from_rfid_tag(tid)
@@ -362,7 +402,7 @@ def process_exit(tid, booth_id):
     entry_plaza_id = entry_data['plaza_id']
     balance_at_entry = entry_data['balance']
     
-    # 2. Lookup fare from LOCAL fare matrix
+    # 2. Lookup fare from LOCAL fare matrix (cached from master)
     try:
         fare = local_db.fare_matrix_local.get(
             entry_plaza_id=entry_plaza_id,
@@ -390,23 +430,29 @@ def process_exit(tid, booth_id):
         'synced_from_booth_id': booth_id
     }
     
-    # 5. DUAL WRITE - Try both, but continue if master fails
+    # 5. DUAL WRITE - BOTH must succeed
     try:
-        # Write to local DB (ALWAYS)
-        local_db.exit_transactions.insert(exit_data)
+        # Write to MASTER DB (PRIMARY)
+        master_result = master_db.exit_transactions.insert(exit_data)
+        if not master_result:
+            return {'success': False, 'reason': 'Failed to write to master DB'}
+        print("✅ Written to master DB")
+        
+        # Write to LOCAL DB (BACKUP)
+        local_result = local_db.exit_transactions.insert(exit_data)
+        if not local_result:
+            # Rollback master write
+            master_db.exit_transactions.delete(exit_data['id'])
+            return {'success': False, 'reason': 'Failed to write to local DB'}
         print("✅ Written to local DB")
         
-        # Try to write to master DB (OK if fails - will sync later)
-        try:
-            master_db.exit_transactions.insert(exit_data)
-            print("✅ Written to master DB")
-            exit_data['synced'] = True
-        except Exception as e:
-            print(f"⚠️ Master DB write failed: {e}")
-            print("Will sync later when connected")
-            exit_data['synced'] = False
+        # Update balance in MASTER DB
+        master_db.accounts.update(
+            tid=tid,
+            balance=new_balance
+        )
         
-        # Update account balance in local DB
+        # Update balance in LOCAL DB (cache)
         local_db.accounts.update(
             tid=tid,
             balance=new_balance
@@ -420,12 +466,18 @@ def process_exit(tid, booth_id):
             'fare': fare,
             'balance_before': balance_at_entry,
             'balance_after': new_balance,
-            'synced': exit_data.get('synced', False)
+            'status': 'SUCCESS - Both DBs updated'
         })
         
         return {'success': True, 'new_balance': new_balance}
         
     except Exception as e:
+        # Rollback both
+        try:
+            master_db.exit_transactions.delete(exit_data['id'])
+            local_db.exit_transactions.delete(exit_data['id'])
+        except:
+            pass
         return {'success': False, 'error': str(e)}
 ```
 
@@ -691,19 +743,25 @@ class BoothSyncScheduler:
 
 ---
 
-## 🎯 Sync Conflict Resolution
+## 🎯 Transaction Failure Resolution (ONLINE-ONLY)
 
-### Scenario 1: Entry Written Locally, Master Write Fails
+### Scenario 1: Master Write Fails
 
 ```
+⚠️ ONLINE-ONLY SYSTEM
+
 Local DB:  ✅ Entry recorded
 Master DB: ❌ Write failed (network issue)
 
-Solution:
-1. Mark as "pending_sync" in local DB
-2. Queue for retry
-3. Retry during next sync cycle
-4. Once synced, mark as "synced"
+Action:
+1. ROLLBACK both writes
+2. ❌ Reject transaction
+3. Display error to user
+4. Vehicle CANNOT proceed
+5. Manual override required (with manager approval)
+
+Result: Transaction is completely rejected
+No partial writes, No pending queue, No retry
 ```
 
 ### Scenario 2: Fare Matrix Updated While Processing
