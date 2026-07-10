@@ -718,3 +718,33 @@ class TagActivationLinkExistingView(APIView):
         except Exception as e:
             logger.error("Error linking tag: %s", str(e))
             return error_response(f"Linking failed: {str(e)}", status_code=500)
+
+
+class InventoryCheckView(APIView):
+    """Check if a tag is in unregistered inventory and get its status."""
+    permission_classes = [IsOperator]
+
+    def get(self, request, tag_serial):
+        try:
+            inv = UnregisteredInventory.objects.get(tag_serial=tag_serial)
+
+            return success_response(
+                data={
+                    'found': True,
+                    'status': inv.status,
+                    'booth_assigned_id': inv.booth_assigned_id,
+                    'first_activated_booth_id': inv.first_activated_booth_id,
+                    'vehicle_plate': inv.vehicle_plate,
+                    'vehicle_type': inv.vehicle_type,
+                    'can_activate': inv.status == UnregisteredInventoryStatus.BOOTH_ASSIGNED,
+                    'activation_required': inv.status != UnregisteredInventoryStatus.ACTIVATED,
+                }
+            )
+        except UnregisteredInventory.DoesNotExist:
+            return success_response(
+                data={
+                    'found': False,
+                    'status': 'not_in_inventory',
+                    'activation_required': False,
+                }
+            )

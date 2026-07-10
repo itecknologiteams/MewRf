@@ -4,7 +4,7 @@ from .views import (
     AvailableTagsView, TagInventoryUploadView, TagCreateView, TagBulkCreateView,
     TagExistsCheckView, TagScanBufferView, ScanDebugView, VehicleSuspendView,
     InventoryUploadView, InventoryListView, BoothAssignmentView,
-    TagActivationQuickCreateView, TagActivationLinkExistingView,
+    TagActivationQuickCreateView, TagActivationLinkExistingView, InventoryCheckView,
 )
 
 urlpatterns = [
@@ -27,4 +27,5 @@ urlpatterns = [
     path('inventory/assign-booth/', BoothAssignmentView.as_view(), name='booth-assignment'),
     path('inventory/activate/', TagActivationQuickCreateView.as_view(), name='tag-activate'),
     path('inventory/activate-existing/', TagActivationLinkExistingView.as_view(), name='tag-activate-existing'),
+    path('inventory/check/<str:tag_serial>/', InventoryCheckView.as_view(), name='inventory-check'),
 ]

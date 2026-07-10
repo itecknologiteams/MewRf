@@ -153,6 +153,60 @@ class BoothAssignmentAPITest(TestCase):
         self.assertEqual(self.inv1.status, UnregisteredInventoryStatus.BOOTH_ASSIGNED)
 
 
+class InventoryCheckAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.operator_user = User.objects.create_user(
+            phone='03001234567', password='testpass123', full_name='Operator', user_role=UserRole.OPERATOR
+        )
+        self.client.force_authenticate(user=self.operator_user)
+
+        self.inv_unregistered = UnregisteredInventory.objects.create(
+            tag_serial='SER001', tid='TID001', status=UnregisteredInventoryStatus.UNREGISTERED
+        )
+        self.inv_assigned = UnregisteredInventory.objects.create(
+            tag_serial='SER002', tid='TID002', status=UnregisteredInventoryStatus.BOOTH_ASSIGNED,
+            booth_assigned_id=2
+        )
+        self.inv_activated = UnregisteredInventory.objects.create(
+            tag_serial='SER003', tid='TID003', status=UnregisteredInventoryStatus.ACTIVATED,
+            first_activated_booth_id=3
+        )
+
+    def test_check_unregistered_tag(self):
+        response = self.client.get('/api/v1/vehicles/inventory/check/SER001/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertTrue(data['found'])
+        self.assertEqual(data['status'], 'unregistered')
+        self.assertFalse(data['can_activate'])
+
+    def test_check_booth_assigned_tag(self):
+        response = self.client.get('/api/v1/vehicles/inventory/check/SER002/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertTrue(data['found'])
+        self.assertEqual(data['status'], 'booth_assigned')
+        self.assertEqual(data['booth_assigned_id'], 2)
+        self.assertTrue(data['can_activate'])
+
+    def test_check_activated_tag(self):
+        response = self.client.get('/api/v1/vehicles/inventory/check/SER003/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertTrue(data['found'])
+        self.assertEqual(data['status'], 'activated')
+        self.assertEqual(data['first_activated_booth_id'], 3)
+        self.assertFalse(data['activation_required'])
+
+    def test_check_nonexistent_tag(self):
+        response = self.client.get('/api/v1/vehicles/inventory/check/NONEXISTENT/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertFalse(data['found'])
+        self.assertEqual(data['status'], 'not_in_inventory')
+
+
 class TagActivationAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
