@@ -537,7 +537,11 @@ Run (from `rfid-frontend/`):
 ```bash
 npx tsc -b --noEmit
 ```
-Expected: errors ONLY in `InventoryActivationModal.tsx` (uses removed `activateQuick`/`activateExisting`/`searchAccounts`). No errors originating in `inventoryApi.ts` itself. (Do not commit yet if consumers break the build — proceed to Task 5, which fixes the modal, then commit Tasks 4+5 together in Task 5 Step 5.)
+**Gate is file-scoped.** The repo has PRE-EXISTING type errors unrelated to this task that will remain until later tasks: `InventoryActivationModal.tsx` (uses removed methods — fixed in Task 5), `InventoryManagement.tsx` / `BoothAssignmentPage.tsx` / `InventoryCheckWarning.tsx` (pre-existing `addToast` 2-arg + unused-import errors — fixed in Tasks 6/7/8), and `Reports.tsx:408` (unrelated pre-existing debt, out of scope — will remain after this whole branch). The only requirement for THIS task: **no error line references `inventoryApi.ts`**. Verify with:
+```bash
+npx tsc -b --noEmit 2>&1 | grep "inventoryApi.ts" || echo "inventoryApi.ts clean"
+```
+Expected: `inventoryApi.ts clean`. (Do not commit yet — proceed to Task 5, which fixes the modal, then commit Tasks 4+5 together in Task 5 Step 5.)
 
 - [ ] **Step 3: Verify no other files import the removed methods**
 
@@ -792,13 +796,13 @@ export default function InventoryActivationModal({
 }
 ```
 
-- [ ] **Step 2: Type-check the whole frontend**
+- [ ] **Step 2: Type-check (file-scoped)**
 
 Run (from `rfid-frontend/`):
 ```bash
-npx tsc -b --noEmit
+npx tsc -b --noEmit 2>&1 | grep -E "inventoryApi.ts|InventoryActivationModal.tsx" || echo "task files clean"
 ```
-Expected: no errors (Task 4 consumers now resolved).
+Expected: `task files clean`. (Pre-existing errors remain in `InventoryManagement.tsx`/`BoothAssignmentPage.tsx`/`InventoryCheckWarning.tsx` — fixed in Tasks 6/7/8 — and in the unrelated `Reports.tsx:408`; those are out of scope for this task.)
 
 - [ ] **Step 3: Lint**
 
@@ -836,7 +840,11 @@ At the top, add the import:
 ```typescript
 import { inventoryApi } from '@/services/inventoryApi';
 ```
-Delete the `const API_BASE = ...` line. Replace the body of `fetchInventory` with:
+Delete the `const API_BASE = ...` line. **Also remove the unused `user`**: delete the line `const { user } = useAuth();` and the `import { useAuth } from '@/context/AuthContext';` line (both are unused and currently cause `TS6133`).
+
+**Important — `addToast` signature:** this project's `addToast` takes a single object `{ type, title, message? }` (see `TopupPage.tsx`), NOT `(message, level)`. The existing inventory code uses the wrong 2-arg form (a pre-existing `TS2554` error). Use the object form everywhere below.
+
+Replace the body of `fetchInventory` with:
 ```typescript
   const fetchInventory = async (page = 1) => {
     try {
@@ -853,7 +861,7 @@ Delete the `const API_BASE = ...` line. Replace the body of `fetchInventory` wit
       setCurrentPage(data.page);
       setTotalPages(data.pages);
     } catch (err: any) {
-      addToast(err.message || 'Failed to fetch inventory', 'error');
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to fetch inventory' });
     } finally {
       setLoading(false);
     }
@@ -863,7 +871,7 @@ Replace the body of `handleUpload` with:
 ```typescript
   const handleUpload = async () => {
     if (!uploadFile) {
-      addToast('Please select a file', 'error');
+      addToast({ type: 'error', title: 'Validation', message: 'Please select a file' });
       return;
     }
     try {
@@ -871,14 +879,14 @@ Replace the body of `handleUpload` with:
       setUploadResult(null);
       const data = await inventoryApi.upload(uploadFile);
       setUploadResult(data);
-      addToast(`${data.added} tags added successfully`, 'success');
+      addToast({ type: 'success', title: 'Uploaded', message: `${data.added} tags added successfully` });
       setUploadFile(null);
       setTimeout(() => {
         setShowUploadModal(false);
         fetchInventory(1);
       }, 2000);
     } catch (err: any) {
-      addToast(err.message || 'Upload failed', 'error');
+      addToast({ type: 'error', title: 'Upload Failed', message: err.message || 'Upload failed' });
     } finally {
       setIsUploading(false);
     }
@@ -932,13 +940,18 @@ const statusColors: Record<string, string> = {
 };
 ```
 
-- [ ] **Step 4: Type-check + lint + build**
+- [ ] **Step 4: Type-check (file-scoped) + lint**
 
 Run (from `rfid-frontend/`):
 ```bash
-npx tsc -b --noEmit && npm run lint && npm run build
+npx tsc -b --noEmit 2>&1 | grep "InventoryManagement.tsx" || echo "InventoryManagement.tsx clean"
+npm run lint
 ```
-Expected: build succeeds; no hardcoded-color classes remain (verify with `grep -nE "bg-white|bg-gray-|text-gray-|bg-blue-|text-blue-|text-green-" src/pages/InventoryManagement.tsx` → no matches).
+Expected: `InventoryManagement.tsx clean` (all its prior `TS2554`/`TS6133` errors gone), and lint clean for this file. Do NOT run `npm run build` yet — it runs `tsc -b` over the whole project and still fails on the unrelated pre-existing `Reports.tsx:408`, which is out of scope for this branch. Also verify no hardcoded-color classes remain:
+```bash
+grep -nE "bg-white|bg-gray-|text-gray-|bg-blue-|text-blue-|text-green-" src/pages/InventoryManagement.tsx || echo "no hardcoded colors"
+```
+Expected: `no hardcoded colors`.
 
 - [ ] **Step 5: Manual verification**
 
@@ -968,7 +981,11 @@ Add import:
 ```typescript
 import { inventoryApi } from '@/services/inventoryApi';
 ```
-Delete the `const API_BASE = ...` line. Replace `fetchUnregisteredInventory` body with:
+Delete the `const API_BASE = ...` line. **Also remove the unused `X` import** (from the `lucide-react` import list — it currently causes `TS6133`).
+
+**Important — `addToast` signature:** use the single-object form `{ type, title, message? }` (NOT `(message, level)`), same as Task 6. The existing 2-arg calls in this file are pre-existing `TS2554` errors; also convert the two validation toasts already in `handleAssign` (`'Please select at least one item'`, `'Please select a booth'`) to the object form.
+
+Replace `fetchUnregisteredInventory` body with:
 ```typescript
   const fetchUnregisteredInventory = async (page = 1) => {
     try {
@@ -978,31 +995,40 @@ Delete the `const API_BASE = ...` line. Replace `fetchUnregisteredInventory` bod
       setCurrentPage(data.page);
       setTotalPages(data.pages);
     } catch (err: any) {
-      addToast(err.message || 'Failed to fetch inventory', 'error');
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to fetch inventory' });
     } finally {
       setLoading(false);
     }
   };
 ```
-Replace the network part of `handleAssign` (the `fetch(...)` through the success toast) with:
+Replace the whole body of `handleAssign` with:
 ```typescript
+  const handleAssign = async () => {
+    if (selectedItems.size === 0) {
+      addToast({ type: 'error', title: 'Validation', message: 'Please select at least one item' });
+      return;
+    }
+    if (!selectedBooth) {
+      addToast({ type: 'error', title: 'Validation', message: 'Please select a booth' });
+      return;
+    }
     try {
       setIsAssigning(true);
       const data = await inventoryApi.assignBooth({
         inventory_ids: Array.from(selectedItems),
         booth_id: parseInt(selectedBooth),
       });
-      addToast(`${data.assigned} tags assigned to Booth ${selectedBooth}`, 'success');
+      addToast({ type: 'success', title: 'Assigned', message: `${data.assigned} tags assigned to Booth ${selectedBooth}` });
       setSelectedItems(new Set());
       setSelectedBooth('');
       fetchUnregisteredInventory(1);
     } catch (err: any) {
-      addToast(err.message || 'Assignment failed', 'error');
+      addToast({ type: 'error', title: 'Assignment Failed', message: err.message || 'Assignment failed' });
     } finally {
       setIsAssigning(false);
     }
+  };
 ```
-(Remove the now-unused `localStorage.getItem('user_phone')` line.)
 
 - [ ] **Step 2: Replace the outer wrapper**
 
@@ -1021,13 +1047,15 @@ to:
 
 Apply the identical find/replace table from Task 6 Step 3 to every hardcoded class in this file, including: the header title/subtitle, the three stat cards, the action bar (booth `<select>` + Assign button), the table (header row, checkboxes, selected-row highlight, cells), and pagination. For the selected-row highlight, change `bg-blue-50` → `bg-[var(--accent-blue)]/10` and the row hover `hover:bg-gray-50` → `hover:bg-[var(--bg-elevated)]`. For the "Selected" stat number `text-blue-700` → `text-[var(--accent-blue)]`.
 
-- [ ] **Step 4: Type-check + lint + build**
+- [ ] **Step 4: Type-check (file-scoped) + lint**
 
 Run (from `rfid-frontend/`):
 ```bash
-npx tsc -b --noEmit && npm run lint && npm run build
+npx tsc -b --noEmit 2>&1 | grep "BoothAssignmentPage.tsx" || echo "BoothAssignmentPage.tsx clean"
+npm run lint
+grep -nE "bg-white|bg-gray-|text-gray-|bg-blue-|text-blue-|bg-blue-50|text-green-" src/pages/BoothAssignmentPage.tsx || echo "no hardcoded colors"
 ```
-Expected: build succeeds; `grep -nE "bg-white|bg-gray-|text-gray-|bg-blue-|text-blue-|bg-blue-50|text-green-" src/pages/BoothAssignmentPage.tsx` → no matches.
+Expected: `BoothAssignmentPage.tsx clean`, lint clean, `no hardcoded colors`. Do NOT run `npm run build` (it still fails on the unrelated pre-existing `Reports.tsx:408`, out of scope).
 
 - [ ] **Step 5: Manual verification**
 
@@ -1111,13 +1139,14 @@ export default function InventoryCheckWarning({
 }
 ```
 
-- [ ] **Step 2: Type-check + lint + build**
+- [ ] **Step 2: Type-check (file-scoped) + lint**
 
-Run (from `rfid-frontend/`):
+This task removes the unused `AlertCircle` import (`TS6133`) by replacing the whole file. Run (from `rfid-frontend/`):
 ```bash
-npx tsc -b --noEmit && npm run lint && npm run build
+npx tsc -b --noEmit 2>&1 | grep "InventoryCheckWarning.tsx" || echo "InventoryCheckWarning.tsx clean"
+npm run lint
 ```
-Expected: build succeeds.
+Expected: `InventoryCheckWarning.tsx clean` and lint clean. (After this task the ONLY remaining project type error is the unrelated pre-existing `Reports.tsx:408`, which is out of scope for this branch — confirm with `npx tsc -b --noEmit 2>&1` that every other error line is gone.)
 
 - [ ] **Step 3: Manual verification**
 
