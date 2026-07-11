@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api/v1';
+export const BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api/v1';
 
 // ─── Auth state helpers (display-only — no tokens stored in JS) ───────────────
 export const clearAuthState = () => localStorage.removeItem('auth_user');
@@ -41,7 +41,7 @@ async function tryRefreshToken(): Promise<boolean> {
 // ─── Core fetch wrapper ───────────────────────────────────────────────────────
 // Tokens are httpOnly cookies — browser sends them automatically.
 // On 401, we attempt a token refresh once before giving up.
-async function apiFetch<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -423,6 +423,43 @@ export interface TransferResult {
   reference_id: string;
 }
 
+// ─── Topup types ─────────────────────────────────────────────────────────────
+export interface TopupLookupResult {
+  found: boolean;
+  tid: string;
+  epc: string;
+  consumer_name?: string;
+  cnic?: string;
+  phone?: string;
+  plate?: string;
+  balance?: string;
+  inventory_status?: 'unregistered' | 'booth_assigned' | 'activated';
+  booth_assigned_id?: number | null;
+}
+
+export interface CashTopupReceipt {
+  receipt_no: string;
+  datetime: string;
+  consumer_name: string;
+  vehicle_reg: string;
+  tid: string;
+  amount: string;
+  balance_before: string;
+  balance_after: string;
+  payment: string;
+  operator: string;
+}
+
+export interface CashTopupResult {
+  registered: boolean;
+  consumer_name: string;
+  plate?: string;
+  amount_added: string;
+  new_balance: string;
+  printed?: boolean;
+  receipt?: CashTopupReceipt;
+}
+
 // ─── Accounts API ─────────────────────────────────────────────────────────────
 export const accountsApi = {
   byVehicle: (vehicleUuid: string) => apiFetch<Account>(`/accounts/vehicle/${vehicleUuid}/`),
@@ -449,6 +486,27 @@ export const accountsApi = {
       '/accounts/topup/plate/',
       { method: 'POST', body: JSON.stringify({ plate_number, amount }) }
     ),
+
+  topupLookup: (tid: string) =>
+    apiFetch<TopupLookupResult>('/accounts/topup/lookup/', {
+      method: 'POST',
+      body: JSON.stringify({ tid }),
+    }),
+
+  cashTopup: (payload: {
+    tid: string;
+    amount: string;
+    epc?: string;
+    consumer_name?: string;
+    cnic?: string;
+    phone?: string;
+    vehicle_reg?: string;
+    activation_booth_id?: number;
+  }) =>
+    apiFetch<CashTopupResult>('/accounts/topup/cash/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   transferBalance: (data: {
     source_vehicle_id: string;
