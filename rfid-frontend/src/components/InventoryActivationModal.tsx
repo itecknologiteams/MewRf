@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { X, Loader2, User, Phone, DollarSign, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Loader2, User, Phone, CreditCard, CheckCircle, Wallet } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
-import { inventoryApi } from '@/services/inventoryApi';
+import { accountsApi, type CashTopupResult, type TopupLookupResult } from '@/services/api';
 
 interface InventoryActivationModalProps {
   tag: {
@@ -12,9 +12,19 @@ interface InventoryActivationModalProps {
     booth_assigned_id?: number;
   };
   activationBoothId: number;
-  onSuccess: (account: any) => void;
+  onSuccess: (result: CashTopupResult) => void;
   onClose: () => void;
 }
+
+const PRESETS = [500, 1000, 2000, 5000];
+
+// Format digits into CNIC XXXXX-XXXXXXX-X (UI only; digits-only sent to API).
+const formatCnic = (raw: string) => {
+  const d = raw.replace(/\D/g, '').slice(0, 13);
+  if (d.length <= 5) return d;
+  if (d.length <= 12) return `${d.slice(0, 5)}-${d.slice(5)}`;
+  return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12)}`;
+};
 
 export default function InventoryActivationModal({
   tag,
@@ -23,320 +33,193 @@ export default function InventoryActivationModal({
   onClose,
 }: InventoryActivationModalProps) {
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'quick' | 'existing'>('quick');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
-  // Quick create form
-  const [quickForm, setQuickForm] = useState({
-    customer_name: '',
-    customer_phone: '',
-    initial_topup: 0,
-    payment_method: 'CASH',
-  });
+  const [looking, setLooking] = useState(true);
+  const [found, setFound] = useState(false);
+  const [balance, setBalance] = useState<string | null>(null);
 
-  // Link existing form
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [cnic, setCnic] = useState('');
+  const [vehicleReg, setVehicleReg] = useState('');
+  const [amount, setAmount] = useState('');
 
-  const handleQuickCreate = async () => {
-    if (!quickForm.customer_name.trim()) {
-      addToast('Please enter customer name', 'error');
+  const [submitting, setSubmitting] = useState(false);
+  const [receipt, setReceipt] = useState<CashTopupResult | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const r: TopupLookupResult = await accountsApi.topupLookup(tag.tid);
+        if (!active) return;
+        setFound(r.found);
+        if (r.found) {
+          setName(r.consumer_name ?? '');
+          setPhone(r.phone ?? '');
+          setCnic(r.cnic ? formatCnic(r.cnic) : '');
+          setVehicleReg(r.plate ?? '');
+          setBalance(r.balance ?? '0');
+        }
+      } catch {
+        if (active) addToast({ type: 'error', title: 'Lookup failed', message: 'Could not look up the tag.' });
+      } finally {
+        if (active) setLooking(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [tag.tid, addToast]);
+
+  const submit = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      addToast({ type: 'error', title: 'Validation', message: 'Enter a valid amount greater than zero.' });
       return;
     }
-    if (!quickForm.customer_phone.trim()) {
-      addToast('Please enter customer phone', 'error');
+    if (!found && (!name.trim() || !phone.trim() || !vehicleReg.trim())) {
+      addToast({ type: 'error', title: 'Validation', message: 'Name, phone and vehicle registration are required to register.' });
       return;
     }
-
+    setSubmitting(true);
     try {
-      setLoading(true);
-      const result = await inventoryApi.activateQuick({
-        tag_serial: tag.tag_serial,
+      const result = await accountsApi.cashTopup({
         tid: tag.tid,
-        customer_name: quickForm.customer_name,
-        customer_phone: quickForm.customer_phone,
-        initial_topup: quickForm.initial_topup,
-        payment_method: quickForm.payment_method,
+        amount: String(parseFloat(amount)),
+        epc: '',
+        consumer_name: name.trim(),
+        cnic: cnic.replace(/\D/g, ''),
+        phone: phone.trim(),
+        vehicle_reg: vehicleReg.trim(),
         activation_booth_id: activationBoothId,
       });
-
-      setSuccess(true);
-      addToast('Tag activated successfully!', 'success');
-      setTimeout(() => {
-        onSuccess(result);
-      }, 1500);
-    } catch (err: any) {
-      addToast(err.message || 'Activation failed', 'error');
+      setReceipt(result);
+      addToast({ type: 'success', title: result.registered ? 'Registered & Activated' : 'Topped Up', message: `New balance PKR ${parseFloat(result.new_balance).toLocaleString()}.` });
+      setTimeout(() => onSuccess(result), 1800);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Activation failed';
+      addToast({ type: 'error', title: 'Failed', message });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setSearching(true);
-      const results = await inventoryApi.searchAccounts(searchQuery);
-      setSearchResults(results);
-    } catch (err: any) {
-      addToast('Search failed', 'error');
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleLinkExisting = async () => {
-    if (!selectedAccount) {
-      addToast('Please select an account', 'error');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const result = await inventoryApi.activateExisting({
-        tag_serial: tag.tag_serial,
-        tid: tag.tid,
-        account_id: selectedAccount,
-        activation_booth_id: activationBoothId,
-      });
-
-      setSuccess(true);
-      addToast('Tag linked successfully!', 'success');
-      setTimeout(() => {
-        onSuccess(result);
-      }, 1500);
-    } catch (err: any) {
-      addToast(err.message || 'Linking failed', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const inputCls =
+    'w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all disabled:opacity-60';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-2xl max-w-md w-full shadow-xl">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b">
+        <div className="flex justify-between items-center p-6 border-b border-[var(--border-custom)]">
           <div>
-            <h2 className="text-xl font-bold">Activate Tag</h2>
-            <p className="text-sm text-gray-600 mt-1">Tag: {tag.tag_serial}</p>
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">Activate Tag</h2>
+            <p className="text-sm text-[var(--text-secondary)] mt-0.5 font-mono">{tag.tag_serial}</p>
           </div>
           <button
             onClick={onClose}
-            disabled={loading || success}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            disabled={submitting || !!receipt}
+            className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
-          {success ? (
-            <div className="flex flex-col items-center justify-center py-6">
-              <CheckCircle className="text-green-600 mb-3" size={48} />
-              <p className="text-center font-semibold text-gray-900">Tag Activated!</p>
-              <p className="text-center text-sm text-gray-600 mt-1">Redirecting...</p>
+          {looking ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="animate-spin text-[var(--accent-blue)]" size={28} />
+            </div>
+          ) : receipt ? (
+            <div className="animate-fade-in-up">
+              <div className="flex flex-col items-center text-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-[var(--accent-emerald)]/10 flex items-center justify-center mb-2">
+                  <CheckCircle className="text-[var(--accent-emerald)]" size={28} />
+                </div>
+                <p className="font-semibold text-[var(--text-primary)]">
+                  {receipt.registered ? 'Registered & Activated' : 'Topped Up'}
+                </p>
+              </div>
+              {receipt.receipt && (
+                <div className="space-y-2 text-sm bg-[var(--bg-elevated)] rounded-xl p-4">
+                  {([
+                    ['Receipt', receipt.receipt.receipt_no],
+                    ['Consumer', receipt.receipt.consumer_name],
+                    ['Vehicle', receipt.receipt.vehicle_reg],
+                    ['Amount', `PKR ${parseFloat(receipt.receipt.amount).toLocaleString()}`],
+                    ['New Balance', `PKR ${parseFloat(receipt.receipt.balance_after).toLocaleString()}`],
+                  ] as [string, string][]).map(([k, v]) => (
+                    <div key={k} className="flex justify-between">
+                      <span className="text-[var(--text-secondary)]">{k}</span>
+                      <span className="font-medium text-[var(--text-primary)]">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
-            <>
-              {/* Tabs */}
-              <div className="flex gap-2 mb-6">
-                <button
-                  onClick={() => setActiveTab('quick')}
-                  className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors ${
-                    activeTab === 'quick'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  disabled={loading}
-                >
-                  Quick Create
-                </button>
-                <button
-                  onClick={() => setActiveTab('existing')}
-                  className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-colors ${
-                    activeTab === 'existing'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  disabled={loading}
-                >
-                  Link Existing
-                </button>
+            <div className="space-y-4">
+              {found ? (
+                <div className="flex items-center justify-between bg-[var(--bg-elevated)] rounded-xl px-4 py-3">
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">{name}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{phone} · {vehicleReg}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">Balance</p>
+                    <p className="font-bold text-[var(--accent-emerald)]">
+                      PKR {parseFloat(balance ?? '0').toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><User size={14} className="inline mr-1.5" />Customer Name</label>
+                    <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" disabled={submitting} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><Phone size={14} className="inline mr-1.5" />Phone</label>
+                    <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="03001234567" disabled={submitting} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><CreditCard size={14} className="inline mr-1.5" />CNIC (optional)</label>
+                    <input className={inputCls} value={cnic} onChange={(e) => setCnic(formatCnic(e.target.value))} placeholder="XXXXX-XXXXXXX-X" disabled={submitting} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Vehicle Registration</label>
+                    <input className={`${inputCls} uppercase`} value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} placeholder="LEB1234" disabled={submitting} />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><Wallet size={14} className="inline mr-1.5" />Amount (Cash)</label>
+                <input className={inputCls} type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" disabled={submitting} />
+                <div className="flex gap-2 flex-wrap mt-2">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setAmount(String(p))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        amount === String(p)
+                          ? 'bg-[var(--accent-emerald)] text-white border-[var(--accent-emerald)]'
+                          : 'bg-[var(--bg-elevated)] border-[var(--border-custom)] text-[var(--text-secondary)] hover:border-[var(--accent-emerald)] hover:text-[var(--accent-emerald)]'
+                      }`}
+                    >
+                      +{p.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Quick Create Tab */}
-              {activeTab === 'quick' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <User size={16} className="inline mr-2" />
-                      Customer Name
-                    </label>
-                    <input
-                      type="text"
-                      value={quickForm.customer_name}
-                      onChange={(e) => setQuickForm({ ...quickForm, customer_name: e.target.value })}
-                      placeholder="Enter customer name"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <Phone size={16} className="inline mr-2" />
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={quickForm.customer_phone}
-                      onChange={(e) => setQuickForm({ ...quickForm, customer_phone: e.target.value })}
-                      placeholder="03001234567"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <DollarSign size={16} className="inline mr-2" />
-                      Initial Top-up (Optional)
-                    </label>
-                    <input
-                      type="number"
-                      value={quickForm.initial_topup}
-                      onChange={(e) => setQuickForm({ ...quickForm, initial_topup: parseFloat(e.target.value) || 0 })}
-                      placeholder="0"
-                      min="0"
-                      step="100"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Payment Method
-                    </label>
-                    <select
-                      value={quickForm.payment_method}
-                      onChange={(e) => setQuickForm({ ...quickForm, payment_method: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      disabled={loading}
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="CARD">Card</option>
-                      <option value="TRANSFER">Transfer</option>
-                    </select>
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={onClose}
-                      disabled={loading}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleQuickCreate}
-                      disabled={loading}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {loading && <Loader2 className="animate-spin" size={18} />}
-                      Activate
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Link Existing Tab */}
-              {activeTab === 'existing' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Search Customer
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Phone or name..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        disabled={loading || searching}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                      />
-                      <button
-                        onClick={handleSearch}
-                        disabled={loading || searching || !searchQuery.trim()}
-                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 disabled:opacity-50"
-                      >
-                        {searching ? <Loader2 className="animate-spin" size={18} /> : 'Search'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {searchResults.length > 0 ? (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Account
-                      </label>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {searchResults.map((account) => (
-                          <button
-                            key={account.id}
-                            onClick={() => setSelectedAccount(account.id)}
-                            className={`w-full p-3 rounded-lg border-2 text-left transition-colors ${
-                              selectedAccount === account.id
-                                ? 'border-blue-600 bg-blue-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                            disabled={loading}
-                          >
-                            <p className="font-semibold text-gray-900">{account.user.full_name}</p>
-                            <p className="text-sm text-gray-600">{account.user.phone}</p>
-                            <p className="text-sm text-gray-600">Balance: Rs. {account.balance}</p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : searchQuery.trim() ? (
-                    <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <AlertCircle size={18} className="text-gray-500" />
-                      <p className="text-sm text-gray-600">No accounts found</p>
-                    </div>
-                  ) : null}
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={onClose}
-                      disabled={loading}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleLinkExisting}
-                      disabled={loading || !selectedAccount}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {loading && <Loader2 className="animate-spin" size={18} />}
-                      Link
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
+              <div className="flex gap-3 pt-2">
+                <button onClick={onClose} disabled={submitting} className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={submit} disabled={submitting} className="flex-1 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                  {submitting && <Loader2 className="animate-spin" size={16} />}
+                  {found ? 'Top Up' : 'Register & Activate'}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

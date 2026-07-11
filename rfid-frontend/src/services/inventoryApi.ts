@@ -1,6 +1,26 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiFetch, BASE_URL } from './api';
 
-interface InventoryCheckResponse {
+export interface InventoryItem {
+  id: string;
+  tag_serial: string;
+  tid: string;
+  vehicle_plate: string;
+  vehicle_type: string;
+  status: 'unregistered' | 'booth_assigned' | 'activated';
+  booth_assigned_id?: number;
+  first_activated_booth_id?: number;
+  created_at: string;
+}
+
+export interface InventoryListResult {
+  items: InventoryItem[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
+export interface InventoryCheckResponse {
   found: boolean;
   status: 'unregistered' | 'booth_assigned' | 'activated' | 'not_in_inventory';
   booth_assigned_id?: number;
@@ -11,108 +31,52 @@ interface InventoryCheckResponse {
   activation_required?: boolean;
 }
 
-interface TagActivationQuickCreateRequest {
-  tag_serial: string;
-  tid: string;
-  customer_name: string;
-  customer_phone: string;
-  initial_topup: number;
-  payment_method: string;
-  activation_booth_id: number;
+export interface InventoryListParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: string;
+  booth_assigned_id?: string | number;
+  vehicle_type?: string;
 }
-
-interface TagActivationLinkExistingRequest {
-  tag_serial: string;
-  tid: string;
-  account_id: string;
-  activation_booth_id: number;
-}
-
-interface AccountSearchResult {
-  id: string;
-  user: {
-    full_name: string;
-    phone: string;
-  };
-  balance: number;
-}
-
-const getAuthHeaders = () => ({
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${localStorage.getItem('token')}`,
-});
 
 export const inventoryApi = {
-  /**
-   * Check if a tag is in unregistered inventory and get its status
-   */
-  async checkStatus(tagSerial: string): Promise<InventoryCheckResponse> {
-    const response = await fetch(
-      `${API_BASE}/api/v1/vehicles/inventory/check/${encodeURIComponent(tagSerial)}/`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to check inventory: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.data;
+  list: (params: InventoryListParams = {}) => {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.per_page) qs.append('per_page', String(params.per_page));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    if (params.booth_assigned_id) qs.append('booth_assigned_id', String(params.booth_assigned_id));
+    if (params.vehicle_type) qs.append('vehicle_type', params.vehicle_type);
+    return apiFetch<InventoryListResult>(`/vehicles/inventory/?${qs.toString()}`);
   },
 
-  /**
-   * Quick activation: Create new account and activate tag
-   */
-  async activateQuick(request: TagActivationQuickCreateRequest) {
-    const response = await fetch(`${API_BASE}/api/v1/vehicles/inventory/activate/`, {
+  checkStatus: (tagSerial: string) =>
+    apiFetch<InventoryCheckResponse>(
+      `/vehicles/inventory/check/${encodeURIComponent(tagSerial)}/`,
+    ),
+
+  assignBooth: (payload: { inventory_ids: string[]; booth_id: number; assigned_by?: string }) =>
+    apiFetch<{ assigned: number }>('/vehicles/inventory/assign-booth/', {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(request),
-    });
+      body: JSON.stringify(payload),
+    }),
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Activation failed');
-    }
-
-    return data.data;
-  },
-
-  /**
-   * Link tag to existing account
-   */
-  async activateExisting(request: TagActivationLinkExistingRequest) {
-    const response = await fetch(`${API_BASE}/api/v1/vehicles/inventory/activate-existing/`, {
+  // Multipart upload: apiFetch always sets JSON Content-Type, so use raw fetch
+  // with credentials so the httpOnly auth cookie is sent (matches vehiclesApi.uploadTagInventory).
+  upload: async (file: File): Promise<{ added: number; skipped: number; errors: string[] }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${BASE_URL}/vehicles/inventory/upload/`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(request),
+      credentials: 'include',
+      body: formData,
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Activation failed');
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || 'Upload failed');
     }
-
-    return data.data;
-  },
-
-  /**
-   * Search for existing accounts by phone or name
-   */
-  async searchAccounts(query: string): Promise<AccountSearchResult[]> {
-    const response = await fetch(`${API_BASE}/api/v1/accounts/search/?q=${encodeURIComponent(query)}`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = await response.json();
-    return data.data?.items || [];
+    return json.data;
   },
 };
