@@ -338,3 +338,12 @@ class BoothTopupActivationTest(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.inv.refresh_from_db()
         self.assertEqual(self.inv.status, UnregisteredInventoryStatus.BOOTH_ASSIGNED)
+
+    def test_lookup_reports_inventory_status(self):
+        resp = self.client.post('/api/v1/accounts/topup/lookup/',
+                                {'tid': 'TID900'}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()['data']
+        self.assertFalse(data['found'])
+        self.assertEqual(data['inventory_status'], 'booth_assigned')
+        self.assertEqual(data['booth_assigned_id'], 2)

@@ -51,7 +51,13 @@ class TopupLookupView(APIView):
                 'balance': str(a.balance),
             })
         # Not registered (unknown tag, or unassigned inventory tag) → register flow.
-        return success_response(data={'found': False, 'tid': tid, 'epc': tag.epc if tag else ''})
+        from apps.vehicles.models import UnregisteredInventory
+        data = {'found': False, 'tid': tid, 'epc': tag.epc if tag else ''}
+        inv = UnregisteredInventory.objects.filter(tid=tid).first()
+        if inv is not None:
+            data['inventory_status'] = inv.status
+            data['booth_assigned_id'] = inv.booth_assigned_id
+        return success_response(data=data)
 
 
 class CashTopupView(APIView):
