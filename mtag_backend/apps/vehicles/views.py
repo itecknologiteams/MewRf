@@ -731,6 +731,7 @@ class InventoryCheckView(APIView):
             return success_response(
                 data={
                     'found': True,
+                    'tid': inv.tid,
                     'status': inv.status,
                     'booth_assigned_id': inv.booth_assigned_id,
                     'first_activated_booth_id': inv.first_activated_booth_id,

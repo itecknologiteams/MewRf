@@ -49,6 +49,11 @@ export default function InventoryActivationModal({
 
   useEffect(() => {
     let active = true;
+    if (!tag.tid) {
+      setLooking(false);
+      addToast({ type: 'error', title: 'Missing tag id', message: 'This tag has no chip TID; cannot activate.' });
+      return;
+    }
     (async () => {
       try {
         const r: TopupLookupResult = await accountsApi.topupLookup(tag.tid);

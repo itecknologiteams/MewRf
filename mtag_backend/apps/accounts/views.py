@@ -177,7 +177,7 @@ class CashTopupView(APIView):
                     tag.save()
                 elif do_booth:  # inventory tag — create Tag with its printed serial
                     tag = Tag.objects.create(
-                        tag_serial=inv.tag_serial, tid=tid, epc=epc, vehicle=vehicle,
+                        tag_serial=inv.tag_serial, tid=tid, epc=epc or inv.epc, vehicle=vehicle,
                         expiry_date=date(2099, 12, 31), status=TagStatus.ACTIVE,
                     )
                 else:    # brand-new tag — create with a generated serial

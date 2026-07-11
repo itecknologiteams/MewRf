@@ -22,6 +22,7 @@ export interface InventoryListResult {
 
 export interface InventoryCheckResponse {
   found: boolean;
+  tid?: string;
   status: 'unregistered' | 'booth_assigned' | 'activated' | 'not_in_inventory';
   booth_assigned_id?: number;
   first_activated_booth_id?: number;

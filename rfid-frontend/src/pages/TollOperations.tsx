@@ -210,7 +210,7 @@ export default function TollOperations() {
         // Assigned to this booth - show activation modal
         setPendingActivationTag({
           tag_serial: tagSerial,
-          tid: '', // Will be filled from API response
+          tid: status.tid ?? '',
           booth_id: boothId,
           mode,
         });

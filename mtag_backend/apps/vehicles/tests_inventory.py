@@ -206,6 +206,13 @@ class InventoryCheckAPITest(TestCase):
         self.assertFalse(data['found'])
         self.assertEqual(data['status'], 'not_in_inventory')
 
+    def test_check_returns_tid(self):
+        response = self.client.get('/api/v1/vehicles/inventory/check/SER002/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()['data']
+        self.assertTrue(data['found'])
+        self.assertEqual(data['tid'], self.inv_assigned.tid)
+
 
 class TagActivationAPITest(TestCase):
     def setUp(self):
@@ -322,6 +329,15 @@ class BoothTopupActivationTest(TestCase):
             tag_serial='SER900', first_scan_booth_id=2).exists())
         # Tag row created with the inventory's printed serial (not a generated one)
         self.assertTrue(Tag.objects.filter(tag_serial='SER900', tid='TID900').exists())
+
+    def test_activation_preserves_inventory_epc_when_request_omits_it(self):
+        self.inv.epc = 'EPCABC'
+        self.inv.save(update_fields=['epc'])
+        resp = self.client.post('/api/v1/accounts/topup/cash/',
+                                self._payload(epc=''), format='json')
+        self.assertEqual(resp.status_code, 201)
+        tag = Tag.objects.get(tag_serial='SER900')
+        self.assertEqual(tag.epc, 'EPCABC')
 
     def test_already_activated_rejected(self):
         self.inv.status = UnregisteredInventoryStatus.ACTIVATED
