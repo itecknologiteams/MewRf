@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
-from .models import UnregisteredInventory, UnregisteredInventoryStatus, TagActivation
+from .models import UnregisteredInventory, UnregisteredInventoryStatus, TagActivation, Tag
 from apps.accounts.models import Account
 from apps.users.models import UserRole
 
@@ -274,3 +274,67 @@ class TagActivationAPITest(TestCase):
 
         self.inv.refresh_from_db()
         self.assertEqual(self.inv.activated_for_account_id, account.id)
+
+
+class BoothTopupActivationTest(TestCase):
+    """Booth-aware cash topup: register + activate an inventory tag at a booth."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.operator = User.objects.create_user(
+            phone='03001234567', password='testpass123', full_name='Op',
+            user_role=UserRole.OPERATOR,
+        )
+        self.client.force_authenticate(user=self.operator)
+        self.inv = UnregisteredInventory.objects.create(
+            tag_serial='SER900', tid='TID900', vehicle_type='car',
+            status=UnregisteredInventoryStatus.BOOTH_ASSIGNED, booth_assigned_id=2,
+        )
+
+    def _payload(self, **over):
+        base = {
+            'tid': 'TID900', 'amount': '500', 'consumer_name': 'Ali',
+            'phone': '03007778888', 'vehicle_reg': 'LEB1234', 'activation_booth_id': 2,
+        }
+        base.update(over)
+        return base
+
+    def test_booth_mismatch_rejected(self):
+        resp = self.client.post('/api/v1/accounts/topup/cash/',
+                                self._payload(activation_booth_id=5), format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('Booth 2', resp.json()['message'])
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.status, UnregisteredInventoryStatus.BOOTH_ASSIGNED)
+
+    def test_activation_success_marks_inventory_and_audit(self):
+        resp = self.client.post('/api/v1/accounts/topup/cash/',
+                                self._payload(), format='json')
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()['data']
+        self.assertTrue(data['registered'])
+        self.assertIn('receipt', data)
+        self.assertEqual(data['receipt']['vehicle_reg'], 'LEB1234')
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.status, UnregisteredInventoryStatus.ACTIVATED)
+        self.assertEqual(self.inv.first_activated_booth_id, 2)
+        self.assertTrue(TagActivation.objects.filter(
+            tag_serial='SER900', first_scan_booth_id=2).exists())
+        # Tag row created with the inventory's printed serial (not a generated one)
+        self.assertTrue(Tag.objects.filter(tag_serial='SER900', tid='TID900').exists())
+
+    def test_already_activated_rejected(self):
+        self.inv.status = UnregisteredInventoryStatus.ACTIVATED
+        self.inv.save(update_fields=['status'])
+        resp = self.client.post('/api/v1/accounts/topup/cash/',
+                                self._payload(), format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_no_booth_id_preserves_flutter_behavior(self):
+        # No activation_booth_id and a TID not in inventory → plain register, untouched inventory
+        resp = self.client.post('/api/v1/accounts/topup/cash/',
+                                self._payload(tid='TID901', vehicle_reg='LEB9999',
+                                              activation_booth_id=None), format='json')
+        self.assertEqual(resp.status_code, 201)
+        self.inv.refresh_from_db()
+        self.assertEqual(self.inv.status, UnregisteredInventoryStatus.BOOTH_ASSIGNED)

@@ -69,7 +69,10 @@ class CashTopupView(APIView):
         import string
         from datetime import date
         from django.utils import timezone
-        from apps.vehicles.models import Tag, TagStatus, Vehicle
+        from apps.vehicles.models import (
+            Tag, TagStatus, Vehicle, UnregisteredInventory,
+            UnregisteredInventoryStatus, TagActivation,
+        )
         from apps.users.models import User
 
         tid = _norm_tid(request.data.get('tid'))
@@ -78,6 +81,11 @@ class CashTopupView(APIView):
         cnic = (request.data.get('cnic') or '').strip()
         phone = (request.data.get('phone') or '').strip()
         plate_raw = (request.data.get('vehicle_reg') or '').strip()
+        booth_id = request.data.get('activation_booth_id')
+        try:
+            booth_id = int(booth_id) if booth_id is not None else None
+        except (ValueError, TypeError):
+            booth_id = None
         if not tid:
             return error_response("tid is required")
         try:
@@ -89,6 +97,17 @@ class CashTopupView(APIView):
 
         tag = (Tag.objects.select_related('vehicle__account', 'vehicle__owner')
                .filter(tid=tid).first())
+
+        inv = UnregisteredInventory.objects.filter(tid=tid).first()
+        do_booth = booth_id is not None and inv is not None
+        if do_booth:
+            if inv.status == UnregisteredInventoryStatus.ACTIVATED:
+                return error_response("Tag already activated.", status_code=400)
+            if inv.booth_assigned_id and inv.booth_assigned_id != booth_id:
+                return error_response(
+                    f"Tag assigned to Booth {inv.booth_assigned_id}, not Booth {booth_id}.",
+                    status_code=400,
+                )
 
         operator_name = getattr(request.user, 'full_name', '') or getattr(request.user, 'phone', '')
 
@@ -144,12 +163,17 @@ class CashTopupView(APIView):
 
                 vehicle = Vehicle.objects.create(plate_number=plate, vehicle_type='car', owner=owner)
 
-                if tag:  # inventory tag — assign + activate
+                if tag:  # existing Tag row found by tid — assign + activate
                     tag.vehicle = vehicle
                     if epc:
                         tag.epc = epc
                     tag.status = TagStatus.ACTIVE
                     tag.save()
+                elif do_booth:  # inventory tag — create Tag with its printed serial
+                    tag = Tag.objects.create(
+                        tag_serial=inv.tag_serial, tid=tid, epc=epc, vehicle=vehicle,
+                        expiry_date=date(2099, 12, 31), status=TagStatus.ACTIVE,
+                    )
                 else:    # brand-new tag — create with a generated serial
                     sprefix = timezone.localtime().strftime('%d%m%y%H%M')
                     last = (Tag.objects.filter(tag_serial__startswith=sprefix)
@@ -176,6 +200,23 @@ class CashTopupView(APIView):
                     balance_before=Decimal('0.00'), balance_after=amount,
                     status=TransactionStatus.SUCCESS, source=TransactionSource.TOPUP_CASH,
                 )
+                if do_booth:
+                    inv.status = UnregisteredInventoryStatus.ACTIVATED
+                    inv.activated_for_account = account
+                    inv.first_activated_booth_id = booth_id
+                    inv.first_activated_at = timezone.now()
+                    inv.save(update_fields=[
+                        'status', 'activated_for_account',
+                        'first_activated_booth_id', 'first_activated_at',
+                    ])
+                    TagActivation.objects.get_or_create(
+                        tag_serial=inv.tag_serial,
+                        defaults=dict(
+                            tid=tid, first_scan_booth_id=booth_id,
+                            first_scan_at=timezone.now(),
+                            created_account=account, activation_type='auto_created',
+                        ),
+                    )
                 logger.info("Cash topup + register — tid:%s plate:%s amount:%s", tid, plate, amount)
                 resp_data = {
                     'registered': True,
@@ -201,6 +242,7 @@ class CashTopupView(APIView):
 
         # ── Topup committed. Print receipt best-effort (never fails the topup). ─
         resp_data['printed'] = print_topup_receipt(receipt)
+        resp_data['receipt'] = receipt
         return success_response(data=resp_data, message=resp_msg, status_code=resp_status)
 
 
