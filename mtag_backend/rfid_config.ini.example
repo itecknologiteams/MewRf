@@ -1,0 +1,60 @@
+; Per-booth RFID gate config, read by `manage.py run_gate`.
+; Copy this to rfid_config.ini (gitignored — booth-specific, never commit the
+; real one) next to manage.py on THIS booth's machine, then fill in the
+; hardware addresses for this specific lane.
+;
+; NOTE: an older rfid_config.ini format (with [api] base_url/operator_token
+; and [barrier] server_url) belongs to the deprecated rfid_final.py script,
+; not the current run_gate.py — don't copy that format, use this one.
+
+[gate]
+; "entry" or "exit"
+mode = entry
+
+; Operator-assigned plaza number — must match a Plaza.plaza_id already present
+; in this booth's local DB (pulled from master by the sync agent). Check with:
+;   python manage.py shell -c "from apps.tolls.models import Plaza; print(list(Plaza.objects.values_list('plaza_id', flat=True)))"
+;
+; NOTE: this key replaced the old `plaza_code = SHF`. It also used to mean the
+; raw Plaza.id UUID — that escape hatch is now the separate `plaza_uuid` key
+; below, and run_gate will refuse to start if a UUID is left in plaza_id.
+plaza_id = 3
+
+; Optional escape hatch: pin this booth to a raw Plaza.id UUID instead of a
+; plaza number. Leave blank unless you specifically need it — plaza_id wins.
+plaza_uuid =
+
+; Lane number at this plaza (this booth's local TollLane.lane_number).
+; Leave blank if this plaza has no lanes configured (lane is optional).
+lane_number = 1
+
+[scanner]
+; RFID reader's own IP + TCP port (not this booth PC's IP)
+reader_host = 192.168.78.14
+reader_port = 9090
+
+; Seconds before the same tag can trigger the barrier again
+tag_cooldown = 5.0
+
+; Antenna transmit power in dBm (5-33). Lower = shorter read range.
+; 31 = max (~18-25m), 20 = medium (~8-12m), 15 = shorter (~4-6m)
+antenna_power = 20
+
+; Seconds between reader inventory polls
+scan_interval = 1.0
+
+; Software RSSI filter — tags below this dBm are ignored (0 = disabled)
+rssi_filter = 0
+rssi_filter_max = 0
+
+[barrier]
+; Serial port the barrier controller is wired to on THIS machine
+port = /dev/ttyUSB0
+baudrate = 115200
+
+; How long the barrier stays open per vehicle
+open_seconds = 2.0
+
+[display]
+; IP of the local fare/status display device
+display_ip = 192.168.78.72
