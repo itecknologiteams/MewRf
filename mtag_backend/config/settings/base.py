@@ -123,7 +123,11 @@ DATABASES = {
         # normal, since they're separate physical Postgres instances.
         'NAME':     env('MASTER_DB_NAME',     default=env('DB_NAME', default='mtag_db')),
         'USER':     env('MASTER_DB_USER',     default=env('DB_USER', default='postgres')),
-        'PASSWORD': env('MASTER_DB_PASSWORD', default='superadmin123456'),
+        # Falls back to the LOCAL DB password, matching how NAME/USER above fall
+        # back. The previous hardcoded 'superadmin123456' silently went stale the
+        # moment master's password changed, and the only symptom was a booth
+        # whose sync could not authenticate — with nothing pointing at settings.
+        'PASSWORD': env('MASTER_DB_PASSWORD', default=env('DB_PASSWORD', default='postgres')),
         'HOST':     _master_host,
         'PORT':     _db_port,
         'OPTIONS':  {'connect_timeout': 3},

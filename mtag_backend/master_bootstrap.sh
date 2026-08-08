@@ -120,24 +120,49 @@ ENV
 
 # ── 3. Local Postgres ─────────────────────────────────────────────────────
 echo "--- configuring Postgres ---"
-if [ "$DB_USER" = "postgres" ]; then
-  sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
+
+# `sudo -u postgres psql` only works when pg_hba.conf grants the postgres OS
+# user peer/trust on the local socket. On a host configured for md5/scram it
+# prompts for a password instead and the deploy dies here. So: prefer a TCP
+# connection with the password we were given, and fall back to peer only if
+# that fails (first-ever bootstrap, before any password is set).
+psql_admin() {
+  if PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres        -tAc 'SELECT 1' >/dev/null 2>&1; then
+    PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" "$@"
+  else
+    sudo -u postgres psql "$@"
+  fi
+}
+
+if PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres \
+     -tAc 'SELECT 1' >/dev/null 2>&1; then
+  # The credentials already work. Do NOT run ALTER USER: rotating master's
+  # password silently breaks every booth whose .env carries the old one, and
+  # booths only discover it when a vehicle is already at the barrier.
+  echo "    ${DB_USER} password already valid — leaving it unchanged"
 else
-  sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
-    sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
+  echo "!!! ${DB_USER} cannot authenticate with the configured DB_PASSWORD." >&2
+  echo "!!!   Setting it now. EVERY BOOTH's MASTER_DB_PASSWORD must match this," >&2
+  echo "!!!   or its sync will fail to reach master." >&2
+  if [ "$DB_USER" = "postgres" ]; then
+    sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
+  else
+    sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
+      sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
+  fi
 fi
-sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "${DB_NAME}" || \
+
+psql_admin -lqt | cut -d '|' -f1 | grep -qw "${DB_NAME}" || \
+  PGPASSWORD="$DB_PASSWORD" createdb -h localhost -U "$DB_USER" -O "${DB_USER}" "${DB_NAME}" 2>/dev/null || \
   sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
 
-# Booths connect to this Postgres over the LAN for the synchronous dual-write,
-# so it must listen on more than the loopback interface. Warn rather than edit
-# postgresql.conf/pg_hba.conf automatically — that is a security decision.
-LISTEN="$(sudo -u postgres psql -tAc 'SHOW listen_addresses' 2>/dev/null || echo '?')"
+# Booths reach this Postgres over the LAN, so it must listen beyond loopback.
+# Warn rather than edit postgresql.conf/pg_hba.conf — that is a security call.
+LISTEN="$(psql_admin -tAc 'SHOW listen_addresses' 2>/dev/null || echo '?')"
 if [ "$LISTEN" = "localhost" ] || [ "$LISTEN" = "127.0.0.1" ]; then
   echo "!!! WARNING: Postgres listen_addresses='${LISTEN}' — booths CANNOT reach it." >&2
   echo "!!!   Set listen_addresses='*' in postgresql.conf and add a pg_hba.conf" >&2
   echo "!!!   line for the booth subnet, then restart postgresql." >&2
-  echo "!!!   Without this every booth entry/exit fails (online-only system)." >&2
 fi
 
 # ── 4. Migrate ────────────────────────────────────────────────────────────
@@ -152,7 +177,7 @@ python manage.py collectstatic --noinput >/dev/null
 # Booths resolve their gate from Plaza.plaza_id, so master must actually have
 # those rows before any booth is useful. Report, don't auto-seed: master may
 # hold real data and seed_data.py is a dev convenience.
-PLAZA_COUNT="$(sudo -u postgres psql -tAc 'SELECT COUNT(*) FROM plazas' "${DB_NAME}" 2>/dev/null || echo 0)"
+PLAZA_COUNT="$(psql_admin -d "${DB_NAME}" -tAc 'SELECT COUNT(*) FROM plazas' 2>/dev/null || echo 0)"
 echo "--- plazas on master: ${PLAZA_COUNT} ---"
 if [ "${PLAZA_COUNT:-0}" = "0" ]; then
   echo "!!! No plazas on master. Booths resolve their lane by Plaza.plaza_id and" >&2
@@ -160,8 +185,8 @@ if [ "${PLAZA_COUNT:-0}" = "0" ]; then
   echo "!!!   portal, or run 'python manage.py seed_data' for the Malir set." >&2
 else
   echo "--- plaza_id values booths can be pointed at: ---"
-  sudo -u postgres psql -c \
-    'SELECT plaza_id, name, is_active FROM plazas ORDER BY plaza_id;' "${DB_NAME}"
+  psql_admin -d "${DB_NAME}" -c \
+    'SELECT plaza_id, name, is_active FROM plazas ORDER BY plaza_id;'
 fi
 
 # ── 6. PM2 ────────────────────────────────────────────────────────────────

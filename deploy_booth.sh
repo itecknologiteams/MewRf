@@ -52,6 +52,10 @@ BARRIER_PORT="/dev/ttyUSB0"    # serial port the barrier is wired to
 MASTER_IP="192.168.78.200"     # master server's LAN IP
 MASTER_DB_NAME="master_tag_db" # master's database name
 MASTER_DB_USER="postgres"      # master's DB user
+MASTER_DB_PASSWORD="12345678"  # master's DB password. MUST be set: left blank,
+                               # base.py falls back to a hardcoded default that
+                               # is almost certainly wrong, and the booth's sync
+                               # silently fails to reach master.
 DB_NAME="tag_db"               # this booth's own local DB name
 DB_USER="postgres"             # this booth's own local DB user
 DB_PASSWORD="12345678"         # this booth's own local DB password
@@ -90,6 +94,7 @@ prompt BARRIER_PORT    "Barrier serial port" "/dev/ttyUSB0"
 prompt MASTER_IP       "Master server LAN IP" "192.168.78.200"
 prompt MASTER_DB_NAME  "Master's database name" "master_tag_db"
 prompt MASTER_DB_USER  "Master's DB user" "postgres"
+prompt MASTER_DB_PASSWORD "Master's DB password"
 prompt DB_NAME         "This booth's local DB name" "tag_db"
 prompt DB_USER         "This booth's local DB user" "postgres"
 prompt DB_PASSWORD     "This booth's local DB password"
@@ -137,6 +142,7 @@ ssh -t -p "$SSH_PORT" "$SSH_USER@$BOOTH_IP" "
   MASTER_IP='$MASTER_IP' \
   MASTER_DB_NAME='$MASTER_DB_NAME' \
   MASTER_DB_USER='$MASTER_DB_USER' \
+  MASTER_DB_PASSWORD='$MASTER_DB_PASSWORD' \
   DB_NAME='$DB_NAME' \
   DB_USER='$DB_USER' \
   DB_PASSWORD='$DB_PASSWORD' \
