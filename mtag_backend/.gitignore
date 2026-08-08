@@ -1,6 +1,10 @@
 # ── Environment & Secrets ─────────────────────────────────────────────────────
 .env
 .env.*
+# ...but template files carry no secrets and MUST be in version control:
+# .env.booth.example documents GATE_MODE and the master DB wiring a booth
+# needs, and booth_bootstrap.sh copies it to create the real .env.
+!.env.*.example
 !.env.example
 
 # ── Python ────────────────────────────────────────────────────────────────────
