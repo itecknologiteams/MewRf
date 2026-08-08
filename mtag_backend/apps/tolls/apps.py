@@ -12,11 +12,16 @@ class TollsConfig(AppConfig):
         import sys
         from django.conf import settings
 
-        # Background sync (and the ANPR gate) connect to the master server.
-        # Disable them in local/dev so a developer machine never touches
-        # production. Controlled by SYNC_AGENT_ENABLED (True in base/lan,
-        # False in config.settings.local).
-        if not getattr(settings, 'SYNC_AGENT_ENABLED', True):
+        # The master sync agent is NO LONGER started here. It runs as its own
+        # process — `manage.py sync_service`, PM2 app `mtag-sync` — so that the
+        # web app and the gate hold no replication logic and never block on
+        # master. Starting it here also meant every `manage.py <anything>`
+        # (shell, migrate, showmigrations) silently spun up a sync thread.
+        #
+        # Gates the ANPR gate auto-start ONLY. Syncing is not affected by any
+        # setting — it runs iff the mtag-sync process is running.
+        if not getattr(settings, 'ANPR_GATE_ENABLED',
+                       getattr(settings, 'SYNC_AGENT_ENABLED', True)):
             return
 
         # Under Django's dev-server reloader the monitor process runs first
@@ -26,10 +31,6 @@ class TollsConfig(AppConfig):
         is_runserver = 'runserver' in sys.argv
         if is_runserver and os.environ.get('RUN_MAIN') != 'true':
             return
-
-        # Start PostgreSQL sync agent
-        from apps.tolls.sync.agent import start as start_sync
-        start_sync()
 
         # Start ANPR gate if config exists next to manage.py
         base_dir = os.path.dirname(
@@ -63,7 +64,7 @@ class TollsConfig(AppConfig):
 
         gate_mode    = cfg.get('gate', 'mode',          fallback='entry').strip().lower()
         plaza_id     = cfg.get('gate', 'plaza_id',      fallback='').strip()
-        plaza_code   = cfg.get('gate', 'plaza_code',    fallback='').strip().upper()
+        plaza_uuid   = cfg.get('gate', 'plaza_uuid',    fallback='').strip()
         lane_id      = cfg.get('gate', 'lane_id',       fallback='').strip() or None
         lane_number  = cfg.get('gate', 'lane_number',   fallback='').strip() or None
         plate_cooldown = float(cfg.get('gate', 'plate_cooldown', fallback='5.0'))
@@ -74,7 +75,7 @@ class TollsConfig(AppConfig):
         display_ip   = cfg.get('display', 'display_ip', fallback='192.168.78.12')
 
         try:
-            plaza_id, lane_id = resolve_plaza_lane(plaza_code, plaza_id, lane_number, lane_id)
+            plaza_uuid, lane_id = resolve_plaza_lane(plaza_id, plaza_uuid, lane_number, lane_id)
         except Exception as exc:
             log.error("[anpr] Plaza/lane config error: %s", exc)
             return
@@ -85,7 +86,7 @@ class TollsConfig(AppConfig):
 
         gate = AnprGateController(
             gate_mode=gate_mode,
-            plaza_id=plaza_id,
+            plaza_id=plaza_uuid,
             lane_id=lane_id,
             serial_port=serial_port,
             serial_baud=serial_baud,

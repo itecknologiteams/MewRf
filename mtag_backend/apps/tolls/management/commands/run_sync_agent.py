@@ -1,40 +1,43 @@
 """
-Standalone sync agent — pull+push in foreground (no Django server needed).
+DEPRECATED — use `manage.py sync_service` instead.
 
-Usage:
-    python manage.py run_sync_agent
-    python manage.py run_sync_agent --interval 60
-    python manage.py run_sync_agent --once
+Kept as a thin shim so existing PM2 entries, cron jobs and runbooks keep working.
+It delegates to sync_service rather than reimplementing the loop, because this
+command was mode-unaware: it always ran the full pull, so an ENTRY booth would
+copy in every other plaza's open trips it has no use for.
+
+    python manage.py sync_service                # loop, mode from GATE_MODE
+    python manage.py sync_service --once
+    python manage.py sync_service --mode entry
 """
-import time
-import logging
 from django.core.management.base import BaseCommand
-from apps.tolls.sync.pull_service import run_pull
-from apps.tolls.sync.push_service import run_push
 
-log = logging.getLogger('apps.tolls.sync.agent')
+from apps.tolls.sync import agent
 
 
 class Command(BaseCommand):
-    help = "Run PostgreSQL sync agent (pull master→local, push local→master)"
+    help = "DEPRECATED — use 'sync_service'. Runs the booth<->master sync agent."
 
     def add_arguments(self, parser):
-        parser.add_argument('--interval', type=int, default=30,
+        parser.add_argument('--interval', type=int, default=None,
                             help='Sync interval in seconds (default: 30)')
         parser.add_argument('--once', action='store_true',
                             help='Run one cycle and exit (for testing)')
+        parser.add_argument('--mode', default=None, choices=list(agent.VALID_MODES),
+                            help='Override GATE_MODE from .env for this run.')
 
     def handle(self, *args, **options):
-        interval = options['interval']
-        once     = options['once']
+        self.stdout.write(self.style.WARNING(
+            "[sync] 'run_sync_agent' is deprecated — use 'manage.py sync_service'. "
+            "Delegating."
+        ))
+        if options['interval']:
+            # _loop() reads this module-level constant each iteration.
+            agent.SYNC_INTERVAL = options['interval']
 
-        self.stdout.write(f"[sync] Starting — interval={interval}s")
-
-        while True:
-            pull = run_pull()
-            push = run_push()
-            self.stdout.write(f"[sync] pull={pull}  push={push}")
-
-            if once:
-                break
-            time.sleep(interval)
+        from django.core.management import call_command
+        call_command(
+            'sync_service',
+            **{k: v for k, v in (('once', options['once']), ('mode', options['mode']))
+               if v},
+        )

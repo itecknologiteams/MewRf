@@ -1,15 +1,23 @@
 """
-Pull service: copies master → local.
+PULL service: master → booth. The other half of the sync service; see
+push_service.py. Never called from the RFID/gate path — the gate only reads its
+local database, and this process is what keeps that database current.
 
-Tables pulled (master is authoritative):
-  - plazas, toll_lanes, toll_rates, tags  — full refresh every cycle (no updated_at)
-  - users, vehicles, accounts             — timestamp-based
-  - toll_trips (active)                   — full refresh so exit gate finds entries
-                                            from any plaza on the network
+Two independent passes, because the two booth modes need different things:
 
-Strategy: ON CONFLICT DO UPDATE so local always mirrors master.
-          accounts pull has a timestamp guard so an offline balance deduction
-          on local is never overwritten by an older master value.
+  pull_reference()  — plazas, toll_lanes, toll_rates, tags, users, vehicles,
+                      accounts. Master owns all of it. BOTH modes need this: an
+                      entry booth cannot validate a tag or check a balance
+                      without it, and an exit booth cannot price a fare.
+
+  pull_trips()      — open trips (full refresh) + trips closed elsewhere
+                      (timestamp-based). Only an EXIT booth needs open trips, to
+                      charge against them. Closed trips matter to both modes:
+                      without them a completed trip stays 'active' locally
+                      forever and blocks the vehicle's next entry.
+
+Strategy: ON CONFLICT DO UPDATE so local mirrors master. Timestamp guards stop
+an older row overwriting a newer one in either direction.
 """
 import logging
 from datetime import datetime, timezone
@@ -17,6 +25,7 @@ from datetime import datetime, timezone
 import psycopg2.extras
 
 from apps.tolls.sync.connections import get_local_conn, get_master_conn
+from apps.tolls.sync.trip_sync import sync_trip_lifecycle
 
 log = logging.getLogger('apps.tolls.sync.pull')
 
@@ -44,21 +53,41 @@ def _set_last_pull(local_cur, table: str, ts: datetime):
     """, (table, ts))
 
 
+
+def _resync_sequence(cur, table: str, column: str = 'id') -> None:
+    """Realign a serial sequence after inserting rows with explicit ids.
+
+    The sync upserts rows using the ids the other side assigned, which bypasses
+    the sequence completely — it stays where it was while the data moves ahead.
+    The next locally-created row then reuses an id that is already taken and the
+    INSERT dies with "duplicate key value violates unique constraint <t>_pkey".
+    Seen in the wild: a booth that had pulled users could not register a new one.
+
+    Only integer-PK tables need this. Everything else the sync touches (vehicles,
+    tags, accounts, plazas, trips, fares) uses UUIDs, which have no sequence.
+    """
+    cur.execute(
+        "SELECT setval(pg_get_serial_sequence(%s, %s), "
+        "       GREATEST(COALESCE((SELECT MAX(" + column + ") FROM " + table + "), 1), 1))",
+        (f"public.{table}", column),
+    )
+
+
 # ── Full-refresh tables (no timestamp columns) ────────────────────────────────
 
 def pull_plazas(master_cur, local_cur) -> int:
     master_cur.execute(
-        "SELECT id, name, code, latitude, longitude, is_active FROM plazas"
+        "SELECT id, plaza_id, name, latitude, longitude, is_active FROM plazas"
     )
     rows = master_cur.fetchall()
     if not rows:
         return 0
     psycopg2.extras.execute_values(local_cur, """
-        INSERT INTO plazas (id, name, code, latitude, longitude, is_active)
+        INSERT INTO plazas (id, plaza_id, name, latitude, longitude, is_active)
         VALUES %s
         ON CONFLICT (id) DO UPDATE SET
+            plaza_id  = EXCLUDED.plaza_id,
             name      = EXCLUDED.name,
-            code      = EXCLUDED.code,
             latitude  = EXCLUDED.latitude,
             longitude = EXCLUDED.longitude,
             is_active = EXCLUDED.is_active
@@ -103,10 +132,89 @@ def pull_toll_rates(master_cur, local_cur) -> int:
     return len(rows)
 
 
+def pull_tag_assignments(master_cur, local_cur) -> int:
+    """Tag installation history (vehicles.TagAssignment). Full refresh — small,
+    append-mostly, and a booth needs the whole chain to answer 'where was this
+    tag before'. Runs AFTER tags/vehicles: every row FKs both."""
+    master_cur.execute("SELECT id, tag_id, tag_serial, vehicle_id, plate_number, assigned_at, assigned_by_id, removed_at, removed_reason, notes, created_at, updated_at FROM tag_assignments")
+    rows = master_cur.fetchall()
+    if not rows:
+        return 0
+    psycopg2.extras.execute_values(local_cur, """
+        INSERT INTO tag_assignments (id, tag_id, tag_serial, vehicle_id, plate_number, assigned_at, assigned_by_id, removed_at, removed_reason, notes, created_at, updated_at)
+        VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            tag_id         = EXCLUDED.tag_id,
+            vehicle_id     = EXCLUDED.vehicle_id,
+            plate_number   = EXCLUDED.plate_number,
+            removed_at     = EXCLUDED.removed_at,
+            removed_reason = EXCLUDED.removed_reason,
+            notes          = EXCLUDED.notes,
+            updated_at     = EXCLUDED.updated_at
+    """, rows)
+    return len(rows)
+
+
+def pull_vehicle_categories(master_cur, local_cur) -> int:
+    """Full refresh — tiny, master-owned billing categories."""
+    master_cur.execute("""
+        SELECT id, category_index, code, name, description,
+               is_active, created_at, updated_at
+        FROM vehicle_categories
+    """)
+    rows = master_cur.fetchall()
+    if not rows:
+        return 0
+    psycopg2.extras.execute_values(local_cur, """
+        INSERT INTO vehicle_categories (id, category_index, code, name,
+               description, is_active, created_at, updated_at)
+        VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            category_index = EXCLUDED.category_index,
+            code           = EXCLUDED.code,
+            name           = EXCLUDED.name,
+            description    = EXCLUDED.description,
+            is_active      = EXCLUDED.is_active,
+            updated_at     = EXCLUDED.updated_at
+    """, rows)
+    return len(rows)
+
+
+def pull_fare_matrix(master_cur, local_cur) -> int:
+    """Full refresh of the fare matrix.
+
+    MUST run after pull_plazas and pull_vehicle_categories — every row FKs a
+    plaza and a category, so pulling it first would fail on the foreign keys.
+    Full refresh rather than timestamp-based: the table is small (plazas^2 x
+    categories) and a booth pricing a trip from a half-synced matrix would
+    under-bill, so it is always brought over whole.
+    """
+    master_cur.execute("""
+        SELECT id, from_plaza_id, to_plaza_id, category_index,
+               fare, created_at, updated_at
+        FROM fare_matrix
+    """)
+    rows = master_cur.fetchall()
+    if not rows:
+        return 0
+    psycopg2.extras.execute_values(local_cur, """
+        INSERT INTO fare_matrix (id, from_plaza_id, to_plaza_id,
+               category_index, fare, created_at, updated_at)
+        VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            from_plaza_id  = EXCLUDED.from_plaza_id,
+            to_plaza_id    = EXCLUDED.to_plaza_id,
+            category_index = EXCLUDED.category_index,
+            fare           = EXCLUDED.fare,
+            updated_at     = EXCLUDED.updated_at
+    """, rows)
+    return len(rows)
+
+
 def pull_tags(master_cur, local_cur) -> int:
     """Full refresh — small table, catches all status/assignment changes from master."""
     master_cur.execute("""
-        SELECT id, tag_serial, epc, vehicle_id, issued_at,
+        SELECT id, tag_serial, tid, epc, vehicle_id, issued_at,
                expiry_date, status, last_scanned_at, updated_at
         FROM tags
     """)
@@ -116,11 +224,12 @@ def pull_tags(master_cur, local_cur) -> int:
     try:
         local_cur.execute("SAVEPOINT pull_tags")
         psycopg2.extras.execute_values(local_cur, """
-            INSERT INTO tags (id, tag_serial, epc, vehicle_id, issued_at,
+            INSERT INTO tags (id, tag_serial, tid, epc, vehicle_id, issued_at,
                    expiry_date, status, last_scanned_at, updated_at)
             VALUES %s
             ON CONFLICT (id) DO UPDATE SET
                 status          = EXCLUDED.status,
+                tid             = EXCLUDED.tid,
                 vehicle_id      = EXCLUDED.vehicle_id,
                 expiry_date     = EXCLUDED.expiry_date,
                 last_scanned_at = EXCLUDED.last_scanned_at,
@@ -131,7 +240,7 @@ def pull_tags(master_cur, local_cur) -> int:
     except Exception:
         local_cur.execute("ROLLBACK TO SAVEPOINT pull_tags")
         psycopg2.extras.execute_values(local_cur, """
-            INSERT INTO tags (id, tag_serial, epc, vehicle_id, issued_at,
+            INSERT INTO tags (id, tag_serial, tid, epc, vehicle_id, issued_at,
                    expiry_date, status, last_scanned_at, updated_at)
             VALUES %s
             ON CONFLICT DO NOTHING
@@ -167,6 +276,9 @@ def pull_users(master_cur, local_cur, since: datetime) -> int:
             updated_at  = EXCLUDED.updated_at
         WHERE users.updated_at < EXCLUDED.updated_at
     """, rows)
+    # users.id is a bigserial and these rows carry master's ids — realign the
+    # sequence or the booth cannot create a user of its own afterwards.
+    _resync_sequence(local_cur, 'users')
     return len(rows)
 
 
@@ -242,72 +354,71 @@ def pull_accounts(master_cur, local_cur, since: datetime) -> int:
     return len(rows)
 
 
-def pull_active_trips(master_cur, local_cur) -> int:
-    """Pull ALL active trips from master — full refresh, no timestamp filter.
-    Exit gate at Plaza B needs the entry trip created at Plaza A."""
-    master_cur.execute("""
-        SELECT id, vehicle_id, tag_id, account_id, entry_plaza_id,
-               entry_lane_id, entry_time, exit_plaza_id, exit_lane_id,
-               exit_time, charge_amount, balance_before, balance_after,
-               status, created_at, updated_at
-        FROM toll_trips WHERE status = 'active'
-    """)
-    rows = master_cur.fetchall()
-    if not rows:
-        return 0
-    psycopg2.extras.execute_values(local_cur, """
-        INSERT INTO toll_trips (id, vehicle_id, tag_id, account_id,
-               entry_plaza_id, entry_lane_id, entry_time,
-               exit_plaza_id, exit_lane_id, exit_time,
-               charge_amount, balance_before, balance_after,
-               status, created_at, updated_at)
-        VALUES %s
-        ON CONFLICT (id) DO UPDATE SET
-            status        = EXCLUDED.status,
-            exit_plaza_id = EXCLUDED.exit_plaza_id,
-            exit_lane_id  = EXCLUDED.exit_lane_id,
-            exit_time     = EXCLUDED.exit_time,
-            charge_amount = EXCLUDED.charge_amount,
-            balance_after = EXCLUDED.balance_after,
-            updated_at    = EXCLUDED.updated_at
-        WHERE toll_trips.updated_at < EXCLUDED.updated_at
-    """, rows)
-    return len(rows)
+def pull_reference(master_cur, local_cur) -> dict:
+    """Master-owned reference data. Required by BOTH booth modes.
 
-
-def run_pull() -> dict:
-    """Pull all tables from master into local. Returns summary dict."""
+    Without this an entry booth has no tags/vehicles/accounts to validate against
+    and would reject every vehicle, and an exit booth has no rates to price with.
+    """
     summary = {}
+    # Full-refresh tables (no usable timestamp column)
+    summary['plazas']     = pull_plazas(master_cur, local_cur)
+    summary['toll_lanes'] = pull_toll_lanes(master_cur, local_cur)
+    summary['toll_rates'] = pull_toll_rates(master_cur, local_cur)
+    summary['tags']       = pull_tags(master_cur, local_cur)
+    # Categories before fares: fare_matrix FKs both plazas and categories.
+    summary['vehicle_categories'] = pull_vehicle_categories(master_cur, local_cur)
+    summary['fare_matrix']        = pull_fare_matrix(master_cur, local_cur)
+    summary['tag_assignments']    = pull_tag_assignments(master_cur, local_cur)
+
+    # Timestamp-tracked tables
+    for table, fn in [
+        ('users',    pull_users),
+        ('vehicles', pull_vehicles),
+        ('accounts', pull_accounts),
+    ]:
+        since = _get_last_pull(local_cur, table)
+        count = fn(master_cur, local_cur, since)
+        if count:
+            _set_last_pull(local_cur, table, _now())
+        summary[table] = count
+    return summary
+
+
+def pull_trips(master_cur, local_cur, include_open: bool) -> dict:
+    """Trip lifecycle. `include_open` should be True only for EXIT booths.
+
+    An entry booth has no use for other plazas' open trips — it never charges
+    against them — but it DOES need the closed-trip pass, or a completed trip
+    stays 'active' in its local DB and blocks that vehicle's next entry.
+    """
+    return sync_trip_lifecycle(master_cur, local_cur, include_open=include_open)
+
+
+def run_pull(mode: str = 'exit') -> dict:
+    """Pull from master into the local DB, according to booth mode.
+
+    mode='entry' — reference data + closed trips.
+    mode='exit'  — reference data + closed trips + OPEN trips.
+
+    Defaults to 'exit' (the superset) so an unset/typo\'d mode degrades to
+    pulling more rather than silently starving an exit lane of open trips.
+    """
+    summary = {'mode': mode}
     try:
         master_conn = get_master_conn()
         local_conn  = get_local_conn()
     except Exception as exc:
         log.warning("[pull] Cannot connect: %s", exc)
-        return {'error': str(exc)}
+        return {'error': str(exc), 'mode': mode}
 
     try:
         with master_conn, local_conn:
             with master_conn.cursor() as mc, local_conn.cursor() as lc:
-                # Full-refresh tables (no timestamp columns)
-                summary['plazas']     = pull_plazas(mc, lc)
-                summary['toll_lanes'] = pull_toll_lanes(mc, lc)
-                summary['toll_rates'] = pull_toll_rates(mc, lc)
-                summary['tags']       = pull_tags(mc, lc)
-
-                # Timestamp-tracked tables
-                for table, fn in [
-                    ('users',    pull_users),
-                    ('vehicles', pull_vehicles),
-                    ('accounts', pull_accounts),
-                ]:
-                    since = _get_last_pull(lc, table)
-                    count = fn(mc, lc, since)
-                    if count:
-                        _set_last_pull(lc, table, _now())
-                    summary[table] = count
-
-                # Active trips — always full refresh
-                summary['active_trips'] = pull_active_trips(mc, lc)
+                summary.update(pull_reference(mc, lc))
+                trips = pull_trips(mc, lc, include_open=(mode != 'entry'))
+                summary['open_trips']   = trips['active']
+                summary['closed_trips'] = trips['closed']
 
         log.info("[pull] done — %s", summary)
     except Exception as exc:
