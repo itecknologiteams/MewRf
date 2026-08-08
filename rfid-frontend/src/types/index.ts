@@ -106,8 +106,9 @@ export interface ApiTransaction {
 
 export interface Plaza {
   id: string;
+  /** Operator-assigned plaza number (Plaza.plaza_id). Replaced `code`. */
+  plaza_id: number;
   name: string;
-  code: string;
   latitude?: string;
   longitude?: string;
   is_active: boolean;
@@ -122,13 +123,29 @@ export interface Lane {
 
 export interface TollRate {
   id: string;
-  entry_plaza: string;
-  entry_plaza_name: string;
-  exit_plaza: string;
-  exit_plaza_name: string;
-  vehicle_type: string;
-  rate: string;
-  effective_from: string;
+  /** fare_matrix row. Field names mirror the table: from_plaza / to_plaza /
+   *  category_index / fare. `category` IS the integer category_index. */
+  from_plaza: string;
+  from_plaza_name: string;
+  from_plaza_display_id: string;
+  to_plaza: string;
+  to_plaza_name: string;
+  to_plaza_display_id: string;
+  category: number;
+  category_name: string;
+  category_code: string;
+  fare: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleCategory {
+  id: string;
+  category_index: number;
+  code: string;
+  name: string;
+  description: string;
+  is_active: boolean;
 }
 
 export interface TollTrip {

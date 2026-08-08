@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { tollsApi } from '@/services/api';
-import type { Plaza, TollRate, Lane } from '@/types';
+import { formatPlazaId } from '@/lib/utils';
+import type { Plaza, TollRate, Lane, VehicleCategory } from '@/types';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -34,7 +35,7 @@ export default function PlazasPage() {
 
   // Add Plaza modal
   const [showPlazaModal, setShowPlazaModal] = useState(false);
-  const [plazaForm, setPlazaForm] = useState({ name: '', code: '', latitude: '', longitude: '' });
+  const [plazaForm, setPlazaForm] = useState({ name: '', plaza_id: '', latitude: '', longitude: '' });
   const [isCreatingPlaza, setIsCreatingPlaza] = useState(false);
 
   // Add Lane modal
@@ -42,14 +43,15 @@ export default function PlazasPage() {
   const [laneForm, setLaneForm] = useState({ lane_number: '' });
   const [isCreatingLane, setIsCreatingLane] = useState(false);
 
-  // Add Rate modal
+  // Add/Edit Rate modal
   const [showRateModal, setShowRateModal] = useState(false);
+  const [editingRateId, setEditingRateId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<VehicleCategory[]>([]);
   const [rateForm, setRateForm] = useState({
-    entry_plaza: '',
-    exit_plaza: '',
-    vehicle_type: 'car',
-    rate: '',
-    effective_from: new Date().toISOString().slice(0, 10),
+    from_plaza: '',
+    to_plaza: '',
+    category: 1,
+    fare: '',
   });
   const [isCreatingRate, setIsCreatingRate] = useState(false);
 
@@ -67,14 +69,19 @@ export default function PlazasPage() {
     setLoading(true);
     setLoadingRates(true);
     try {
-      const [plazasData, ratesData] = await Promise.allSettled([
+      const [plazasData, ratesData, categoriesData] = await Promise.allSettled([
         isAdmin ? tollsApi.adminPlazas() : tollsApi.plazas(),
         tollsApi.rates(),
+        tollsApi.vehicleCategories(),
       ]);
       if (plazasData.status === 'fulfilled') setPlazas(plazasData.value);
       else addToast({ type: 'error', title: 'Error', message: 'Failed to load plazas' });
       if (ratesData.status === 'fulfilled') setRates(ratesData.value);
-      else addToast({ type: 'error', title: 'Error', message: 'Failed to load rates' });
+      else addToast({ type: 'error', title: 'Error', message: 'Failed to load fares' });
+      // Categories drive the fare editor's dropdown; without them a fare cannot
+      // be created, so surface the failure rather than showing an empty select.
+      if (categoriesData.status === 'fulfilled') setCategories(categoriesData.value);
+      else addToast({ type: 'error', title: 'Error', message: 'Failed to load vehicle categories' });
     } finally {
       setLoading(false);
       setLoadingRates(false);
@@ -85,29 +92,34 @@ export default function PlazasPage() {
 
   const filteredPlazas = useMemo(() => {
     const s = search.toLowerCase();
-    return plazas.filter(p => p.name.toLowerCase().includes(s) || p.code.toLowerCase().includes(s));
+    return plazas.filter(p => p.name.toLowerCase().includes(s) || String(p.plaza_id).includes(s) || formatPlazaId(p.plaza_id).includes(s));
   }, [plazas, search]);
 
   const toggleExpand = (id: string) => setExpandedPlaza(expandedPlaza === id ? null : id);
 
   const handleCreatePlaza = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!plazaForm.name.trim() || !plazaForm.code.trim()) {
-      addToast({ type: 'error', title: 'Validation Error', message: 'Name and code are required.' });
+    if (!plazaForm.name.trim() || !plazaForm.plaza_id.trim()) {
+      addToast({ type: 'error', title: 'Validation Error', message: 'Name and plaza ID are required.' });
+      return;
+    }
+    const plazaIdNumber = Number(plazaForm.plaza_id);
+    if (!Number.isInteger(plazaIdNumber) || plazaIdNumber < 0) {
+      addToast({ type: 'error', title: 'Validation Error', message: 'Plaza ID must be a whole number.' });
       return;
     }
     setIsCreatingPlaza(true);
     try {
       await tollsApi.adminCreatePlaza({
         name: plazaForm.name.trim(),
-        code: plazaForm.code.trim().toUpperCase(),
+        plaza_id: plazaIdNumber,
         latitude: plazaForm.latitude || undefined,
         longitude: plazaForm.longitude || undefined,
         is_active: true,
       });
       addToast({ type: 'success', title: 'Plaza Created', message: `${plazaForm.name} added.` });
       setShowPlazaModal(false);
-      setPlazaForm({ name: '', code: '', latitude: '', longitude: '' });
+      setPlazaForm({ name: '', plaza_id: '', latitude: '', longitude: '' });
       fetchData();
     } catch (err: unknown) {
       addToast({ type: 'error', title: 'Failed', message: err instanceof Error ? err.message : 'Error' });
@@ -195,18 +207,39 @@ export default function PlazasPage() {
     }
   };
 
-  const handleCreateRate = async (e: React.FormEvent) => {
+  const closeRateModal = () => {
+    setShowRateModal(false);
+    setEditingRateId(null);
+    setRateForm({ from_plaza: '', to_plaza: '', category: categories[0]?.category_index ?? 1, fare: '' });
+  };
+
+  const openEditRate = (rate: TollRate) => {
+    setEditingRateId(rate.id);
+    setRateForm({
+      from_plaza: rate.from_plaza,
+      to_plaza: rate.to_plaza,
+      category: rate.category,
+      fare: rate.fare,
+    });
+    setShowRateModal(true);
+  };
+
+  const handleSaveRate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rateForm.entry_plaza || !rateForm.exit_plaza || !rateForm.rate || !rateForm.effective_from) {
+    if (!rateForm.from_plaza || !rateForm.to_plaza || !rateForm.fare) {
       addToast({ type: 'error', title: 'Validation Error', message: 'All fields are required.' });
       return;
     }
     setIsCreatingRate(true);
     try {
-      await tollsApi.adminCreateRate(rateForm);
-      addToast({ type: 'success', title: 'Rate Created', message: 'Toll rate has been configured.' });
-      setShowRateModal(false);
-      setRateForm({ entry_plaza: '', exit_plaza: '', vehicle_type: 'car', rate: '', effective_from: new Date().toISOString().slice(0, 10) });
+      if (editingRateId) {
+        await tollsApi.adminUpdateRate(editingRateId, rateForm);
+        addToast({ type: 'success', title: 'Rate Updated', message: 'Toll rate has been updated.' });
+      } else {
+        await tollsApi.adminCreateRate(rateForm);
+        addToast({ type: 'success', title: 'Rate Created', message: 'Toll rate has been configured.' });
+      }
+      closeRateModal();
       fetchData();
     } catch (err: unknown) {
       addToast({ type: 'error', title: 'Failed', message: err instanceof Error ? err.message : 'Error' });
@@ -253,7 +286,7 @@ export default function PlazasPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by plaza name or code..."
+            placeholder="Search by plaza name or ID..."
             className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
           />
         </div>
@@ -284,7 +317,7 @@ export default function PlazasPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-[var(--text-primary)]">{plaza.name}</h3>
-                      <p className="text-xs text-[var(--text-secondary)] font-mono mt-0.5">{plaza.code}</p>
+                      <p className="text-xs text-[var(--text-secondary)] font-mono mt-0.5">ID {formatPlazaId(plaza.plaza_id)}</p>
                       {(plaza.latitude || plaza.longitude) && (
                         <p className="text-xs text-[var(--text-tertiary)] mt-1">{plaza.latitude}, {plaza.longitude}</p>
                       )}
@@ -409,7 +442,7 @@ export default function PlazasPage() {
             </span>
             {isAdmin && (
               <button
-                onClick={() => setShowRateModal(true)}
+                onClick={() => { setEditingRateId(null); setShowRateModal(true); }}
                 className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-emerald)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
               >
                 <Plus className="w-4 h-4" />
@@ -431,38 +464,48 @@ export default function PlazasPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-[var(--bg-elevated)]">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Entry Plaza</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Exit Plaza</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Vehicle Type</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Rate (PKR)</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Effective From</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">From Plaza</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">To Plaza</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Category</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Fare (PKR)</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Updated</th>
                   {isAdmin && <th className="px-6 py-3" />}
                 </tr>
               </thead>
               <tbody>
                 {rates.map((rate) => (
                   <tr key={rate.id} className="border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)] transition-colors">
-                    <td className="px-6 py-4 text-sm text-[var(--text-primary)]">{rate.entry_plaza_name}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{rate.exit_plaza_name}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-primary)]">{rate.from_plaza_display_id} {rate.from_plaza_name}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{rate.to_plaza_display_id} {rate.to_plaza_name}</td>
                     <td className="px-6 py-4">
                       <span className="text-xs bg-[var(--bg-elevated)] text-[var(--text-secondary)] px-2.5 py-1 rounded-full border border-[var(--border-custom)] capitalize">
-                        {rate.vehicle_type}
+                        {rate.category_name}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-[var(--text-primary)] text-right">
-                      {parseFloat(rate.rate).toLocaleString()}
+                      {parseFloat(rate.fare).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
-                      {rate.effective_from ? new Date(rate.effective_from).toLocaleDateString('en-PK') : '—'}
+                      {rate.updated_at ? new Date(rate.updated_at).toLocaleDateString('en-PK') : '—'}
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-4">
-                        <button
-                          onClick={() => setConfirmDeleteRate(rate)}
-                          className="p-1.5 rounded-lg hover:bg-[var(--accent-rose)]/10 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openEditRate(rate)}
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-tertiary)] transition-colors"
+                            title="Edit rate"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteRate(rate)}
+                            className="p-1.5 rounded-lg hover:bg-[var(--accent-rose)]/10 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-colors"
+                            title="Delete rate"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -499,14 +542,15 @@ export default function PlazasPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                    Code <span className="text-[var(--accent-rose)]">*</span>
+                    Plaza ID <span className="text-[var(--accent-rose)]">*</span>
                   </label>
                   <input
-                    type="text"
-                    value={plazaForm.code}
-                    onChange={(e) => setPlazaForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
-                    placeholder="LHR01"
-                    maxLength={10}
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={plazaForm.plaza_id}
+                    onChange={(e) => setPlazaForm(p => ({ ...p, plaza_id: e.target.value }))}
+                    placeholder="3"
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   />
                 </div>
@@ -552,25 +596,25 @@ export default function PlazasPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-custom)]">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-[var(--accent-emerald)]" />
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Add Toll Rate</h2>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">{editingRateId ? 'Edit Toll Rate' : 'Add Toll Rate'}</h2>
               </div>
-              <button onClick={() => setShowRateModal(false)} className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">
+              <button onClick={closeRateModal} className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleCreateRate} className="p-6 space-y-4">
+            <form onSubmit={handleSaveRate} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                     Entry Plaza <span className="text-[var(--accent-rose)]">*</span>
                   </label>
                   <select
-                    value={rateForm.entry_plaza}
-                    onChange={(e) => setRateForm(f => ({ ...f, entry_plaza: e.target.value }))}
+                    value={rateForm.from_plaza}
+                    onChange={(e) => setRateForm(f => ({ ...f, from_plaza: e.target.value }))}
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   >
                     <option value="">Select plaza</option>
-                    {plazas.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+                    {plazas.map(p => <option key={p.id} value={p.id}>{p.name} ({formatPlazaId(p.plaza_id)})</option>)}
                   </select>
                 </div>
                 <div>
@@ -578,64 +622,54 @@ export default function PlazasPage() {
                     Exit Plaza <span className="text-[var(--accent-rose)]">*</span>
                   </label>
                   <select
-                    value={rateForm.exit_plaza}
-                    onChange={(e) => setRateForm(f => ({ ...f, exit_plaza: e.target.value }))}
+                    value={rateForm.to_plaza}
+                    onChange={(e) => setRateForm(f => ({ ...f, to_plaza: e.target.value }))}
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   >
                     <option value="">Select plaza</option>
-                    {plazas.filter(p => p.id !== rateForm.entry_plaza).map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                    {plazas.filter(p => p.id !== rateForm.from_plaza).map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({formatPlazaId(p.plaza_id)})</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                    Vehicle Type <span className="text-[var(--accent-rose)]">*</span>
+                    Vehicle Category <span className="text-[var(--accent-rose)]">*</span>
                   </label>
                   <select
-                    value={rateForm.vehicle_type}
-                    onChange={(e) => setRateForm(f => ({ ...f, vehicle_type: e.target.value }))}
+                    value={rateForm.category}
+                    onChange={(e) => setRateForm(f => ({ ...f, category: Number(e.target.value) }))}
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   >
-                    <option value="car">Car</option>
-                    <option value="motorcycle">Motorcycle</option>
-                    <option value="truck">Truck</option>
-                    <option value="bus">Bus</option>
+                    {categories.map(c => (
+                      <option key={c.category_index} value={c.category_index}>
+                        {c.category_index}. {c.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                    Rate (PKR) <span className="text-[var(--accent-rose)]">*</span>
+                    Fare (PKR) <span className="text-[var(--accent-rose)]">*</span>
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={rateForm.rate}
-                    onChange={(e) => setRateForm(f => ({ ...f, rate: e.target.value }))}
+                    value={rateForm.fare}
+                    onChange={(e) => setRateForm(f => ({ ...f, fare: e.target.value }))}
                     placeholder="500.00"
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                    Effective From <span className="text-[var(--accent-rose)]">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={rateForm.effective_from}
-                    onChange={(e) => setRateForm(f => ({ ...f, effective_from: e.target.value }))}
-                    className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
-                  />
-                </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowRateModal(false)} className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors">
+                <button type="button" onClick={closeRateModal} className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors">
                   Cancel
                 </button>
                 <button type="submit" disabled={isCreatingRate} className="flex-1 py-2.5 bg-[var(--accent-emerald)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
-                  {isCreatingRate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Save Rate
+                  {isCreatingRate ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingRateId ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />)}
+                  {editingRateId ? 'Update Rate' : 'Save Rate'}
                 </button>
               </div>
             </form>
@@ -708,7 +742,7 @@ export default function PlazasPage() {
               </div>
               <div>
                 <p className="font-semibold text-[var(--text-primary)]">Delete Toll Rate</p>
-                <p className="text-xs text-[var(--text-secondary)]">{confirmDeleteRate.entry_plaza_name} → {confirmDeleteRate.exit_plaza_name} · {confirmDeleteRate.vehicle_type}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{confirmDeleteRate.from_plaza_name} → {confirmDeleteRate.to_plaza_name} · {confirmDeleteRate.category_name}</p>
               </div>
             </div>
             <p className="text-sm text-[var(--text-secondary)] mb-5">This rate will be permanently removed. New toll trips will not find a rate for this route until a new one is added.</p>

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { tollsApi } from '@/services/api';
+import { formatPlazaId } from '@/lib/utils';
 import type { StatsData, DailyReport, PlazaReport, LaneReport } from '@/services/api';
 
 const COLORS = ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6'];
@@ -239,7 +240,7 @@ function PlazaCard({ plaza, colorIndex, forceOpen }: { plaza: PlazaReport; color
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold text-[var(--text-primary)]">{plaza.name}</p>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-custom)]">{plaza.code}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-custom)]">ID {formatPlazaId(plaza.plaza_id)}</span>
             {!plaza.is_active && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] font-medium">Inactive</span>
             )}
@@ -310,11 +311,11 @@ function DailyReportTab() {
     ];
     for (const plaza of report.plazas) {
       if (plaza.lanes.length === 0) {
-        rows.push([plaza.name, plaza.code, '', plaza.entries, plaza.exits, plaza.revenue, '']);
+        rows.push([plaza.name, formatPlazaId(plaza.plaza_id), '', plaza.entries, plaza.exits, plaza.revenue, '']);
       } else {
         for (const lane of plaza.lanes) {
           const types = Object.entries(lane.vehicle_types).map(([t, c]) => `${t}:${c}`).join(' | ');
-          rows.push([plaza.name, plaza.code, lane.lane_number ?? 'Unassigned', lane.entries, lane.exits, lane.revenue, types]);
+          rows.push([plaza.name, formatPlazaId(plaza.plaza_id), lane.lane_number ?? 'Unassigned', lane.entries, lane.exits, lane.revenue, types]);
         }
       }
     }
@@ -405,7 +406,9 @@ function DailyReportTab() {
             ))}
           </div>
 
-          {report.plazas.every((p) => p.trips === 0) && (
+          {/* PlazaReport has no `trips` field — it reports entries/exits. The old
+              `p.trips === 0` compared undefined to 0, so this never rendered. */}
+          {report.plazas.every((p) => p.entries === 0 && p.exits === 0) && (
             <p className="text-center py-10 text-sm text-[var(--text-secondary)]">No trips recorded on {date}</p>
           )}
         </>

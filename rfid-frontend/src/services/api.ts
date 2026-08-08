@@ -250,8 +250,8 @@ export interface LaneReport {
 
 export interface PlazaReport {
   id: string;
+  plaza_id: number;
   name: string;
-  code: string;
   is_active: boolean;
   entries: number;
   exits: number;
@@ -274,8 +274,9 @@ export interface Lane {
 
 export interface Plaza {
   id: string;
+  /** Operator-assigned plaza number (Plaza.plaza_id). Replaced `code`. */
+  plaza_id: number;
   name: string;
-  code: string;
   latitude?: string;
   longitude?: string;
   is_active: boolean;
@@ -284,13 +285,29 @@ export interface Plaza {
 
 export interface TollRate {
   id: string;
-  entry_plaza: string;
-  entry_plaza_name: string;
-  exit_plaza: string;
-  exit_plaza_name: string;
-  vehicle_type: string;
-  rate: string;
-  effective_from: string;
+  /** fare_matrix row. Field names mirror the table: from_plaza / to_plaza /
+   *  category_index / fare. `category` IS the integer category_index. */
+  from_plaza: string;
+  from_plaza_name: string;
+  from_plaza_display_id: string;
+  to_plaza: string;
+  to_plaza_name: string;
+  to_plaza_display_id: string;
+  category: number;
+  category_name: string;
+  category_code: string;
+  fare: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleCategory {
+  id: string;
+  category_index: number;
+  code: string;
+  name: string;
+  description: string;
+  is_active: boolean;
 }
 
 export interface TollTrip {
@@ -338,6 +355,7 @@ export const tollsApi = {
   plazas: () => apiFetch<Plaza[]>('/tolls/plazas/'),
 
   rates: () => apiFetch<TollRate[]>('/tolls/rates/'),
+  vehicleCategories: () => apiFetch<VehicleCategory[]>('/tolls/vehicle-categories/'),
 
   trips: (vehicleUuid: string) => apiFetch<TollTrip[]>(`/tolls/trips/${vehicleUuid}/`),
 
@@ -348,7 +366,7 @@ export const tollsApi = {
 
   adminPlazas: () => apiFetch<Plaza[]>('/tolls/admin/plazas/'),
 
-  adminCreatePlaza: (data: { name: string; code: string; latitude?: string; longitude?: string; is_active?: boolean }) =>
+  adminCreatePlaza: (data: { name: string; plaza_id: number; latitude?: string; longitude?: string; is_active?: boolean }) =>
     apiFetch<Plaza>('/tolls/admin/plazas/', { method: 'POST', body: JSON.stringify(data) }),
 
   adminUpdatePlaza: (id: string, data: { is_active?: boolean; name?: string }) =>
@@ -358,12 +376,18 @@ export const tollsApi = {
     apiFetch<Lane>(`/tolls/admin/plazas/${plazaId}/lanes/`, { method: 'POST', body: JSON.stringify(data) }),
 
   adminCreateRate: (data: {
-    entry_plaza: string;
-    exit_plaza: string;
-    vehicle_type: string;
-    rate: string;
-    effective_from: string;
+    from_plaza: string;
+    to_plaza: string;
+    category: number;
+    fare: string;
   }) => apiFetch<TollRate>('/tolls/admin/rates/', { method: 'POST', body: JSON.stringify(data) }),
+
+  adminUpdateRate: (id: string, data: {
+    from_plaza?: string;
+    to_plaza?: string;
+    category?: number;
+    fare?: string;
+  }) => apiFetch<TollRate>(`/tolls/admin/rates/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   adminDeleteRate: (id: string) =>
     apiFetch<null>(`/tolls/admin/rates/${id}/`, { method: 'DELETE' }),
