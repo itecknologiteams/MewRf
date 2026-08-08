@@ -191,16 +191,43 @@ class AdminTollRateView(APIView):
         return success_response(data=FareSerializer(fares, many=True).data)
 
     def post(self, request):
+        """Create or update the fare for a (from_plaza, to_plaza, category).
+
+        Deliberately an UPSERT. There is exactly one fare per combination, and
+        load_fares populates every combination up front, so a plain create would
+        always collide — an operator setting a fare in the portal would only ever
+        see "must make a unique set", which says nothing useful.
+        """
         serializer = FareCreateSerializer(data=request.data)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            # A uniqueness complaint here means the row already exists, which is
+            # the normal case. Re-validate as an update of that row instead.
+            existing = None
+            if 'non_field_errors' in serializer.errors:
+                existing = FareMatrix.objects.filter(
+                    from_plaza=request.data.get('from_plaza'),
+                    to_plaza=request.data.get('to_plaza'),
+                    category__category_index=request.data.get('category'),
+                ).first()
+            if existing is None:
+                return error_response("Invalid data", errors=serializer.errors)
+            serializer = FareCreateSerializer(existing, data=request.data, partial=True)
+            if not serializer.is_valid():
+                return error_response("Invalid data", errors=serializer.errors)
             fare = serializer.save()
             invalidate_rate_cache()
             return success_response(
                 data=FareSerializer(fare).data,
-                message="Fare created successfully",
-                status_code=201,
+                message="Fare updated (this route already had one)",
             )
-        return error_response("Invalid data", errors=serializer.errors)
+
+        fare = serializer.save()
+        invalidate_rate_cache()
+        return success_response(
+            data=FareSerializer(fare).data,
+            message="Fare created successfully",
+            status_code=201,
+        )
 
 
 class AdminRateDetailView(APIView):
