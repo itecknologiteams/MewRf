@@ -22,37 +22,66 @@ from django.core.management.base import BaseCommand, CommandError
 log = logging.getLogger('apps.tolls.gate')
 
 
-def resolve_plaza_lane(plaza_code: str, plaza_id: str, lane_number: str, lane_id: str):
-    """Resolve human-readable plaza_code/lane_number to UUIDs from the DB."""
+def resolve_plaza_lane(plaza_id: str, plaza_uuid: str, lane_number: str, lane_id: str):
+    """Resolve config's plaza_id/lane_number to the DB UUIDs the gate needs.
+
+    `plaza_id` is the operator-assigned plaza number from Plaza.plaza_id (this
+    replaced the old `plaza_code`). `plaza_uuid` is the raw Plaza.id escape
+    hatch, used only when plaza_id is not set.
+
+    Returns (plaza_uuid, lane_id) — GateController addresses rows by UUID.
+    """
     from apps.tolls.models import Plaza, TollLane
 
-    # Resolve plaza
-    if plaza_code:
-        try:
-            plaza = Plaza.objects.get(code=plaza_code)
-            plaza_id = str(plaza.id)
-        except Plaza.DoesNotExist:
-            raise CommandError(
-                f"Plaza with code '{plaza_code}' not found in DB.\n"
-                f"Available codes: {', '.join(Plaza.objects.values_list('code', flat=True))}"
-            )
-    elif not plaza_id or plaza_id == '00000000-0000-0000-0000-000000000000':
-        codes = ', '.join(Plaza.objects.values_list('code', flat=True))
+    def _available():
+        numbers = Plaza.objects.order_by('plaza_id').values_list('plaza_id', flat=True)
+        return ', '.join(str(n) for n in numbers) or '(no plazas in DB — has the sync agent run?)'
+
+    # `plaza_id` used to mean the Plaza UUID in this config file, and now means
+    # the integer plaza number. Fail loudly rather than letting int() blow up
+    # with an opaque error on a booth someone forgot to update.
+    if plaza_id and '-' in plaza_id:
         raise CommandError(
-            f"Set plaza_code (e.g. plaza_code = KPT) in config.\nAvailable: {codes}"
+            f"plaza_id = '{plaza_id}' looks like a UUID.\n"
+            "In this config, plaza_id is now the operator-assigned plaza number "
+            "(e.g. plaza_id = 3). Use the plaza_uuid key if you really do want to "
+            "pin this booth to a raw Plaza.id."
         )
 
-    # Resolve lane
+    # Resolve plaza
+    if plaza_id:
+        try:
+            number = int(plaza_id)
+        except ValueError:
+            raise CommandError(
+                f"plaza_id '{plaza_id}' in [gate] is not an integer.\n"
+                f"Available plaza_ids: {_available()}"
+            )
+        try:
+            plaza_uuid = str(Plaza.objects.get(plaza_id=number).id)
+        except Plaza.DoesNotExist:
+            raise CommandError(
+                f"Plaza with plaza_id {number} not found in DB.\n"
+                f"Available plaza_ids: {_available()}"
+            )
+    elif not plaza_uuid or plaza_uuid == '00000000-0000-0000-0000-000000000000':
+        raise CommandError(
+            f"Set plaza_id (e.g. plaza_id = 3) in config.\n"
+            f"Available plaza_ids: {_available()}"
+        )
+
+    # Resolve lane. NB: TollLane.plaza_id is Django's FK column and holds the
+    # Plaza UUID — it is not Plaza.plaza_id, the integer resolved above.
     if lane_number and not lane_id:
         try:
-            lane = TollLane.objects.get(plaza_id=plaza_id, lane_number=int(lane_number))
+            lane = TollLane.objects.get(plaza_id=plaza_uuid, lane_number=int(lane_number))
             lane_id = str(lane.id)
         except TollLane.DoesNotExist:
             raise CommandError(
-                f"Lane {lane_number} not found for plaza {plaza_code or plaza_id}."
+                f"Lane {lane_number} not found for plaza {plaza_id or plaza_uuid}."
             )
 
-    return plaza_id, lane_id or None
+    return plaza_uuid, lane_id or None
 
 
 class Command(BaseCommand):
@@ -79,7 +108,8 @@ class Command(BaseCommand):
                 "Create rfid_config.ini next to manage.py (see sample below).\n\n"
                 "[gate]\n"
                 "mode = entry          # entry or exit\n"
-                "plaza_id = 00000000-0000-0000-0000-000000000000\n"
+                "plaza_id = 3          # operator-assigned plaza number\n"
+                "lane_number = 1\n"
                 "lane_id =             # optional uuid\n\n"
                 "[scanner]\n"
                 "reader_host = 192.168.78.8\n"
@@ -98,7 +128,7 @@ class Command(BaseCommand):
 
         gate_mode   = cfg.get('gate', 'mode',       fallback='entry').strip().lower()
         plaza_id    = cfg.get('gate', 'plaza_id',   fallback='').strip()
-        plaza_code  = cfg.get('gate', 'plaza_code', fallback='').strip().upper()
+        plaza_uuid  = cfg.get('gate', 'plaza_uuid', fallback='').strip()
         lane_id     = cfg.get('gate', 'lane_id',    fallback='').strip() or None
         lane_number = cfg.get('gate', 'lane_number', fallback='').strip() or None
         reader_host = cfg.get('scanner', 'reader_host', fallback='192.168.78.8')
@@ -116,6 +146,23 @@ class Command(BaseCommand):
         if gate_mode not in ('entry', 'exit'):
             raise CommandError(f"Invalid gate mode '{gate_mode}' — must be 'entry' or 'exit'.")
 
+        # This booth's mode is declared twice: `mode` here in rfid_config.ini
+        # (what the gate does) and GATE_MODE in .env (which sync passes mtag-sync
+        # runs). booth_bootstrap.sh writes both from one value, but a hand-edit to
+        # one leaves them disagreeing — and the bad case is silent: an exit lane
+        # whose sync runs in entry mode never pulls open trips, so every exiting
+        # vehicle is turned away with "No active trip found".
+        from django.conf import settings
+        sync_mode = str(getattr(settings, 'GATE_MODE', '') or '').strip().lower()
+        if sync_mode and sync_mode != gate_mode:
+            self.stdout.write(self.style.ERROR(
+                f"!!! MODE MISMATCH: rfid_config.ini mode='{gate_mode}' but "
+                f".env GATE_MODE='{sync_mode}'.\n"
+                f"!!!   The gate will run as '{gate_mode}' while mtag-sync syncs as "
+                f"'{sync_mode}'.\n"
+                f"!!!   Fix .env to GATE_MODE={gate_mode} and restart mtag-sync."
+            ))
+
         test_mode = options['test_mode']
 
         if test_mode:
@@ -123,15 +170,16 @@ class Command(BaseCommand):
                 "[TEST MODE] DB checks DISABLED — barrier will open for every scan"
             ))
         else:
-            plaza_id, lane_id = resolve_plaza_lane(plaza_code, plaza_id, lane_number, lane_id)
+            plaza_uuid, lane_id = resolve_plaza_lane(plaza_id, plaza_uuid, lane_number, lane_id)
 
         self.stdout.write(self.style.SUCCESS(
-            f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id or 'TEST'} | Lane: {lane_id or 'unset'}"
+            f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id or 'TEST'} "
+            f"({plaza_uuid or 'TEST'}) | Lane: {lane_id or 'unset'}"
         ))
 
         gate = GateController(
             gate_mode=gate_mode,
-            plaza_id=plaza_id,
+            plaza_id=plaza_uuid,
             lane_id=lane_id,
             serial_port=serial_port,
             serial_baud=serial_baud,

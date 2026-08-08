@@ -3,10 +3,59 @@ from django.db import models
 
 
 class VehicleType(models.TextChoices):
-    CAR = 'car', 'Car'
-    MOTORCYCLE = 'motorcycle', 'Motorcycle'
-    TRUCK = 'truck', 'Truck'
-    BUS = 'bus', 'Bus'
+    """Fare classes from the Shahra-e-Bhutto toll notification (Column 2).
+
+    One choice per notified fare class — the earlier generic 'bus'/'truck' could
+    not distinguish a Wagon (150) from a Large Bus (250), or a 2-axle truck (350)
+    from a 4-axle (450), so every such vehicle was billed at one arbitrary rate.
+
+    Value strings are what land in the database and in TollRate.vehicle_type;
+    labels mirror the notification's wording so operators can match them to the
+    printed schedule.
+    """
+    CAR         = 'car',         'Car / Jeep / Taxi / Pickup'
+    WAGON       = 'wagon',       'Wagon / Hiace'
+    COACH       = 'coach',       'Coach / Coaster / Mini Bus'
+    LARGE_BUS   = 'large_bus',   'Large Bus'
+    TRUCK_2AXLE = 'truck_2axle', '2 Axle Truck'
+    TRUCK_3AXLE = 'truck_3axle', '3 Axle Truck'
+    TRUCK_4AXLE = 'truck_4axle', '4 or More Axle Truck'
+    # Not permitted on the expressway, but kept as a valid registration class so
+    # a motorcycle can be recorded and refused rather than mis-billed as a car.
+    MOTORCYCLE  = 'motorcycle',  'Motorcycle'
+
+
+class VehicleCategory(models.Model):
+    """Billing category for a vehicle — the notification's Column 2 classes.
+
+    Fares live in the database (see tolls.FareMatrix), not in code, so the
+    operator can revise a rate without a deployment. `category_index` is the
+    stable business key the fare matrix joins on; `code` mirrors the
+    VehicleType choice value so an existing vehicles.vehicle_type string maps
+    straight onto a category without touching the Vehicle table.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category_index = models.IntegerField(
+        unique=True,
+        help_text="Stable numeric key referenced by fare_matrix.category_index",
+    )
+    code = models.CharField(
+        max_length=20, unique=True,
+        help_text="Matches Vehicle.vehicle_type, e.g. 'car', 'truck_2axle'",
+    )
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=255, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'vehicle_categories'
+        ordering = ['category_index']
+        verbose_name_plural = 'vehicle categories'
+
+    def __str__(self):
+        return f"{self.category_index}. {self.name}"
 
 
 class VehicleStatus(models.TextChoices):
@@ -68,6 +117,73 @@ class Tag(models.Model):
             self.status == TagStatus.ACTIVE and
             self.expiry_date >= timezone.now().date()
         )
+
+
+class TagAssignment(models.Model):
+    """History of which vehicle a tag was fitted to, and for how long.
+
+    One row per installation period. Answers, for any tag:
+      - which vehicle is it in now          -> removed_at IS NULL
+      - which vehicle was it in before      -> order by assigned_at
+      - when was it taken out, and why      -> removed_at, removed_reason
+      - where did it go next                -> the following row
+
+    Kept as periods rather than an event stream so "where was this tag on
+    <date>" is one query instead of replaying events. `tags.vehicle` still holds
+    the CURRENT assignment; this table is the audit trail behind it.
+
+    tag_serial is denormalised so history survives a tag row being deleted —
+    an audit trail that disappears with its subject is not an audit trail.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tag = models.ForeignKey(
+        'Tag', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='assignments',
+    )
+    tag_serial = models.CharField(max_length=24, db_index=True)
+    vehicle = models.ForeignKey(
+        Vehicle, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='tag_assignments',
+    )
+    plate_number = models.CharField(max_length=20, blank=True, default='')
+
+    assigned_at = models.DateTimeField()
+    assigned_by = models.ForeignKey(
+        'users.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='tag_assignments_made',
+    )
+
+    # NULL while the tag is still fitted to this vehicle.
+    removed_at = models.DateTimeField(null=True, blank=True)
+    removed_reason = models.CharField(max_length=120, blank=True, default='')
+
+    notes = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tag_assignments'
+        ordering = ['-assigned_at']
+        indexes = [
+            models.Index(fields=['tag_serial', '-assigned_at']),
+            models.Index(fields=['vehicle', '-assigned_at']),
+        ]
+        constraints = [
+            # A tag can only be fitted to one vehicle at a time.
+            models.UniqueConstraint(
+                fields=['tag_serial'],
+                condition=models.Q(removed_at__isnull=True),
+                name='unique_open_assignment_per_tag',
+            ),
+        ]
+
+    def __str__(self):
+        until = self.removed_at.date() if self.removed_at else 'present'
+        return f"{self.tag_serial} -> {self.plate_number or '?'} ({self.assigned_at.date()}..{until})"
+
+    @property
+    def is_current(self) -> bool:
+        return self.removed_at is None
 
 
 class ScanBuffer(models.Model):

@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     VehicleEntryView, VehicleExitView, TripHistoryView,
-    PlazaListView, TollRateListView, AdminTripListView,
+    PlazaListView, TollRateListView, VehicleCategoryListView, AdminTripListView,
     AdminPlazaView, AdminPlazaDetailView, AdminLaneView,
     AdminTollRateView, AdminRateDetailView, AdminStatsView,
     AdminTripCloseView, AdminTripRefundView, AdminGateEventListView,
@@ -13,6 +13,7 @@ urlpatterns = [
     path('exit/', VehicleExitView.as_view(), name='toll-exit'),
     path('plazas/', PlazaListView.as_view(), name='plaza-list'),
     path('rates/', TollRateListView.as_view(), name='rate-list'),
+    path('vehicle-categories/', VehicleCategoryListView.as_view(), name='vehicle-category-list'),
     path('trips/<uuid:vehicle_id>/', TripHistoryView.as_view(), name='trip-history'),
     path('admin/trips/', AdminTripListView.as_view(), name='admin-trips'),
     path('admin/trips/<uuid:trip_id>/close/', AdminTripCloseView.as_view(), name='admin-trip-close'),

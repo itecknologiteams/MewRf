@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
+from django.db import models
 from django.db import transaction as db_transaction
 
 from apps.tolls.offline_cache import _connect, get_db_path, init_db
@@ -231,7 +232,7 @@ class ReconciliationService:
         """
         from apps.vehicles.models import Tag
         from apps.accounts.models import Account, Transaction, TransactionType, TransactionStatus, TransactionSource
-        from apps.tolls.models import TollRate, TollTrip, TripStatus, TollLane
+        from apps.tolls.models import FareMatrix, TollTrip, TripStatus, TollLane
         from django.utils import timezone as dj_timezone
 
         event_id: int = event['id']
@@ -298,12 +299,15 @@ class ReconciliationService:
                 )
 
             # ── 5. Rate lookup ────────────────────────────────────────────────
-            rate_obj = TollRate.objects.filter(
-                entry_plaza_id=trip.entry_plaza_id,
-                exit_plaza_id=exit_plaza_id,
-                vehicle_type=vehicle.vehicle_type,
-                effective_from__lte=dj_timezone.now().date(),
-            ).order_by('-effective_from').values('rate').first()
+            # Same table and join the live gate prices from (services._cached_rate),
+            # so a replayed offline exit can never be billed differently than it
+            # would have been online.
+            rate_obj = FareMatrix.objects.filter(
+                from_plaza_id=trip.entry_plaza_id,
+                to_plaza_id=exit_plaza_id,
+                category__code=vehicle.vehicle_type,
+                category__is_active=True,
+            ).values(rate=models.F('fare')).first()
 
             if rate_obj is None:
                 return (

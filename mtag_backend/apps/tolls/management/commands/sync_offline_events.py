@@ -9,7 +9,7 @@ Usage:
 
 Config file sections used:
     [gate]
-    plaza_code  = SHF
+    plaza_id    = 3
     lane_number = 10
 
     [offline]
@@ -60,7 +60,7 @@ class Command(BaseCommand):
                 f"Config file not found: {cfg_path}\n\n"
                 "Expected format:\n"
                 "[gate]\n"
-                "plaza_code  = SHF\n"
+                "plaza_id    = 3\n"
                 "lane_number = 10\n\n"
                 "[offline]\n"
                 "db_path = /opt/booths/booth_10/offline_cache.db\n"
@@ -70,7 +70,7 @@ class Command(BaseCommand):
         cfg.read(cfg_path)
 
         # ── Read config values ────────────────────────────────────────────────
-        plaza_code: str = cfg.get('gate', 'plaza_code', fallback='').strip().upper()
+        plaza_id: str = cfg.get('gate', 'plaza_id', fallback='').strip()
         lane_number_str: str = cfg.get('gate', 'lane_number', fallback='0').strip()
         try:
             lane_number: int = int(lane_number_str)
@@ -98,7 +98,7 @@ class Command(BaseCommand):
                 f"[sync] Starting offline event sync\n"
                 f"  config       : {cfg_path}\n"
                 f"  db_path      : {db_path}\n"
-                f"  plaza_code   : {plaza_code or '(not set)'}\n"
+                f"  plaza_id     : {plaza_id or '(not set)'}\n"
                 f"  lane_number  : {lane_number}\n"
                 f"  mode         : {'once' if run_once else 'loop every 30s'}"
             )

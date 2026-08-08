@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Plaza, TollLane, TollRate, TollTrip
+from apps.vehicles.models import VehicleCategory
+from .models import FareMatrix, Plaza, TollLane, TollTrip
 
 
 class TollLaneSerializer(serializers.ModelSerializer):
@@ -13,13 +14,13 @@ class PlazaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Plaza
-        fields = ['id', 'name', 'code', 'latitude', 'longitude', 'is_active', 'lanes']
+        fields = ['id', 'plaza_id', 'name', 'latitude', 'longitude', 'is_active', 'lanes']
 
 
 class PlazaCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plaza
-        fields = ['name', 'code', 'latitude', 'longitude', 'is_active']
+        fields = ['plaza_id', 'name', 'latitude', 'longitude', 'is_active']
 
 
 class LaneCreateSerializer(serializers.ModelSerializer):
@@ -28,28 +29,53 @@ class LaneCreateSerializer(serializers.ModelSerializer):
         fields = ['lane_number', 'is_active']
 
 
-class TollRateSerializer(serializers.ModelSerializer):
-    entry_plaza_name = serializers.CharField(source='entry_plaza.name', read_only=True)
-    exit_plaza_name = serializers.CharField(source='exit_plaza.name', read_only=True)
+class VehicleCategorySerializer(serializers.ModelSerializer):
+    """Billing categories — drives the fare editor's category dropdown."""
 
     class Meta:
-        model = TollRate
+        model = VehicleCategory
+        fields = ['id', 'category_index', 'code', 'name', 'description', 'is_active']
+
+
+class FareSerializer(serializers.ModelSerializer):
+    """Read shape for fare_matrix rows.
+
+    `category` is exposed as the integer category_index (not the row UUID) so the
+    JSON mirrors the physical fare_matrix.category_index column.
+    """
+    from_plaza_name = serializers.CharField(source='from_plaza.name', read_only=True)
+    to_plaza_name = serializers.CharField(source='to_plaza.name', read_only=True)
+    from_plaza_display_id = serializers.CharField(source='from_plaza.display_id', read_only=True)
+    to_plaza_display_id = serializers.CharField(source='to_plaza.display_id', read_only=True)
+    category = serializers.SlugRelatedField(
+        slug_field='category_index', queryset=VehicleCategory.objects.all()
+    )
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_code = serializers.CharField(source='category.code', read_only=True)
+
+    class Meta:
+        model = FareMatrix
         fields = [
-            'id', 'entry_plaza', 'entry_plaza_name',
-            'exit_plaza', 'exit_plaza_name',
-            'vehicle_type', 'rate', 'effective_from'
+            'id',
+            'from_plaza', 'from_plaza_name', 'from_plaza_display_id',
+            'to_plaza', 'to_plaza_name', 'to_plaza_display_id',
+            'category', 'category_name', 'category_code',
+            'fare', 'created_at', 'updated_at',
         ]
 
 
-class TollRateCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TollRate
-        fields = ['entry_plaza', 'exit_plaza', 'vehicle_type', 'rate', 'effective_from']
+class FareCreateSerializer(serializers.ModelSerializer):
+    category = serializers.SlugRelatedField(
+        slug_field='category_index', queryset=VehicleCategory.objects.all()
+    )
 
-    def validate(self, data):
-        if data.get('entry_plaza') == data.get('exit_plaza'):
-            raise serializers.ValidationError("Entry and exit plaza cannot be the same.")
-        return data
+    class Meta:
+        model = FareMatrix
+        fields = ['from_plaza', 'to_plaza', 'category', 'fare']
+
+    # NOTE: from_plaza == to_plaza is deliberately ALLOWED. A vehicle that
+    # enters and exits at the same plaza is charged the same fare as any other
+    # trip, so that combination needs a real row in the matrix.
 
 
 class TollTripSerializer(serializers.ModelSerializer):

@@ -15,7 +15,7 @@ Usage:
 Sample anpr_config.ini:
     [gate]
     mode = entry               # entry or exit
-    plaza_code = KPT
+    plaza_id = 1               # operator-assigned plaza number (Plaza.plaza_id)
     lane_number = 1
     plate_cooldown = 5.0       # seconds to ignore same plate again
 
@@ -215,7 +215,7 @@ class Command(BaseCommand):
                 "Create anpr_config.ini next to manage.py.\n\n"
                 "[gate]\n"
                 "mode = entry\n"
-                "plaza_code = KPT\n"
+                "plaza_id = 1\n"
                 "lane_number = 1\n"
                 "plate_cooldown = 5.0\n\n"
                 "[anpr]\n"
@@ -233,7 +233,7 @@ class Command(BaseCommand):
 
         gate_mode    = cfg.get('gate', 'mode',          fallback='entry').strip().lower()
         plaza_id     = cfg.get('gate', 'plaza_id',      fallback='').strip()
-        plaza_code   = cfg.get('gate', 'plaza_code',    fallback='').strip().upper()
+        plaza_uuid   = cfg.get('gate', 'plaza_uuid',    fallback='').strip()
         lane_id      = cfg.get('gate', 'lane_id',       fallback='').strip() or None
         lane_number  = cfg.get('gate', 'lane_number',   fallback='').strip() or None
         plate_cooldown = float(cfg.get('gate', 'plate_cooldown', fallback='5.0'))
@@ -248,15 +248,16 @@ class Command(BaseCommand):
         if gate_mode not in ('entry', 'exit'):
             raise CommandError(f"Invalid gate mode '{gate_mode}' — must be 'entry' or 'exit'.")
 
-        plaza_id, lane_id = resolve_plaza_lane(plaza_code, plaza_id, lane_number, lane_id)
+        plaza_uuid, lane_id = resolve_plaza_lane(plaza_id, plaza_uuid, lane_number, lane_id)
 
         self.stdout.write(self.style.SUCCESS(
-            f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id} | Lane: {lane_id or 'unset'}"
+            f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id} ({plaza_uuid}) "
+            f"| Lane: {lane_id or 'unset'}"
         ))
 
         gate = AnprGateController(
             gate_mode=gate_mode,
-            plaza_id=plaza_id,
+            plaza_id=plaza_uuid,
             lane_id=lane_id,
             serial_port=serial_port,
             serial_baud=serial_baud,

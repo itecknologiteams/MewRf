@@ -34,7 +34,7 @@ MAX_OFFLINE_EXITS_PER_TAG: int = 3
 # ── Idempotency key ───────────────────────────────────────────────────────────
 
 def make_exit_idempotency_key(
-    plaza_code: str,
+    plaza_id: int,
     lane_number: int,
     tag_serial: str,
     exit_time: datetime,
@@ -42,13 +42,21 @@ def make_exit_idempotency_key(
     """
     Generate a deterministic idempotency key for an offline exit event.
 
+    `plaza_id` is the operator-assigned plaza number (Plaza.plaza_id); this
+    used to be the old plaza code string.
+
     The key is bucketed to the nearest 5-minute interval to absorb retries
     and minor clock skew between booth PC and server.
+
+    NB: switching the plaza component from code to number changes every key
+    this produces. Keys already persisted on a booth are unaffected (retries
+    reuse the stored key), so the only exposure is the same tag exiting the
+    same lane twice inside one 5-minute bucket across the deploy restart.
     """
     bucket_minute = (exit_time.minute // 5) * 5
     bucket = exit_time.replace(minute=bucket_minute, second=0, microsecond=0)
     raw = (
-        f"EXIT_{plaza_code}_{lane_number}_{tag_serial}_"
+        f"EXIT_{plaza_id}_{lane_number}_{tag_serial}_"
         f"{bucket.strftime('%Y%m%d%H%M')}"
     )
     digest = hashlib.sha256(raw.encode()).hexdigest()[:32]
@@ -68,15 +76,18 @@ class OfflineExitService:
     def __init__(
         self,
         db_path: Optional[str],
-        plaza_code: str,
+        plaza_id: int,
         lane_number: int,
-        plaza_id: str,
+        plaza_uuid: str,
         lane_id: Optional[str],
     ) -> None:
         self.db_path: str = init_db(db_path or get_db_path())
-        self.plaza_code: str = plaza_code
+        # plaza_id = operator-assigned plaza number (Plaza.plaza_id), used for
+        # the idempotency key. plaza_uuid = Plaza.id, used for the UUID-typed
+        # plaza columns in the local SQLite cache.
+        self.plaza_id: int = int(plaza_id)
         self.lane_number: int = int(lane_number)
-        self.plaza_id: str = plaza_id
+        self.plaza_uuid: str = plaza_uuid
         self.lane_id: Optional[str] = lane_id
         self._reader = CacheReader(self.db_path)
         self._lock = threading.Lock()
@@ -114,7 +125,7 @@ class OfflineExitService:
                 'exit',
                 tag_serial,
                 vehicle_plate,
-                self.plaza_id,
+                self.plaza_uuid,
                 self.lane_id,
                 result,
                 reason,
@@ -188,7 +199,7 @@ class OfflineExitService:
                 tag_serial, age_hours, CACHE_STALENESS_LIMIT_HOURS,
             )
             idempotency_key = make_exit_idempotency_key(
-                self.plaza_code, self.lane_number, tag_serial, now
+                self.plaza_id, self.lane_number, tag_serial, now
             )
             with self._lock:
                 conn = self._conn()
@@ -203,7 +214,7 @@ class OfflineExitService:
                         """,
                         (
                             idempotency_key, tag_serial, vehicle_id, plate_number,
-                            self.plaza_id, self.lane_id, now_iso, now_iso, now_iso,
+                            self.plaza_uuid, self.lane_id, now_iso, now_iso, now_iso,
                         ),
                     )
                     event_id_row = conn.execute(
@@ -303,7 +314,7 @@ class OfflineExitService:
 
         # ── Step 6: Max unsynced exits check ─────────────────────────────────
         idempotency_key = make_exit_idempotency_key(
-            self.plaza_code, self.lane_number, tag_serial, now
+            self.plaza_id, self.lane_number, tag_serial, now
         )
 
         with self._lock:
@@ -342,7 +353,7 @@ class OfflineExitService:
                         """,
                         (
                             idempotency_key, tag_serial, vehicle_id, plate_number,
-                            self.plaza_id, self.lane_id, now_iso, now_iso, now_iso,
+                            self.plaza_uuid, self.lane_id, now_iso, now_iso, now_iso,
                         ),
                     )
                     inserted = True

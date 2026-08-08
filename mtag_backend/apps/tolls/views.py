@@ -7,8 +7,12 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from utils.response import success_response, error_response
 from utils.pagination import StandardPagination
-from .models import Plaza, TollRate, TollTrip, TripStatus, PendingGateOpen, DailySummary
-from .serializers import PlazaSerializer, TollRateSerializer, TollRateCreateSerializer, TollTripSerializer, TollLaneSerializer, PlazaCreateSerializer, LaneCreateSerializer
+from apps.vehicles.models import VehicleCategory
+from .models import FareMatrix, Plaza, TollTrip, TripStatus, PendingGateOpen, DailySummary
+from .serializers import (
+    PlazaSerializer, FareSerializer, FareCreateSerializer, VehicleCategorySerializer,
+    TollTripSerializer, TollLaneSerializer, PlazaCreateSerializer, LaneCreateSerializer,
+)
 from .services import EntryService, ExitService, invalidate_rate_cache
 from apps.users.permissions import IsAdmin, IsOperator
 
@@ -70,11 +74,24 @@ class PlazaListView(APIView):
 
 
 class TollRateListView(APIView):
+    """Public fare list. Reads fare_matrix — the same table ExitService charges
+    from, so what an operator sees here is what a vehicle is actually billed."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        rates = TollRate.objects.select_related('entry_plaza', 'exit_plaza').all()
-        return success_response(data=TollRateSerializer(rates, many=True).data)
+        fares = FareMatrix.objects.select_related('from_plaza', 'to_plaza', 'category').all().order_by(
+            'from_plaza__plaza_id', 'to_plaza__plaza_id', 'category__category_index'
+        )
+        return success_response(data=FareSerializer(fares, many=True).data)
+
+
+class VehicleCategoryListView(APIView):
+    """Billing categories, for the fare editor's dropdown."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cats = VehicleCategory.objects.filter(is_active=True).order_by('category_index')
+        return success_response(data=VehicleCategorySerializer(cats, many=True).data)
 
 
 class AdminTripListView(APIView):
@@ -168,19 +185,19 @@ class AdminTollRateView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        rates = TollRate.objects.select_related('entry_plaza', 'exit_plaza').all().order_by(
-            'entry_plaza__name', 'exit_plaza__name', 'vehicle_type'
+        fares = FareMatrix.objects.select_related('from_plaza', 'to_plaza', 'category').all().order_by(
+            'from_plaza__plaza_id', 'to_plaza__plaza_id', 'category__category_index'
         )
-        return success_response(data=TollRateSerializer(rates, many=True).data)
+        return success_response(data=FareSerializer(fares, many=True).data)
 
     def post(self, request):
-        serializer = TollRateCreateSerializer(data=request.data)
+        serializer = FareCreateSerializer(data=request.data)
         if serializer.is_valid():
-            rate = serializer.save()
+            fare = serializer.save()
             invalidate_rate_cache()
             return success_response(
-                data=TollRateSerializer(rate).data,
-                message="Toll rate created successfully",
+                data=FareSerializer(fare).data,
+                message="Fare created successfully",
                 status_code=201,
             )
         return error_response("Invalid data", errors=serializer.errors)
@@ -191,22 +208,23 @@ class AdminRateDetailView(APIView):
 
     def delete(self, request, pk):
         try:
-            rate = TollRate.objects.get(pk=pk)
-        except TollRate.DoesNotExist:
-            return error_response("Toll rate not found", status_code=404)
-        rate.delete()
-        return success_response(message="Toll rate deleted")
+            fare = FareMatrix.objects.get(pk=pk)
+        except FareMatrix.DoesNotExist:
+            return error_response("Fare not found", status_code=404)
+        fare.delete()
+        invalidate_rate_cache()
+        return success_response(message="Fare deleted")
 
     def patch(self, request, pk):
         try:
-            rate = TollRate.objects.select_related('entry_plaza', 'exit_plaza').get(pk=pk)
-        except TollRate.DoesNotExist:
-            return error_response("Toll rate not found", status_code=404)
-        serializer = TollRateCreateSerializer(rate, data=request.data, partial=True)
+            fare = FareMatrix.objects.select_related('from_plaza', 'to_plaza', 'category').get(pk=pk)
+        except FareMatrix.DoesNotExist:
+            return error_response("Fare not found", status_code=404)
+        serializer = FareCreateSerializer(fare, data=request.data, partial=True)
         if serializer.is_valid():
-            rate = serializer.save()
+            fare = serializer.save()
             invalidate_rate_cache()
-            return success_response(data=TollRateSerializer(rate).data, message="Rate updated")
+            return success_response(data=FareSerializer(fare).data, message="Fare updated")
         return error_response("Invalid data", errors=serializer.errors)
 
 
@@ -481,7 +499,7 @@ class AdminDailyReportView(APIView):
             plaza_data.append({
                 'id': str(plaza.id),
                 'name': plaza.name,
-                'code': plaza.code,
+                'plaza_id': plaza.plaza_id,
                 'is_active': plaza.is_active,
                 'entries': plaza_totals['entries'],
                 'exits': plaza_totals['exits'],

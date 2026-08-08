@@ -23,6 +23,8 @@ SQLite pragmas applied on every connection:
 import logging
 import os
 import sqlite3
+
+from django.db import models
 import threading
 import time
 from datetime import datetime, timezone
@@ -100,8 +102,11 @@ CREATE TABLE IF NOT EXISTS toll_rate_cache (
 CREATE TABLE IF NOT EXISTS active_trip_cache (
     tag_serial          TEXT PRIMARY KEY,
     trip_id             TEXT NOT NULL,
+    -- entry_plaza_id holds Plaza.id (a UUID), which is why the operator-assigned
+    -- Plaza.plaza_id below cannot also be called entry_plaza_id. It replaced the
+    -- old entry_plaza_code column.
     entry_plaza_id      TEXT NOT NULL,
-    entry_plaza_code    TEXT,
+    entry_plaza_num     INTEGER,
     entry_time          TEXT NOT NULL,
     vehicle_id          TEXT,
     vehicle_plate       TEXT,
@@ -158,6 +163,7 @@ def init_db(db_path: Optional[str] = None) -> str:
 
     conn = _connect(db_path)
     try:
+        _migrate_active_trip_cache(conn)
         conn.executescript(_SCHEMA_SQL)
         conn.commit()
     finally:
@@ -165,6 +171,35 @@ def init_db(db_path: Optional[str] = None) -> str:
 
     logger.info("[cache] SQLite schema initialised at %s", db_path)
     return db_path
+
+
+def _migrate_active_trip_cache(conn: sqlite3.Connection) -> None:
+    """Drop a pre-existing active_trip_cache still carrying entry_plaza_code.
+
+    Booths provisioned before Plaza.code was replaced by Plaza.plaza_id have the
+    old column, and CREATE TABLE IF NOT EXISTS will not add the new one — every
+    insert would then fail with "no column named entry_plaza_num".
+
+    Dropping is safe *only* for this table: it is a read-through cache that
+    sync_active_trips() fully repopulates from the central DB on the next cycle.
+    offline_exit_events is deliberately never touched here — it holds exits that
+    have not been synced yet.
+    """
+    table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='active_trip_cache'"
+    ).fetchone()
+    if table is None:
+        return
+
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(active_trip_cache)")}
+    if 'entry_plaza_num' in columns:
+        return
+
+    logger.warning(
+        "[cache] active_trip_cache has the pre-plaza_id schema — dropping it so it "
+        "can be rebuilt from the central DB on the next sync cycle"
+    )
+    conn.execute("DROP TABLE active_trip_cache")
 
 
 # ── CacheSync ─────────────────────────────────────────────────────────────────
@@ -294,30 +329,41 @@ class CacheSync:
 
     def sync_rates(self) -> int:
         """
-        Sync TollRate records from central DB into toll_rate_cache.
+        Sync fare_matrix rows from central DB into toll_rate_cache.
         Returns the number of rows upserted.
+
+        Sources from FareMatrix (not the legacy toll_rates table) so an offline
+        exit is priced from exactly what the online gate would have charged.
+        The local cache columns keep their original names.
         """
-        from apps.tolls.models import TollRate
-        from django.utils import timezone as dj_timezone
+        from apps.tolls.models import FareMatrix
 
         now_iso = datetime.now(timezone.utc).isoformat()
         rows = []
 
         try:
-            rates = TollRate.objects.filter(
-                effective_from__lte=dj_timezone.now().date()
+            rates = FareMatrix.objects.filter(
+                category__is_active=True
             ).values(
-                'entry_plaza_id', 'exit_plaza_id', 'vehicle_type',
-                'rate', 'effective_from',
+                entry_plaza_id=models.F('from_plaza_id'),
+                exit_plaza_id=models.F('to_plaza_id'),
+                vehicle_type=models.F('category__code'),
+                rate=models.F('fare'),
             ).iterator(chunk_size=500)
 
+            # FareMatrix holds exactly one current fare per (from, to, category) —
+            # there is no effective_from / versioning. The cache column is NOT NULL
+            # and part of its UNIQUE key, so a constant sentinel is written: that
+            # collapses the key to (entry, exit, vehicle_type), which is precisely
+            # FareMatrix's own uniqueness. A real date here would instead create a
+            # new cache row every time a fare changed.
             for r in rates:
                 rows.append((
                     str(r['entry_plaza_id']),
                     str(r['exit_plaza_id']),
                     r['vehicle_type'],
                     float(r['rate']),
-                    r['effective_from'].isoformat(),
+                    'current',
                     now_iso,
                 ))
         except Exception:
@@ -387,7 +433,7 @@ class CacheSync:
                     tag_serial,
                     str(trip.id),
                     str(trip.entry_plaza_id),
-                    trip.entry_plaza.code if trip.entry_plaza else None,
+                    trip.entry_plaza.plaza_id if trip.entry_plaza else None,
                     trip.entry_time.isoformat(),
                     str(trip.vehicle_id) if trip.vehicle_id else None,
                     trip.vehicle.plate_number if trip.vehicle else None,
@@ -405,13 +451,13 @@ class CacheSync:
                 conn.executemany(
                     """
                     INSERT INTO active_trip_cache
-                        (tag_serial, trip_id, entry_plaza_id, entry_plaza_code,
+                        (tag_serial, trip_id, entry_plaza_id, entry_plaza_num,
                          entry_time, vehicle_id, vehicle_plate, vehicle_type, synced_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(tag_serial) DO UPDATE SET
                         trip_id         = excluded.trip_id,
                         entry_plaza_id  = excluded.entry_plaza_id,
-                        entry_plaza_code= excluded.entry_plaza_code,
+                        entry_plaza_num = excluded.entry_plaza_num,
                         entry_time      = excluded.entry_time,
                         vehicle_id      = excluded.vehicle_id,
                         vehicle_plate   = excluded.vehicle_plate,
@@ -571,13 +617,13 @@ class CacheReader:
         """
         Return the cached active trip for the given tag, or None.
 
-        Keys: tag_serial, trip_id, entry_plaza_id, entry_plaza_code,
+        Keys: tag_serial, trip_id, entry_plaza_id, entry_plaza_num,
               entry_time, vehicle_id, vehicle_plate, vehicle_type, synced_at
         """
         conn = self._conn()
         try:
             row = conn.execute(
-                "SELECT tag_serial, trip_id, entry_plaza_id, entry_plaza_code, "
+                "SELECT tag_serial, trip_id, entry_plaza_id, entry_plaza_num, "
                 "       entry_time, vehicle_id, vehicle_plate, vehicle_type, synced_at "
                 "FROM active_trip_cache WHERE tag_serial = ?",
                 (tag_serial,),
