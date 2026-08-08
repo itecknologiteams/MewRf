@@ -93,6 +93,8 @@ class VehicleCreateSerializer(serializers.ModelSerializer):
             tag.expiry_date = date(2099, 12, 31)
             tag.status = TagStatus.ACTIVE
             tag.save()
+            from apps.vehicles.tag_history import open_assignment
+            open_assignment(tag, vehicle, notes='initial registration')
             Account.objects.create(
                 vehicle=vehicle,
                 user_id=validated_data['owner_id'],

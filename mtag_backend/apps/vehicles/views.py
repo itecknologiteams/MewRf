@@ -93,12 +93,20 @@ class TagReissueView(APIView):
         from datetime import date
         new_serial = serializer.validated_data['tag_serial']
 
+        from apps.vehicles.tag_history import close_open_assignment, open_assignment
+
         # Deactivate the vehicle's current tag
         old_tag = Tag.objects.filter(vehicle=vehicle).first()
         if old_tag:
             old_tag.vehicle = None
             old_tag.status = TagStatus.DEACTIVATED
             old_tag.save()
+            # Close its history period so the old tag shows when it came off
+            # this vehicle, rather than an open-ended row.
+            close_open_assignment(
+                old_tag.tag_serial,
+                reason=f"reissued; replaced by {new_serial}",
+            )
 
         # Assign the unassigned inventory tag to this vehicle
         new_tag = Tag.objects.get(tag_serial=new_serial, vehicle__isnull=True)
@@ -106,6 +114,11 @@ class TagReissueView(APIView):
         new_tag.expiry_date = date(2099, 12, 31)
         new_tag.status = TagStatus.ACTIVE
         new_tag.save()
+        open_assignment(
+            new_tag, vehicle,
+            assigned_by=getattr(request, 'user', None),
+            notes=f"reissue, replaced {old_tag.tag_serial}" if old_tag else 'reissue',
+        )
 
         logger.info("Tag reissued for vehicle %s — old deactivated, new serial %s", vehicle.plate_number, new_serial)
         return success_response(
