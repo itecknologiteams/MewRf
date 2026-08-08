@@ -1,3 +1,4 @@
+import sys
 import environ
 from pathlib import Path
 
@@ -115,9 +116,14 @@ DATABASES = {
     },
     'master_pg': {
         'ENGINE':   'django.db.backends.postgresql',
-        'NAME':     env('DB_NAME',     default='mtag_db'),
-        'USER':     env('DB_USER',     default='postgres'),
-        'PASSWORD': 'superadmin123456',
+        # Falls back to the local DB_NAME/DB_USER/hardcoded password if unset,
+        # so existing deployments where master and local share the same DB
+        # name/user keep working unchanged. Set these explicitly whenever a
+        # booth's local database name/user differs from master's — which is
+        # normal, since they're separate physical Postgres instances.
+        'NAME':     env('MASTER_DB_NAME',     default=env('DB_NAME', default='mtag_db')),
+        'USER':     env('MASTER_DB_USER',     default=env('DB_USER', default='postgres')),
+        'PASSWORD': env('MASTER_DB_PASSWORD', default='superadmin123456'),
         'HOST':     _master_host,
         'PORT':     _db_port,
         'OPTIONS':  {'connect_timeout': 3},
@@ -196,9 +202,39 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
-# Background master sync agent (and ANPR gate) auto-start. Enabled by default;
-# config.settings.local turns it off so dev machines never reach production.
-SYNC_AGENT_ENABLED = True
+# ANPR gate auto-start (see apps/tolls/apps.py).
+#
+# Renamed from SYNC_AGENT_ENABLED, which no longer described what it does: the
+# master sync agent is its own process now (`manage.py sync_service` / PM2 app
+# `mtag-sync`) and is NOT gated by any setting — it runs because PM2 runs it.
+# Leaving the old name would invite someone to set it expecting sync to stop.
+# The old name is still honoured so existing .env files keep working.
+ANPR_GATE_ENABLED = env.bool(
+    'ANPR_GATE_ENABLED',
+    default=env.bool('SYNC_AGENT_ENABLED', default=True),
+)
+# Deprecated alias — read nowhere; kept so old code/config referencing it does
+# not silently get a different value than ANPR_GATE_ENABLED.
+SYNC_AGENT_ENABLED = ANPR_GATE_ENABLED
+
+# Booth mode — 'entry' or 'exit'. Selects which sync passes the sync service
+# runs (see apps/tolls/sync/agent.py):
+#   entry  push + pull(reference, closed trips)
+#   exit   push + pull(reference, closed trips, OPEN trips)
+# An unset or misspelled value degrades to 'exit', the superset: an exit booth
+# denied open trips turns paying vehicles away, whereas an entry booth pulling a
+# few extra rows costs nothing.
+GATE_MODE = env('GATE_MODE', default='exit')
+
+# NO LONGER USED — kept only so an existing .env carrying ONLINE_ONLY_MODE does
+# not break, and to document the change.
+#
+# The gate used to write to the local DB and master synchronously, rejecting the
+# transaction outright if master was unreachable — which meant a master outage
+# closed every lane. The gate now writes only to its local database, and the
+# separate sync service (apps/tolls/sync/, PM2 app mtag-sync) replicates to
+# master. Nothing reads this setting; delete it once no deployed .env sets it.
+ONLINE_ONLY_MODE = env.bool('ONLINE_ONLY_MODE', default=False)
 
 JAZZCASH_MERCHANT_ID = env('JAZZCASH_MERCHANT_ID', default='')
 JAZZCASH_PASSWORD = env('JAZZCASH_PASSWORD', default='')

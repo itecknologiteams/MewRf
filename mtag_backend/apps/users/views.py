@@ -17,7 +17,20 @@ class LoginRateThrottle(AnonRateThrottle):
 
 
 def _set_auth_cookies(response, access: str, refresh: str) -> None:
-    is_secure = not django_settings.DEBUG
+    # Follow SESSION_COOKIE_SECURE, NOT `not DEBUG`.
+    #
+    # config.settings.lan runs with DEBUG=False over plain HTTP on the toll LAN,
+    # and deliberately sets SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE to False for
+    # exactly that reason. Keying off DEBUG marked these cookies Secure, so the
+    # browser silently discarded them: login returned 200, the cookie never
+    # landed, the next request was unauthenticated, and the UI reported "invalid
+    # phone number or password". Nobody could log into master or any booth.
+    #
+    # production.py sets SESSION_COOKIE_SECURE=True, so HTTPS deployments still
+    # get Secure cookies. Falls back to the old behaviour if the setting is absent.
+    is_secure = getattr(
+        django_settings, 'SESSION_COOKIE_SECURE', not django_settings.DEBUG
+    )
     jwt_settings = django_settings.SIMPLE_JWT
     access_max_age = int(jwt_settings['ACCESS_TOKEN_LIFETIME'].total_seconds())
     refresh_max_age = int(jwt_settings['REFRESH_TOKEN_LIFETIME'].total_seconds())

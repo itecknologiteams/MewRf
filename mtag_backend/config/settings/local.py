@@ -24,7 +24,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 # ── Isolate local dev from the production master ──────────────────────────────
 # Never auto-start the bidirectional sync agent on a dev machine.
-SYNC_AGENT_ENABLED = False
+ANPR_GATE_ENABLED = False
 # Defence-in-depth: even an explicit/manual sync or the exit-time master fallback
 # must stay on localhost — never reach 192.168.78.200.
 DATABASES['master_pg'] = DATABASES['local_pg']
