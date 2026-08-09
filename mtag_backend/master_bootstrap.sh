@@ -173,16 +173,29 @@ python manage.py migrate
 echo "--- collecting static files (admin + DRF UI) ---"
 python manage.py collectstatic --noinput >/dev/null
 
-# ── 5. Plaza sanity check ─────────────────────────────────────────────────
-# Booths resolve their gate from Plaza.plaza_id, so master must actually have
-# those rows before any booth is useful. Report, don't auto-seed: master may
-# hold real data and seed_data.py is a dev convenience.
+# ── 5. Reference data: plazas, lanes, vehicle categories, fare matrix ─────
+# Booths do NOT seed these — they arrive by sync — so master must hold them
+# before any booth is useful. run_gate refuses to start when it cannot resolve
+# its Plaza.plaza_id, and an exit cannot price a trip with an empty fare_matrix.
+#
+# Both commands are idempotent upserts (update_or_create) of the operator's
+# real plaza list and tariff, so re-running a bootstrap re-asserts them without
+# disturbing live data. Destructive cleanup only happens behind the explicit
+# --drop-legacy flag, which is deliberately not used here.
+echo "--- loading plazas + lanes ---"
+python manage.py load_plazas --apply
+
+echo "--- loading vehicle categories + fare matrix ---"
+python manage.py load_fares --apply
+
 PLAZA_COUNT="$(psql_admin -d "${DB_NAME}" -tAc 'SELECT COUNT(*) FROM plazas' 2>/dev/null || echo 0)"
-echo "--- plazas on master: ${PLAZA_COUNT} ---"
-if [ "${PLAZA_COUNT:-0}" = "0" ]; then
-  echo "!!! No plazas on master. Booths resolve their lane by Plaza.plaza_id and" >&2
-  echo "!!!   will refuse to start until these exist. Create them via the admin" >&2
-  echo "!!!   portal, or run 'python manage.py seed_data' for the Malir set." >&2
+FARE_COUNT="$(psql_admin -d "${DB_NAME}" -tAc 'SELECT COUNT(*) FROM fare_matrix' 2>/dev/null || echo 0)"
+echo "--- master reference data: ${PLAZA_COUNT} plazas, ${FARE_COUNT} fares ---"
+if [ "${PLAZA_COUNT:-0}" = "0" ] || [ "${FARE_COUNT:-0}" = "0" ]; then
+  echo "!!! Reference data is incomplete. Booths resolve their lane by" >&2
+  echo "!!!   Plaza.plaza_id and price exits from fare_matrix, so they will fail" >&2
+  echo "!!!   until both are populated. Check the load_plazas/load_fares output" >&2
+  echo "!!!   above before deploying any booth." >&2
 else
   echo "--- plaza_id values booths can be pointed at: ---"
   psql_admin -d "${DB_NAME}" -c \

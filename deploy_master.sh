@@ -28,7 +28,7 @@ set -euo pipefail
 # interactively instead when the script runs.
 # ─────────────────────────────────────────────────────────────────────────────
 MASTER_IP="192.168.78.200"     # master's LAN IP (SSH target + ALLOWED_HOSTS)
-SSH_USER="iteck"               # SSH username on master
+SSH_USER="mew02"               # SSH username on master
 SSH_PORT="22"                  # SSH port
 DB_NAME="master_tag_db"        # master's database name
 DB_USER="postgres"             # master's DB user
@@ -98,7 +98,8 @@ echo ""
 echo "=== Master deployed ($MASTER_IP) ==="
 echo "Next:"
 echo "  1. Confirm the plaza_id list printed above matches your operator numbering."
-echo "     If not, fix ROUTE_ORDER in migration 0007 BEFORE deploying any booth."
+echo "     If not, edit PLAZAS in apps/tolls/plaza_registry.py, re-run"
+echo "     'python manage.py load_plazas --apply', and re-check BEFORE any booth."
 echo "  2. Deploy each booth:  ./deploy_booth.sh"
 echo "  3. Per booth, confirm sync:  python manage.py trip_sync   (DRIFT must be 0)"
 echo "SSH in to double-check: ssh -p $SSH_PORT $SSH_USER@$MASTER_IP"

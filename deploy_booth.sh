@@ -27,11 +27,11 @@ set -euo pipefail
 # FILLED IN for this booth. Change these for the next booth, or blank any of
 # them out ("") to be asked for it interactively instead when the script runs.
 # ─────────────────────────────────────────────────────────────────────────────
-BOOTH_IP="192.168.78.252"        # this booth's LAN IP (SSH target)
+BOOTH_IP="192.168.78.19"        # this booth's LAN IP (SSH target)
 SSH_USER="iteck"               # SSH username on the booth
 SSH_PORT="22"                  # SSH port
-BOOTH_NUMBER="05"              # this booth's number
-PLAZA_ID="1"                   # integer Plaza.plaza_id. Operator numbering:
+BOOTH_NUMBER="04"              # this booth's number
+PLAZA_ID="001"                   # integer Plaza.plaza_id. Operator numbering:
                                #   1  = 001 Shahfaisal Main Toll Plaza
                                #   2  = 002 Kathor Main Toll Plaza
                                #   101 = Shafaisal-1     102 = Shafaisal-2
@@ -43,19 +43,21 @@ PLAZA_ID="1"                   # integer Plaza.plaza_id. Operator numbering:
                                # is a guess, and a wrong value tolls the wrong plaza.
                                # Must already exist on master (run load_plazas there).
 GATE_MODE="entry"              # "entry" or "exit" — must match this booth's actual lane
-READER_IP="192.168.78.26"      # RFID reader's own IP
-LANE_NUMBER="05"               # this booth's TollLane.lane_number at plaza 3.
+READER_IP="192.168.78.20"      # RFID reader's own IP
+LANE_NUMBER="04"               # this booth's TollLane.lane_number at plaza 3.
                                # Only correct because this is an entry booth — an
                                # exit booth's lane number is NOT its booth number.
-DISPLAY_IP="192.168.78.30"     # UFD (display) IP
+DISPLAY_IP="192.168.78.24"     # UFD (display) IP
 BARRIER_PORT="/dev/ttyUSB0"    # serial port the barrier is wired to
 MASTER_IP="192.168.78.200"     # master server's LAN IP
 MASTER_DB_NAME="master_tag_db" # master's database name
 MASTER_DB_USER="postgres"      # master's DB user
-MASTER_DB_PASSWORD="12345678"  # master's DB password. MUST be set: left blank,
-                               # base.py falls back to a hardcoded default that
-                               # is almost certainly wrong, and the booth's sync
-                               # silently fails to reach master.
+MASTER_DB_PASSWORD=""          # master's DB password — MUST match what you gave
+                               # deploy_master.sh. Deliberately blank: a stale
+                               # baked-in value is worse than an empty one,
+                               # because the prompt below re-asks for it while a
+                               # wrong default gets accepted silently and the
+                               # booth's sync then cannot authenticate.
 DB_NAME="tag_db"               # this booth's own local DB name
 DB_USER="postgres"             # this booth's own local DB user
 DB_PASSWORD="12345678"         # this booth's own local DB password
@@ -95,6 +97,11 @@ prompt MASTER_IP       "Master server LAN IP" "192.168.78.200"
 prompt MASTER_DB_NAME  "Master's database name" "master_tag_db"
 prompt MASTER_DB_USER  "Master's DB user" "postgres"
 prompt MASTER_DB_PASSWORD "Master's DB password"
+if [ -z "$MASTER_DB_PASSWORD" ]; then
+  echo "ERROR: master's DB password is required — the booth's sync authenticates" >&2
+  echo "       to master with it. It must match what you gave deploy_master.sh." >&2
+  exit 1
+fi
 prompt DB_NAME         "This booth's local DB name" "tag_db"
 prompt DB_USER         "This booth's local DB user" "postgres"
 prompt DB_PASSWORD     "This booth's local DB password"

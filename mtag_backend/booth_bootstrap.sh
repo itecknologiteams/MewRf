@@ -25,6 +25,12 @@ req() {
 }
 req PLAZA_ID
 req DB_PASSWORD
+# Without this the booth cannot authenticate to master and mtag-sync dies on
+# every cycle — an exit lane then never learns about trips opened elsewhere.
+# It used to be allowed to be blank, on the belief that base.py carried a usable
+# hardcoded default; base.py now falls back to the BOOTH'S OWN local password,
+# which master will always reject. Fail here instead of at 2am on a lane.
+req MASTER_DB_PASSWORD
 
 # Catch a stale caller still passing the pre-plaza_id contract, rather than
 # writing a non-numeric plaza_id into rfid_config.ini and failing later at
@@ -65,7 +71,6 @@ if [ "$GATE_MODE" != "entry" ] && [ "$GATE_MODE" != "exit" ]; then
   exit 1
 fi
 MASTER_DB_USER="${MASTER_DB_USER:-$DB_USER}"
-MASTER_DB_PASSWORD="${MASTER_DB_PASSWORD:-}"
 
 echo "=== Booth $BOOTH_NUMBER bootstrap — plaza_id=$PLAZA_ID lane=$LANE_NUMBER ==="
 
@@ -138,11 +143,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD}/" .env
 sed -i "s/^MASTER_DB_HOST=.*/MASTER_DB_HOST=${MASTER_IP}/" .env
 sed -i "s/^MASTER_DB_NAME=.*/MASTER_DB_NAME=${MASTER_DB_NAME}/" .env
 sed -i "s/^MASTER_DB_USER=.*/MASTER_DB_USER=${MASTER_DB_USER}/" .env
-if [ -n "$MASTER_DB_PASSWORD" ]; then
-  sed -i "s/^MASTER_DB_PASSWORD=.*/MASTER_DB_PASSWORD=${MASTER_DB_PASSWORD}/" .env
-else
-  sed -i "s/^MASTER_DB_PASSWORD=.*/# MASTER_DB_PASSWORD= (unset — using the hardcoded default in base.py)/" .env
-fi
+sed -i "s/^MASTER_DB_PASSWORD=.*/MASTER_DB_PASSWORD=${MASTER_DB_PASSWORD}/" .env
 
 # ── 3. rfid_config.ini ────────────────────────────────────────────────────
 echo "--- writing rfid_config.ini ---"
