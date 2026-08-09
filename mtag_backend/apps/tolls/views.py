@@ -464,7 +464,7 @@ class AdminDailyReportView(APIView):
         # Index summaries by (plaza_id, lane_id, vehicle_type) for O(1) lookup
         summary_map: dict = {}
         for s in summaries:
-            key = (str(s.plaza_id), str(s.lane_id) if s.lane_id else None)
+            key = (s.plaza_id, s.lane_id)
             if key not in summary_map:
                 summary_map[key] = {'entries': 0, 'exits': 0, 'revenue': 0.0, 'vehicle_types': {}}
             summary_map[key]['entries'] += s.entries
@@ -482,15 +482,15 @@ class AdminDailyReportView(APIView):
         grand_revenue = 0.0
 
         for plaza in plazas:
-            plaza_key = (str(plaza.id), None)
+            plaza_key = (plaza.id, None)
             plaza_totals = {'entries': 0, 'exits': 0, 'revenue': 0.0}
 
             lanes_data = []
             for lane in plaza.lanes.all().order_by('lane_number'):
-                key = (str(plaza.id), str(lane.id))
+                key = (plaza.id, lane.id)
                 row = summary_map.get(key, {'entries': 0, 'exits': 0, 'revenue': 0.0, 'vehicle_types': {}})
                 lanes_data.append({
-                    'id': str(lane.id),
+                    'id': lane.id,
                     'lane_number': lane.lane_number,
                     'is_active': lane.is_active,
                     'entries': row['entries'],
@@ -503,7 +503,7 @@ class AdminDailyReportView(APIView):
                 plaza_totals['revenue'] += row['revenue']
 
             # Trips recorded with no lane
-            no_lane_key = (str(plaza.id), None)
+            no_lane_key = (plaza.id, None)
             no_lane_row = summary_map.get(no_lane_key, {'entries': 0, 'exits': 0, 'revenue': 0.0, 'vehicle_types': {}})
             if no_lane_row['entries'] or no_lane_row['exits']:
                 lanes_data.append({
@@ -524,7 +524,7 @@ class AdminDailyReportView(APIView):
             grand_revenue += plaza_totals['revenue']
 
             plaza_data.append({
-                'id': str(plaza.id),
+                'id': plaza.id,
                 'name': plaza.name,
                 'plaza_id': plaza.plaza_id,
                 'is_active': plaza.is_active,

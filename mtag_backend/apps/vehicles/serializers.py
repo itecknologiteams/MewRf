@@ -140,10 +140,29 @@ class UnregisteredInventoryListSerializer(serializers.ModelSerializer):
         ]
 
 
+def _validate_booth_id(value):
+    """A booth id is a Plaza.plaza_id, not a 1..7 index.
+
+    This was capped at max_value=7 from an early assumption that booths were
+    numbered 1-7. The real plazas are 1, 2 and 101-107, so that cap rejected
+    activation at seven of the nine booths. Validate against the plazas that
+    actually exist instead of a hardcoded range.
+    """
+    from apps.tolls.models import Plaza
+    if not Plaza.objects.filter(plaza_id=value).exists():
+        known = ', '.join(str(n) for n in
+                          Plaza.objects.order_by('plaza_id')
+                          .values_list('plaza_id', flat=True))
+        raise serializers.ValidationError(
+            f"No plaza with plaza_id {value}. Known plaza_ids: {known or '(none loaded)'}"
+        )
+    return value
+
+
 class BoothAssignmentSerializer(serializers.Serializer):
     """Serializer for booth assignment operation."""
-    inventory_ids = serializers.ListField(child=serializers.CharField())
-    booth_id = serializers.IntegerField(min_value=1, max_value=7)
+    inventory_ids = serializers.ListField(child=serializers.IntegerField())
+    booth_id = serializers.IntegerField(min_value=1, validators=[_validate_booth_id])
     assigned_by = serializers.CharField(required=False, allow_blank=True)
 
     def validate_inventory_ids(self, value):
@@ -166,15 +185,15 @@ class TagActivationQuickCreateSerializer(serializers.Serializer):
         min_value=0
     )
     payment_method = serializers.CharField(max_length=50, default='CASH')
-    activation_booth_id = serializers.IntegerField(min_value=1, max_value=7)
+    activation_booth_id = serializers.IntegerField(min_value=1, validators=[_validate_booth_id])
 
 
 class TagActivationLinkExistingSerializer(serializers.Serializer):
     """Activation - link to existing account."""
     tag_serial = serializers.CharField(max_length=50)
     tid = serializers.CharField(max_length=50)
-    account_id = serializers.CharField()  # UUID as string
-    activation_booth_id = serializers.IntegerField(min_value=1, max_value=7)
+    account_id = serializers.IntegerField()
+    activation_booth_id = serializers.IntegerField(min_value=1, validators=[_validate_booth_id])
 
 
 class TagActivationSerializer(serializers.ModelSerializer):

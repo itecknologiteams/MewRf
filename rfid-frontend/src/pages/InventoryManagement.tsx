@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 interface InventoryItem {
-  id: string;
+  id: number;
   tag_serial: string;
   tid: string;
   vehicle_plate: string;

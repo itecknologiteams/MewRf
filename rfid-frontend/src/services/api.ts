@@ -239,7 +239,7 @@ export const vehiclesApi = {
 
 // ─── Daily report types ───────────────────────────────────────────────────────
 export interface LaneReport {
-  id: string | null;
+  id: number | null;
   lane_number: number | null;
   is_active: boolean;
   entries: number;

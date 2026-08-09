@@ -8,12 +8,20 @@ from rest_framework import status
 from .models import UnregisteredInventory, UnregisteredInventoryStatus, TagActivation, Tag
 from apps.accounts.models import Account
 from apps.users.models import UserRole
+from apps.tolls.models import Plaza
 
 User = get_user_model()
 
 
+def make_plazas(*plaza_ids):
+    """Booth ids are validated against real plazas, so tests need them to exist."""
+    for n in plaza_ids:
+        Plaza.objects.get_or_create(plaza_id=n, defaults={'name': f'Test Plaza {n}'})
+
+
 class InventoryUploadAPITest(TestCase):
     def setUp(self):
+        make_plazas(1, 2, 3, 101)
         self.client = APIClient()
         self.admin_user = User.objects.create_user(
             phone='03001234567', password='testpass123', full_name='Admin', user_role=UserRole.ADMIN, is_staff=True
@@ -72,6 +80,7 @@ SER002,TID002,EPC002,LHR5678,truck,blue"""
 
 class InventoryListAPITest(TestCase):
     def setUp(self):
+        make_plazas(1, 2, 3, 101)
         self.client = APIClient()
         self.operator_user = User.objects.create_user(
             phone='03001234567', password='testpass123', full_name='Operator', user_role=UserRole.OPERATOR
@@ -120,6 +129,7 @@ class InventoryListAPITest(TestCase):
 
 class BoothAssignmentAPITest(TestCase):
     def setUp(self):
+        make_plazas(1, 2, 3, 101)
         self.client = APIClient()
         self.admin_user = User.objects.create_user(
             phone='03001234567', password='testpass123', full_name='Admin', user_role=UserRole.ADMIN, is_staff=True
@@ -155,6 +165,7 @@ class BoothAssignmentAPITest(TestCase):
 
 class InventoryCheckAPITest(TestCase):
     def setUp(self):
+        make_plazas(1, 2, 3, 101)
         self.client = APIClient()
         self.operator_user = User.objects.create_user(
             phone='03001234567', password='testpass123', full_name='Operator', user_role=UserRole.OPERATOR
@@ -216,6 +227,7 @@ class InventoryCheckAPITest(TestCase):
 
 class TagActivationAPITest(TestCase):
     def setUp(self):
+        make_plazas(1, 2, 3, 101)
         self.client = APIClient()
         self.operator_user = User.objects.create_user(
             phone='03001234567', password='testpass123', full_name='Operator', user_role=UserRole.OPERATOR
@@ -252,6 +264,68 @@ class TagActivationAPITest(TestCase):
         self.inv.refresh_from_db()
         self.assertIsNotNone(self.inv.activated_for_account)
 
+        # The barrier looks the tag up by tags.tid. Activation used to return
+        # 201 without ever creating this row, so the vehicle was refused at the
+        # gate with "Tag not found".
+        tag = Tag.objects.get(tid='TID001')
+        self.assertEqual(tag.tag_serial, 'SER001')
+        self.assertEqual(tag.status, 'active')
+        self.assertIsNotNone(tag.vehicle_id)
+        self.assertTrue(tag.is_valid)
+
+        # and the installation is recorded in tag history
+        from .models import TagAssignment
+        self.assertTrue(
+            TagAssignment.objects.filter(tag_serial='SER001', removed_at__isnull=True).exists()
+        )
+
+    def test_activate_creates_user_when_customer_is_new(self):
+        """create_user() was called without the required password argument, so
+        activating for any customer who wasn't already in the DB 500'd."""
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/activate/',
+            {
+                'tag_serial': 'SER001', 'tid': 'TID001',
+                'customer_name': 'Brand New', 'customer_phone': '03335554444',
+                'initial_topup': 1000, 'payment_method': 'CASH',
+                'activation_booth_id': 2,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        self.assertTrue(User.objects.filter(phone='03335554444').exists())
+        self.assertTrue(Tag.objects.filter(tid='TID001').exists())
+
+    def test_activate_at_a_three_digit_booth(self):
+        """Booth ids were capped at 1..7, which rejected plazas 101-107 —
+        seven of the nine real booths."""
+        self.inv.booth_assigned_id = 101
+        self.inv.save()
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/activate/',
+            {
+                'tag_serial': 'SER001', 'tid': 'TID001',
+                'customer_name': 'Booth 101', 'customer_phone': '03336667777',
+                'initial_topup': 1000, 'payment_method': 'CASH',
+                'activation_booth_id': 101,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+
+    def test_activate_rejects_an_unknown_booth(self):
+        response = self.client.post(
+            '/api/v1/vehicles/inventory/activate/',
+            {
+                'tag_serial': 'SER001', 'tid': 'TID001',
+                'customer_name': 'Nowhere', 'customer_phone': '03338889999',
+                'initial_topup': 1000, 'payment_method': 'CASH',
+                'activation_booth_id': 999,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_activate_link_existing(self):
         from .models import Vehicle
         user = User.objects.create_user(
@@ -282,11 +356,17 @@ class TagActivationAPITest(TestCase):
         self.inv.refresh_from_db()
         self.assertEqual(self.inv.activated_for_account_id, account.id)
 
+        # Linking must also produce the Tag row the barrier matches on.
+        tag = Tag.objects.get(tid='TID001')
+        self.assertEqual(tag.vehicle_id, vehicle.id)
+        self.assertEqual(tag.status, 'active')
+
 
 class BoothTopupActivationTest(TestCase):
     """Booth-aware cash topup: register + activate an inventory tag at a booth."""
 
     def setUp(self):
+        make_plazas(1, 2, 3, 101)
         self.client = APIClient()
         self.operator = User.objects.create_user(
             phone='03001234567', password='testpass123', full_name='Op',

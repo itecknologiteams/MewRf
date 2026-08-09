@@ -168,7 +168,7 @@ class TagCreateView(APIView):
         )
         logger.info("Single tag added: serial=%s tid=%s", tag_serial, tid)
         return success_response(
-            data={'id': str(tag.id), 'tag_serial': tag.tag_serial, 'tid': tag.tid, 'epc': tag.epc},
+            data={'id': tag.id, 'tag_serial': tag.tag_serial, 'tid': tag.tid, 'epc': tag.epc},
             message="Tag added to inventory",
             status_code=201,
         )
@@ -604,6 +604,7 @@ class TagActivationQuickCreateView(APIView):
 
         try:
             from django.db import transaction
+            from apps.vehicles.tag_history import close_open_assignment, open_assignment
 
             with transaction.atomic():
                 inv = UnregisteredInventory.objects.get(tag_serial=tag_serial, tid=tid)
@@ -623,16 +624,35 @@ class TagActivationQuickCreateView(APIView):
                 if user_or_none:
                     user = user_or_none
                 else:
+                    # password is a required positional on the manager. A booth
+                    # walk-up customer never logs in, so give them an unusable
+                    # password rather than omitting the argument — which raised
+                    # TypeError and 500'd every activation for a new customer.
                     user = User.objects.create_user(
                         phone=customer_phone,
+                        password=None,
                         full_name=customer_name,
                     )
 
                 vehicle = Vehicle.objects.create(
                     owner=user,
-                    plate_number=f"{tag_serial}",
+                    plate_number=inv.vehicle_plate or f"{tag_serial}",
                     vehicle_type=inv.vehicle_type or 'car',
                 )
+
+                # The barrier matches on tags.tid, so activation has to create a
+                # real Tag row. Without it this endpoint returned 201 "activated"
+                # while the vehicle was refused at the gate with "Tag not found".
+                tag = Tag.objects.create(
+                    tag_serial=inv.tag_serial,
+                    tid=tid,
+                    epc=inv.epc or '',
+                    vehicle=vehicle,
+                    expiry_date=date(2099, 12, 31),
+                    status=TagStatus.ACTIVE,
+                )
+                open_assignment(tag, vehicle,
+                                notes=f'activated at booth {activation_booth_id}')
 
                 account = Account.objects.create(user=user, vehicle=vehicle, balance=initial_topup)
 
@@ -685,6 +705,7 @@ class TagActivationLinkExistingView(APIView):
 
         try:
             from django.db import transaction
+            from apps.vehicles.tag_history import close_open_assignment, open_assignment
 
             with transaction.atomic():
                 inv = UnregisteredInventory.objects.get(tag_serial=tag_serial, tid=tid)
@@ -699,6 +720,33 @@ class TagActivationLinkExistingView(APIView):
                     )
 
                 account = Account.objects.get(id=account_id)
+                vehicle = account.vehicle
+
+                # Same as the quick-create path: the gate matches on tags.tid, so
+                # linking has to produce a Tag row. Replacing the vehicle's
+                # current tag is a tag swap, so close its history period first.
+                old_tag = Tag.objects.filter(vehicle=vehicle).first()
+                if old_tag and old_tag.tid != tid:
+                    close_open_assignment(
+                        old_tag.tag_serial,
+                        reason=f'replaced by {inv.tag_serial} at booth {activation_booth_id}',
+                    )
+                    old_tag.vehicle = None
+                    old_tag.status = TagStatus.DEACTIVATED
+                    old_tag.save()
+
+                tag, _ = Tag.objects.update_or_create(
+                    tid=tid,
+                    defaults={
+                        'tag_serial': inv.tag_serial,
+                        'epc': inv.epc or '',
+                        'vehicle': vehicle,
+                        'expiry_date': date(2099, 12, 31),
+                        'status': TagStatus.ACTIVE,
+                    },
+                )
+                open_assignment(tag, vehicle,
+                                notes=f'linked at booth {activation_booth_id}')
 
                 inv.status = UnregisteredInventoryStatus.ACTIVATED
                 inv.activated_for_account = account

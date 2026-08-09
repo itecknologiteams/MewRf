@@ -1,7 +1,7 @@
 import { apiFetch, BASE_URL } from './api';
 
 export interface InventoryItem {
-  id: string;
+  id: number;
   tag_serial: string;
   tid: string;
   vehicle_plate: string;
@@ -58,7 +58,7 @@ export const inventoryApi = {
       `/vehicles/inventory/check/${encodeURIComponent(tagSerial)}/`,
     ),
 
-  assignBooth: (payload: { inventory_ids: string[]; booth_id: number; assigned_by?: string }) =>
+  assignBooth: (payload: { inventory_ids: number[]; booth_id: number; assigned_by?: string }) =>
     apiFetch<{ assigned: number }>('/vehicles/inventory/assign-booth/', {
       method: 'POST',
       body: JSON.stringify(payload),

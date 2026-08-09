@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 interface InventoryItem {
-  id: string;
+  id: number;
   tag_serial: string;
   tid: string;
   vehicle_plate: string;
@@ -26,7 +26,7 @@ export default function BoothAssignmentPage() {
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [selectedBooth, setSelectedBooth] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,7 +50,7 @@ export default function BoothAssignmentPage() {
     fetchUnregisteredInventory(1);
   }, []);
 
-  const toggleItemSelection = (id: string) => {
+  const toggleItemSelection = (id: number) => {
     const newSelected = new Set(selectedItems);
     if (newSelected.has(id)) {
       newSelected.delete(id);

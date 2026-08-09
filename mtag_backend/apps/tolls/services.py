@@ -323,7 +323,7 @@ def _find_active_trip(vehicle):
                 FROM toll_trips
                 WHERE vehicle_id = %s AND status = 'active'
                 LIMIT 1
-            """, [str(vehicle.id)])
+            """, [vehicle.id])
             row = mcur.fetchone()
             if row:
                 # Pull trip into local DB so ExitService can lock it normally
