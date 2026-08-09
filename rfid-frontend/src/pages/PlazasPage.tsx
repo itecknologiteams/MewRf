@@ -31,7 +31,7 @@ export default function PlazasPage() {
   const [loading, setLoading] = useState(true);
   const [loadingRates, setLoadingRates] = useState(true);
   const [search, setSearch] = useState('');
-  const [expandedPlaza, setExpandedPlaza] = useState<string | null>(null);
+  const [expandedPlaza, setExpandedPlaza] = useState<number | null>(null);
 
   // Add Plaza modal
   const [showPlazaModal, setShowPlazaModal] = useState(false);
@@ -45,9 +45,14 @@ export default function PlazasPage() {
 
   // Add/Edit Rate modal
   const [showRateModal, setShowRateModal] = useState(false);
-  const [editingRateId, setEditingRateId] = useState<string | null>(null);
+  const [editingRateId, setEditingRateId] = useState<number | null>(null);
   const [categories, setCategories] = useState<VehicleCategory[]>([]);
-  const [rateForm, setRateForm] = useState({
+  const [rateForm, setRateForm] = useState<{
+    from_plaza: number | '';
+    to_plaza: number | '';
+    category: number;
+    fare: string;
+  }>({
     from_plaza: '',
     to_plaza: '',
     category: 1,
@@ -95,7 +100,7 @@ export default function PlazasPage() {
     return plazas.filter(p => p.name.toLowerCase().includes(s) || String(p.plaza_id).includes(s) || formatPlazaId(p.plaza_id).includes(s));
   }, [plazas, search]);
 
-  const toggleExpand = (id: string) => setExpandedPlaza(expandedPlaza === id ? null : id);
+  const toggleExpand = (id: number) => setExpandedPlaza(expandedPlaza === id ? null : id);
 
   const handleCreatePlaza = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,13 +235,19 @@ export default function PlazasPage() {
       addToast({ type: 'error', title: 'Validation Error', message: 'All fields are required.' });
       return;
     }
+    // Validated non-empty above, so the `| ''` half of the union is gone.
+    const ratePayload = {
+      ...rateForm,
+      from_plaza: Number(rateForm.from_plaza),
+      to_plaza: Number(rateForm.to_plaza),
+    };
     setIsCreatingRate(true);
     try {
       if (editingRateId) {
-        await tollsApi.adminUpdateRate(editingRateId, rateForm);
+        await tollsApi.adminUpdateRate(editingRateId, ratePayload);
         addToast({ type: 'success', title: 'Rate Updated', message: 'Toll rate has been updated.' });
       } else {
-        await tollsApi.adminCreateRate(rateForm);
+        await tollsApi.adminCreateRate(ratePayload);
         addToast({ type: 'success', title: 'Rate Created', message: 'Toll rate has been configured.' });
       }
       closeRateModal();
@@ -610,7 +621,7 @@ export default function PlazasPage() {
                   </label>
                   <select
                     value={rateForm.from_plaza}
-                    onChange={(e) => setRateForm(f => ({ ...f, from_plaza: e.target.value }))}
+                    onChange={(e) => setRateForm(f => ({ ...f, from_plaza: e.target.value ? Number(e.target.value) : '' }))}
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   >
                     <option value="">Select plaza</option>
@@ -623,7 +634,7 @@ export default function PlazasPage() {
                   </label>
                   <select
                     value={rateForm.to_plaza}
-                    onChange={(e) => setRateForm(f => ({ ...f, to_plaza: e.target.value }))}
+                    onChange={(e) => setRateForm(f => ({ ...f, to_plaza: e.target.value ? Number(e.target.value) : '' }))}
                     className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
                   >
                     <option value="">Select plaza</option>

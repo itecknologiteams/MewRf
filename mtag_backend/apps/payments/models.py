@@ -1,4 +1,3 @@
-import uuid
 from django.db import models
 
 
@@ -9,7 +8,6 @@ class TopupStatus(models.TextChoices):
 
 
 class TopupRequest(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account = models.ForeignKey('accounts.Account', on_delete=models.CASCADE, related_name='topups')
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='topups')
     jazzcash_txn_id = models.CharField(max_length=100, unique=True, null=True, blank=True)

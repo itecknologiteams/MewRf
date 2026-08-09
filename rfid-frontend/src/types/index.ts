@@ -63,7 +63,7 @@ export interface ApiUser {
 }
 
 export interface Tag {
-  id: string;
+  id: number;
   tag_serial: string;
   issued_at: string;
   status: string;
@@ -72,7 +72,7 @@ export interface Tag {
 }
 
 export interface ApiVehicle {
-  id: string;
+  id: number;
   plate_number: string;
   vehicle_type: string;
   status: string;
@@ -84,7 +84,7 @@ export interface ApiVehicle {
 }
 
 export interface Account {
-  id: string;
+  id: number;
   plate_number: string;
   vehicle_type: string;
   balance: string;
@@ -93,7 +93,7 @@ export interface Account {
 }
 
 export interface ApiTransaction {
-  id: string;
+  id: number;
   transaction_type: string;
   amount: string;
   balance_before: string;
@@ -105,7 +105,7 @@ export interface ApiTransaction {
 }
 
 export interface Plaza {
-  id: string;
+  id: number;
   /** Operator-assigned plaza number (Plaza.plaza_id). Replaced `code`. */
   plaza_id: number;
   name: string;
@@ -116,19 +116,19 @@ export interface Plaza {
 }
 
 export interface Lane {
-  id: string;
+  id: number;
   lane_number: number;
   is_active: boolean;
 }
 
 export interface TollRate {
-  id: string;
+  id: number;
   /** fare_matrix row. Field names mirror the table: from_plaza / to_plaza /
    *  category_index / fare. `category` IS the integer category_index. */
-  from_plaza: string;
+  from_plaza: number;
   from_plaza_name: string;
   from_plaza_display_id: string;
-  to_plaza: string;
+  to_plaza: number;
   to_plaza_name: string;
   to_plaza_display_id: string;
   category: number;
@@ -140,7 +140,7 @@ export interface TollRate {
 }
 
 export interface VehicleCategory {
-  id: string;
+  id: number;
   category_index: number;
   code: string;
   name: string;
@@ -149,7 +149,7 @@ export interface VehicleCategory {
 }
 
 export interface TollTrip {
-  id: string;
+  id: number;
   plate_number: string;
   entry_plaza_name: string;
   exit_plaza_name?: string;
@@ -163,7 +163,7 @@ export interface TollTrip {
 }
 
 export interface TopupRequest {
-  id: string;
+  id: number;
   amount: string;
   status: string;
   jazzcash_txn_id?: string;

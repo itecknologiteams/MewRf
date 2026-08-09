@@ -36,7 +36,7 @@ export default function Profile() {
   // Vehicle/Account data
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
   const [loadingAccounts, setLoadingAccounts] = useState(true);
 
   // Topup
@@ -95,11 +95,11 @@ export default function Profile() {
 
   useEffect(() => {
     if (selectedAccountId && activeTab === 'wallet') {
-      fetchTopupHistory(selectedAccountId);
+      fetchTopupHistory(Number(selectedAccountId));
     }
   }, [selectedAccountId, activeTab]);
 
-  const fetchTopupHistory = async (accountId: string) => {
+  const fetchTopupHistory = async (accountId: number) => {
     setLoadingHistory(true);
     try {
       const history = await paymentsApi.history(accountId);
@@ -124,10 +124,10 @@ export default function Profile() {
 
     setIsRecharging(true);
     try {
-      const topup = await paymentsApi.initiate({ account_id: selectedAccountId, amount });
+      const topup = await paymentsApi.initiate({ account_id: Number(selectedAccountId), amount });
       // Simulate JazzCash callback
       await paymentsApi.callback({
-        pp_TxnRefNo: topup.id,
+        pp_TxnRefNo: String(topup.id),
         pp_ResponseCode: '000',
         topup_id: topup.id,
       });
@@ -145,7 +145,7 @@ export default function Profile() {
       }
       setAccounts(refreshedAccounts);
       setRechargeAmount('');
-      fetchTopupHistory(selectedAccountId);
+      fetchTopupHistory(Number(selectedAccountId));
       addToast({ type: 'success', title: 'Recharge Successful', message: `PKR ${amount.toLocaleString()} added to your wallet.` });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Recharge failed';
@@ -312,7 +312,7 @@ export default function Profile() {
                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Recharge Account</label>
                     <select
                       value={selectedAccountId}
-                      onChange={(e) => setSelectedAccountId(e.target.value)}
+                      onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : '')}
                       className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-emerald)]"
                     >
                       {accounts.map((a) => (
@@ -389,7 +389,7 @@ export default function Profile() {
                   <h3 className="text-base font-semibold text-[var(--text-primary)]">Recharge History</h3>
                 </div>
                 <button
-                  onClick={() => fetchTopupHistory(selectedAccountId)}
+                  onClick={() => fetchTopupHistory(Number(selectedAccountId))}
                   className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />

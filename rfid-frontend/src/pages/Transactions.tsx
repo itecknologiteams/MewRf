@@ -79,7 +79,7 @@ export default function Transactions() {
     return transactions.filter((tx) => {
       const s = search.toLowerCase();
       const matchesSearch =
-        tx.id.toLowerCase().includes(s) ||
+        String(tx.id).includes(s) ||
         tx.tag_serial?.toLowerCase().includes(s) ||
         tx.transaction_type.toLowerCase().includes(s) ||
         tx.description?.toLowerCase().includes(s);
@@ -295,7 +295,7 @@ export default function Transactions() {
                       className="border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)] hover:translate-x-1 transition-all duration-200 cursor-pointer"
                     >
                       <td className="px-6 py-4 text-sm font-mono text-[var(--text-primary)]">
-                        #{tx.id.slice(0, 8).toUpperCase()}
+                        #{tx.id}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getTypeColor(tx.transaction_type)}`}>

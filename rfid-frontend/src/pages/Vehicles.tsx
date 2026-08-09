@@ -69,7 +69,7 @@ export default function Vehicles() {
   const [reissueVehicle, setReissueVehicle] = useState<ApiVehicle | null>(null);
   const [reissueForm, setReissueForm] = useState({ tag_serial: '' });
   const [isReissuing, setIsReissuing] = useState(false);
-  const [reissueTags, setReissueTags] = useState<{ id: string; tag_serial: string; epc: string }[]>([]);
+  const [reissueTags, setReissueTags] = useState<{ id: number; tag_serial: string; epc: string }[]>([]);
   const [reissueTagsLoading, setReissueTagsLoading] = useState(false);
   const [showReissueConfirm, setShowReissueConfirm] = useState(false);
 

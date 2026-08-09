@@ -20,7 +20,7 @@ const vehicleIcons: Record<string, React.ElementType> = {
 };
 
 interface VehicleInfo {
-  id: string;
+  id: number;
   plate_number: string;
   vehicle_type: string;
   balance: string;

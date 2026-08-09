@@ -28,8 +28,8 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 
 class TransferSerializer(serializers.Serializer):
-    source_vehicle_id = serializers.UUIDField()
-    target_vehicle_id = serializers.UUIDField()
+    source_vehicle_id = serializers.IntegerField()
+    target_vehicle_id = serializers.IntegerField()
     cnic = serializers.CharField(max_length=20)
     phone = serializers.CharField(max_length=20)
     name = serializers.CharField(max_length=100)

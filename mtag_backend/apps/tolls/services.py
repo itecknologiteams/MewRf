@@ -192,7 +192,7 @@ def _reconcile_local_active_trips(trip_ids) -> list:
 
 class EntryService:
     @staticmethod
-    def process_entry(tag_serial: str, plaza_id: str, lane_id: str = None) -> dict:
+    def process_entry(tag_serial: str, plaza_id: int, lane_id: int = None) -> dict:
         logger.info("Entry — tag: %s plaza: %s", tag_serial, plaza_id)
 
         with db_transaction.atomic():
@@ -352,7 +352,7 @@ def _find_active_trip(vehicle):
 
 class ExitService:
     @staticmethod
-    def process_exit(tag_serial: str, exit_plaza_id: str, lane_id: str = None) -> dict:
+    def process_exit(tag_serial: str, exit_plaza_id: int, lane_id: int = None) -> dict:
         logger.info("Exit — tag: %s plaza: %s", tag_serial, exit_plaza_id)
 
         with db_transaction.atomic():

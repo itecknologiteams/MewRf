@@ -55,22 +55,43 @@ def _set_last_pull(local_cur, table: str, ts: datetime):
 
 
 def _resync_sequence(cur, table: str, column: str = 'id') -> None:
-    """Realign a serial sequence after inserting rows with explicit ids.
+    """Realign a table's id sequence after inserting rows with explicit ids.
 
     The sync upserts rows using the ids the other side assigned, which bypasses
-    the sequence completely — it stays where it was while the data moves ahead.
-    The next locally-created row then reuses an id that is already taken and the
-    INSERT dies with "duplicate key value violates unique constraint <t>_pkey".
-    Seen in the wild: a booth that had pulled users could not register a new one.
+    the sequence entirely — it stays where it was while the data moves ahead.
+    The next locally-created row then reuses a taken id and the INSERT dies with
+    "duplicate key value violates unique constraint <table>_pkey". Seen in the
+    wild on `users` before every table had an integer key.
 
-    Only integer-PK tables need this. Everything else the sync touches (vehicles,
-    tags, accounts, plazas, trips, fares) uses UUIDs, which have no sequence.
+    Since primary keys became integers this applies to EVERY synced table, not
+    just users — which is why _resync_all() below runs after each pass.
     """
     cur.execute(
         "SELECT setval(pg_get_serial_sequence(%s, %s), "
         "       GREATEST(COALESCE((SELECT MAX(" + column + ") FROM " + table + "), 1), 1))",
         (f"public.{table}", column),
     )
+
+
+# Every table this service moves rows for. All have integer primary keys now, so
+# all of them need their sequence realigned after an upsert with explicit ids.
+SYNCED_TABLES = (
+    'users', 'vehicles', 'tags', 'tag_assignments', 'accounts',
+    'plazas', 'toll_lanes', 'toll_rates', 'vehicle_categories',
+    'fare_matrix', 'toll_trips', 'transactions',
+)
+
+
+def _resync_all(cur) -> None:
+    """Realign every synced table's sequence. Cheap (one setval each) and safe
+    to run every cycle — setval to MAX(id) is idempotent."""
+    for table in SYNCED_TABLES:
+        try:
+            _resync_sequence(cur, table)
+        except Exception:
+            # A table may not exist yet on a partially-migrated peer. Never let
+            # sequence maintenance abort a sync cycle.
+            log.debug("sequence resync skipped for %s", table, exc_info=True)
 
 
 # ── Full-refresh tables (no timestamp columns) ────────────────────────────────
@@ -276,9 +297,6 @@ def pull_users(master_cur, local_cur, since: datetime) -> int:
             updated_at  = EXCLUDED.updated_at
         WHERE users.updated_at < EXCLUDED.updated_at
     """, rows)
-    # users.id is a bigserial and these rows carry master's ids — realign the
-    # sequence or the booth cannot create a user of its own afterwards.
-    _resync_sequence(local_cur, 'users')
     return len(rows)
 
 
@@ -333,7 +351,7 @@ def pull_accounts(master_cur, local_cur, since: datetime) -> int:
         return 0
     # Pre-filter: skip accounts whose vehicle_id doesn't exist locally
     vehicle_ids = [str(r[1]) for r in rows]
-    local_cur.execute("SELECT id FROM vehicles WHERE id = ANY(%s::uuid[])", (vehicle_ids,))
+    local_cur.execute("SELECT id FROM vehicles WHERE id = ANY(%s::bigint[])", (vehicle_ids,))
     existing = {str(r[0]) for r in local_cur.fetchall()}
     rows = [r for r in rows if str(r[1]) in existing]
     if not rows:
@@ -382,6 +400,10 @@ def pull_reference(master_cur, local_cur) -> dict:
         if count:
             _set_last_pull(local_cur, table, _now())
         summary[table] = count
+
+    # Every row above arrived with master's id, bypassing each table's sequence.
+    # Without this the booth's next locally-created row collides on the pkey.
+    _resync_all(local_cur)
     return summary
 
 

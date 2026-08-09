@@ -233,7 +233,8 @@ class Command(BaseCommand):
 
         gate_mode    = cfg.get('gate', 'mode',          fallback='entry').strip().lower()
         plaza_id     = cfg.get('gate', 'plaza_id',      fallback='').strip()
-        plaza_uuid   = cfg.get('gate', 'plaza_uuid',    fallback='').strip()
+        plaza_row_id = cfg.get('gate', 'plaza_row_id',
+                               fallback=cfg.get('gate', 'plaza_uuid', fallback='')).strip()
         lane_id      = cfg.get('gate', 'lane_id',       fallback='').strip() or None
         lane_number  = cfg.get('gate', 'lane_number',   fallback='').strip() or None
         plate_cooldown = float(cfg.get('gate', 'plate_cooldown', fallback='5.0'))
@@ -248,16 +249,16 @@ class Command(BaseCommand):
         if gate_mode not in ('entry', 'exit'):
             raise CommandError(f"Invalid gate mode '{gate_mode}' — must be 'entry' or 'exit'.")
 
-        plaza_uuid, lane_id = resolve_plaza_lane(plaza_id, plaza_uuid, lane_number, lane_id)
+        plaza_row_id, lane_id = resolve_plaza_lane(plaza_id, plaza_row_id, lane_number, lane_id)
 
         self.stdout.write(self.style.SUCCESS(
-            f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id} ({plaza_uuid}) "
+            f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id} ({plaza_row_id}) "
             f"| Lane: {lane_id or 'unset'}"
         ))
 
         gate = AnprGateController(
             gate_mode=gate_mode,
-            plaza_id=plaza_uuid,
+            plaza_id=plaza_row_id,
             lane_id=lane_id,
             serial_port=serial_port,
             serial_baud=serial_baud,

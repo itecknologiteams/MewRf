@@ -9,8 +9,8 @@ from .views import (
 
 urlpatterns = [
     path('', VehicleListCreateView.as_view(), name='vehicle-list'),
-    path('<uuid:pk>/', VehicleDetailView.as_view(), name='vehicle-detail'),
-    path('<uuid:pk>/suspend/', VehicleSuspendView.as_view(), name='vehicle-suspend'),
+    path('<int:pk>/', VehicleDetailView.as_view(), name='vehicle-detail'),
+    path('<int:pk>/suspend/', VehicleSuspendView.as_view(), name='vehicle-suspend'),
     path('plate/<str:plate_number>/', VehicleByPlateView.as_view(), name='vehicle-by-plate'),
     path('tags/', TagCreateView.as_view(), name='tag-create'),
     path('tags/bulk/', TagBulkCreateView.as_view(), name='tag-bulk-create'),
@@ -19,7 +19,7 @@ urlpatterns = [
     path('tags/scan-debug/', ScanDebugView.as_view(), name='tag-scan-debug'),
     path('tags/available/', AvailableTagsView.as_view(), name='available-tags'),
     path('tags/upload/', TagInventoryUploadView.as_view(), name='tag-upload'),
-    path('tags/<uuid:vehicle_id>/reissue/', TagReissueView.as_view(), name='tag-reissue'),
+    path('tags/<int:vehicle_id>/reissue/', TagReissueView.as_view(), name='tag-reissue'),
 
     # Inventory Management
     path('inventory/', InventoryListView.as_view(), name='inventory-list'),

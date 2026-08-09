@@ -172,7 +172,7 @@ class JazzCashService:
             'topup_id': str(topup.id),
         }
     @staticmethod
-    def initiate_topup(account_id: str, user_id: int, amount: Decimal) -> dict:
+    def initiate_topup(account_id: int, user_id: int, amount: Decimal) -> dict:
         if amount < Decimal('100'):
             return {'success': False, 'reason': 'Minimum top-up amount is Rs.100'}
 

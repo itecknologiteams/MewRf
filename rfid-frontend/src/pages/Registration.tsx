@@ -60,7 +60,7 @@ export default function Registration() {
   // Step 2
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(initialVehicleForm);
   const [errors, setErrors] = useState<Partial<VehicleForm>>({});
-  const [availableTags, setAvailableTags] = useState<{ id: string; tag_serial: string; epc: string }[]>([]);
+  const [availableTags, setAvailableTags] = useState<{ id: number; tag_serial: string; epc: string }[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
 
   useEffect(() => {

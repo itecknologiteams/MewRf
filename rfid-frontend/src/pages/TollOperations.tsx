@@ -66,14 +66,14 @@ export default function TollOperations() {
 
   // Entry form
   const [entryTag, setEntryTag] = useState('');
-  const [entryPlaza, setEntryPlaza] = useState('');
-  const [entryLane, setEntryLane] = useState('');
+  const [entryPlaza, setEntryPlaza] = useState<number | ''>('');
+  const [entryLane, setEntryLane] = useState<number | ''>('');
   const [processingEntry, setProcessingEntry] = useState(false);
 
   // Exit form
   const [exitTag, setExitTag] = useState('');
-  const [exitPlaza, setExitPlaza] = useState('');
-  const [exitLane, setExitLane] = useState('');
+  const [exitPlaza, setExitPlaza] = useState<number | ''>('');
+  const [exitLane, setExitLane] = useState<number | ''>('');
   const [processingExit, setProcessingExit] = useState(false);
 
   // Logs
@@ -146,28 +146,26 @@ export default function TollOperations() {
   const getEntryPlazaLanes = () => plazas.find((p) => p.id === entryPlaza)?.lanes || [];
   const getExitPlazaLanes = () => plazas.find((p) => p.id === exitPlaza)?.lanes || [];
 
-  const addLog = (type: 'entry' | 'exit', tag_serial: string, plazaId: string, result: OperationResult) => {
+  const addLog = (type: 'entry' | 'exit', tag_serial: string, plazaId: number, result: OperationResult) => {
     const plaza = plazas.find((p) => p.id === plazaId);
     const log: OpLog = {
       id: Date.now().toString(),
       time: new Date().toLocaleTimeString('en-PK'),
       type,
       tag_serial,
-      plaza: plaza?.name || plazaId,
+      plaza: plaza?.name || String(plazaId),
       result,
     };
     setOpLogs((prev) => [log, ...prev].slice(0, 10));
   };
 
   // Convert plaza ID to booth number (e.g., plaza_1 -> booth 1)
-  const getBoothIdFromPlazaId = (plazaId: string): number => {
-    const match = plazaId.match(/\d+/);
-    return match ? parseInt(match[0]) : 1;
-  };
+  const getBoothIdFromPlazaId = (plazaId: number): number =>
+    plazas.find((p) => p.id === plazaId)?.plaza_id ?? 1;
 
   const checkInventoryAndProceed = async (
     tagSerial: string,
-    plazaId: string,
+    plazaId: number,
     mode: 'entry' | 'exit'
   ) => {
     try {
@@ -237,7 +235,7 @@ export default function TollOperations() {
 
     try {
       // Check inventory first
-      const inventoryCheck = await checkInventoryAndProceed(entryTag, entryPlaza, 'entry');
+      const inventoryCheck = await checkInventoryAndProceed(entryTag, Number(entryPlaza), 'entry');
 
       if (!inventoryCheck.proceed) {
         setProcessingEntry(false);
@@ -247,17 +245,17 @@ export default function TollOperations() {
       // Proceed with normal toll operation
       const trip = await tollsApi.entry({
         tag_serial: entryTag,
-        plaza_id: entryPlaza,
-        ...(entryLane ? { lane_id: entryLane } : {}),
+        plaza_id: Number(entryPlaza),
+        ...(entryLane ? { lane_id: Number(entryLane) } : {}),
       });
       const result: OperationResult = { success: true, trip, message: 'Entry recorded successfully', type: 'entry' };
-      addLog('entry', entryTag, entryPlaza, result);
+      addLog('entry', entryTag, Number(entryPlaza), result);
       addToast({ type: 'success', title: 'Entry Recorded', message: `Vehicle entered at ${plazas.find((p) => p.id === entryPlaza)?.name}` });
       setEntryTag('');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Entry failed';
       const result: OperationResult = { success: false, message, type: 'entry' };
-      addLog('entry', entryTag, entryPlaza, result);
+      addLog('entry', entryTag, Number(entryPlaza), result);
       if (err instanceof ApiError && message.toLowerCase().includes('insufficient balance')) {
         setLowBalance({
           tagSerial: entryTag,
@@ -286,7 +284,7 @@ export default function TollOperations() {
 
     try {
       // Check inventory first
-      const inventoryCheck = await checkInventoryAndProceed(exitTag, exitPlaza, 'exit');
+      const inventoryCheck = await checkInventoryAndProceed(exitTag, Number(exitPlaza), 'exit');
 
       if (!inventoryCheck.proceed) {
         setProcessingExit(false);
@@ -296,18 +294,18 @@ export default function TollOperations() {
       // Proceed with normal toll operation
       const trip = await tollsApi.exit({
         tag_serial: exitTag,
-        plaza_id: exitPlaza,
-        ...(exitLane ? { lane_id: exitLane } : {}),
+        plaza_id: Number(exitPlaza),
+        ...(exitLane ? { lane_id: Number(exitLane) } : {}),
       });
       const result: OperationResult = { success: true, trip, message: 'Exit processed successfully', type: 'exit' };
-      addLog('exit', exitTag, exitPlaza, result);
+      addLog('exit', exitTag, Number(exitPlaza), result);
       const charge = trip.charge_amount ? `PKR ${parseFloat(trip.charge_amount).toLocaleString()} charged` : '';
       addToast({ type: 'success', title: 'Exit Processed', message: charge || 'Vehicle exited successfully' });
       setExitTag('');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Exit failed';
       const result: OperationResult = { success: false, message, type: 'exit' };
-      addLog('exit', exitTag, exitPlaza, result);
+      addLog('exit', exitTag, Number(exitPlaza), result);
       if (err instanceof ApiError && message.toLowerCase().includes('insufficient balance')) {
         setLowBalance({
           tagSerial: exitTag,
@@ -345,20 +343,20 @@ export default function TollOperations() {
       const laneId  = lowBalance.mode === 'entry' ? entryLane  : exitLane;
       const payload = {
         tag_serial: lowBalance.tagSerial,
-        plaza_id: plazaId,
-        ...(laneId ? { lane_id: laneId } : {}),
+        plaza_id: Number(plazaId),
+        ...(laneId ? { lane_id: Number(laneId) } : {}),
       };
 
       if (lowBalance.mode === 'entry') {
         const trip = await tollsApi.entry(payload);
         const result: OperationResult = { success: true, trip, message: 'Entry recorded after top-up', type: 'entry' };
-        addLog('entry', lowBalance.tagSerial, plazaId, result);
+        addLog('entry', lowBalance.tagSerial, Number(plazaId), result);
         addToast({ type: 'success', title: 'Gate Open', message: `Entry recorded at ${plazas.find((p) => p.id === plazaId)?.name}` });
         setEntryTag('');
       } else {
         const trip = await tollsApi.exit(payload);
         const result: OperationResult = { success: true, trip, message: 'Exit processed after top-up', type: 'exit' };
-        addLog('exit', lowBalance.tagSerial, plazaId, result);
+        addLog('exit', lowBalance.tagSerial, Number(plazaId), result);
         const charge = trip.charge_amount ? `PKR ${parseFloat(trip.charge_amount).toLocaleString()} charged` : '';
         addToast({ type: 'success', title: 'Gate Open', message: charge || 'Exit processed successfully' });
         setExitTag('');
@@ -445,7 +443,7 @@ export default function TollOperations() {
                   </label>
                   <select
                     value={entryPlaza}
-                    onChange={(e) => { setEntryPlaza(e.target.value); setEntryLane(''); }}
+                    onChange={(e) => { setEntryPlaza(e.target.value ? Number(e.target.value) : ''); setEntryLane(''); }}
                     className={inputClass}
                   >
                     <option value="">Select Plaza</option>
@@ -459,7 +457,7 @@ export default function TollOperations() {
                     <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Lane (optional)</label>
                     <select
                       value={entryLane}
-                      onChange={(e) => setEntryLane(e.target.value)}
+                      onChange={(e) => setEntryLane(e.target.value ? Number(e.target.value) : '')}
                       className={inputClass}
                     >
                       <option value="">Auto-assign</option>
@@ -514,7 +512,7 @@ export default function TollOperations() {
                   </label>
                   <select
                     value={exitPlaza}
-                    onChange={(e) => { setExitPlaza(e.target.value); setExitLane(''); }}
+                    onChange={(e) => { setExitPlaza(e.target.value ? Number(e.target.value) : ''); setExitLane(''); }}
                     className={inputClass}
                   >
                     <option value="">Select Plaza</option>
@@ -528,7 +526,7 @@ export default function TollOperations() {
                     <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Lane (optional)</label>
                     <select
                       value={exitLane}
-                      onChange={(e) => setExitLane(e.target.value)}
+                      onChange={(e) => setExitLane(e.target.value ? Number(e.target.value) : '')}
                       className={inputClass}
                     >
                       <option value="">Auto-assign</option>
@@ -781,7 +779,7 @@ export default function TollOperations() {
             status={inventoryCheckWarning.type}
             boothAssignedId={inventoryCheckWarning.boothAssignedId}
             currentBoothId={getBoothIdFromPlazaId(
-              inventoryCheckWarning.mode === 'entry' ? entryPlaza : exitPlaza
+              Number(inventoryCheckWarning.mode === 'entry' ? entryPlaza : exitPlaza)
             )}
           />
         </div>
@@ -803,17 +801,17 @@ export default function TollOperations() {
               try {
                 const trip = await tollsApi.entry({
                   tag_serial: pendingActivationTag.tag_serial,
-                  plaza_id: entryPlaza,
-                  ...(entryLane ? { lane_id: entryLane } : {}),
+                  plaza_id: Number(entryPlaza),
+                  ...(entryLane ? { lane_id: Number(entryLane) } : {}),
                 });
                 const result: OperationResult = { success: true, trip, message: 'Entry recorded after activation', type: 'entry' };
-                addLog('entry', pendingActivationTag.tag_serial, entryPlaza, result);
+                addLog('entry', pendingActivationTag.tag_serial, Number(entryPlaza), result);
                 addToast({ type: 'success', title: 'Entry Recorded', message: `Vehicle entered at ${plazas.find((p) => p.id === entryPlaza)?.name}` });
                 setEntryTag('');
               } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : 'Entry failed';
                 const result: OperationResult = { success: false, message, type: 'entry' };
-                addLog('entry', pendingActivationTag.tag_serial, entryPlaza, result);
+                addLog('entry', pendingActivationTag.tag_serial, Number(entryPlaza), result);
                 addToast({ type: 'error', title: 'Entry Failed', message });
               }
             } else {
@@ -821,18 +819,18 @@ export default function TollOperations() {
               try {
                 const trip = await tollsApi.exit({
                   tag_serial: pendingActivationTag.tag_serial,
-                  plaza_id: exitPlaza,
-                  ...(exitLane ? { lane_id: exitLane } : {}),
+                  plaza_id: Number(exitPlaza),
+                  ...(exitLane ? { lane_id: Number(exitLane) } : {}),
                 });
                 const result: OperationResult = { success: true, trip, message: 'Exit processed after activation', type: 'exit' };
-                addLog('exit', pendingActivationTag.tag_serial, exitPlaza, result);
+                addLog('exit', pendingActivationTag.tag_serial, Number(exitPlaza), result);
                 const charge = trip.charge_amount ? `PKR ${parseFloat(trip.charge_amount).toLocaleString()} charged` : '';
                 addToast({ type: 'success', title: 'Exit Processed', message: charge || 'Vehicle exited successfully' });
                 setExitTag('');
               } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : 'Exit failed';
                 const result: OperationResult = { success: false, message, type: 'exit' };
-                addLog('exit', pendingActivationTag.tag_serial, exitPlaza, result);
+                addLog('exit', pendingActivationTag.tag_serial, Number(exitPlaza), result);
                 addToast({ type: 'error', title: 'Exit Failed', message });
               }
             }

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class TransferService:
     @staticmethod
     @db_transaction.atomic
-    def execute(user, source_vehicle_id: str, target_vehicle_id: str,
+    def execute(user, source_vehicle_id: int, target_vehicle_id: int,
                 cnic: str, phone: str, name: str) -> dict:
 
         # ── Load accounts first so KYC verifies against the actual vehicle owner

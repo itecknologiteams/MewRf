@@ -50,15 +50,15 @@ export default function TripsPage() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [closingTripId, setClosingTripId] = useState<string | null>(null);
+  const [closingTripId, setClosingTripId] = useState<number | null>(null);
   const [confirmClose, setConfirmClose] = useState<TollTrip | null>(null);
   const [refundTarget, setRefundTarget] = useState<TollTrip | null>(null);
   const [isRefunding, setIsRefunding] = useState(false);
-  const [refundedTripIds, setRefundedTripIds] = useState<Set<string>>(new Set());
+  const [refundedTripIds, setRefundedTripIds] = useState<Set<number>>(new Set());
 
   // For non-admin: vehicle selector
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([]);
-  const [selectedVehicle, setSelectedVehicle] = useState('');
+  const [selectedVehicle, setSelectedVehicle] = useState<number | ''>('');
 
   useEffect(() => {
     if (!isAdmin) {
@@ -84,7 +84,7 @@ export default function TripsPage() {
       if (isAdmin) {
         data = await tollsApi.adminTrips(statusFilter !== 'All' ? { status: statusFilter } : undefined);
       } else {
-        data = await tollsApi.trips(selectedVehicle);
+        data = await tollsApi.trips(selectedVehicle as number);
       }
       setTrips(data);
       setCurrentPage(1);
@@ -170,7 +170,7 @@ export default function TripsPage() {
           {!isAdmin && vehicles.length > 0 && (
             <select
               value={selectedVehicle}
-              onChange={(e) => setSelectedVehicle(e.target.value)}
+              onChange={(e) => setSelectedVehicle(e.target.value ? Number(e.target.value) : '')}
               className="px-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
             >
               {vehicles.map((v) => (

@@ -1,15 +1,13 @@
-import uuid
 from django.db import models
 from apps.vehicles.models import VehicleType
 from apps.tolls.plaza_registry import format_plaza_id
 
 
 class Plaza(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # Operator-assigned plaza number. This is the identifier humans and booth
-    # configs use (replaced the old `code` CharField). NOT the same thing as
-    # `id` above, and NOT the same thing as the `plaza_id` FK column Django
-    # generates on TollLane/TollRate/TollTrip — those hold this row's UUID.
+    # Operator-assigned plaza number — the identifier humans and booth configs
+    # use (it replaced the old `code` CharField). NOT the same thing as this
+    # row's `id`, and NOT the same thing as the `plaza_id` FK column Django
+    # generates on TollLane/TollRate/TollTrip, which holds this row's id.
     plaza_id = models.IntegerField(unique=True)
     name = models.CharField(max_length=100)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -29,7 +27,6 @@ class Plaza(models.Model):
 
 
 class TollLane(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     plaza = models.ForeignKey(Plaza, on_delete=models.CASCADE, related_name='lanes')
     lane_number = models.IntegerField()
     is_active = models.BooleanField(default=True)
@@ -43,7 +40,6 @@ class TollLane(models.Model):
 
 
 class TollRate(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     entry_plaza = models.ForeignKey(Plaza, on_delete=models.CASCADE, related_name='entry_rates')
     exit_plaza = models.ForeignKey(Plaza, on_delete=models.CASCADE, related_name='exit_rates')
     vehicle_type = models.CharField(max_length=20, choices=VehicleType.choices)
@@ -74,7 +70,6 @@ class FareMatrix(models.Model):
     Direction matters: (A -> B) and (B -> A) are separate rows, so an asymmetric
     fare is representable. `load_fares` writes both directions.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     from_plaza = models.ForeignKey(
         Plaza, on_delete=models.CASCADE, related_name='fares_from'
     )
@@ -116,7 +111,6 @@ class TripStatus(models.TextChoices):
 
 
 class TollTrip(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vehicle = models.ForeignKey('vehicles.Vehicle', on_delete=models.PROTECT, related_name='trips')
     tag = models.ForeignKey('vehicles.Tag', on_delete=models.PROTECT, related_name='trips')
     account = models.ForeignKey('accounts.Account', on_delete=models.PROTECT, related_name='trips')

@@ -154,7 +154,7 @@ export const authApi = {
 
 // ─── Vehicle types ────────────────────────────────────────────────────────────
 export interface ApiVehicle {
-  id: string;
+  id: number;
   plate_number: string;
   vehicle_type: string;
   status: string;
@@ -163,7 +163,7 @@ export interface ApiVehicle {
   owner_name: string;
   owner_id?: number;
   tag?: {
-    id: string;
+    id: number;
     tag_serial: string;
     issued_at: string;
     status: string;
@@ -187,40 +187,40 @@ export const vehiclesApi = {
     initial_balance?: number;
   }) => apiFetch<ApiVehicle>('/vehicles/', { method: 'POST', body: JSON.stringify(data) }),
 
-  detail: (uuid: string) => apiFetch<ApiVehicle>(`/vehicles/${uuid}/`),
+  detail: (id: number) => apiFetch<ApiVehicle>(`/vehicles/${id}/`),
 
-  update: (uuid: string, data: Partial<ApiVehicle>) =>
-    apiFetch<ApiVehicle>(`/vehicles/${uuid}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+  update: (id: number, data: Partial<ApiVehicle>) =>
+    apiFetch<ApiVehicle>(`/vehicles/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   byPlate: (plateNumber: string) => apiFetch<ApiVehicle>(`/vehicles/plate/${encodeURIComponent(plateNumber)}/`),
 
-  reissueTag: (vehicleUuid: string, data: { tag_serial: string }) =>
-    apiFetch<ApiVehicle['tag']>(`/vehicles/tags/${vehicleUuid}/reissue/`, {
+  reissueTag: (vehicleId: number, data: { tag_serial: string }) =>
+    apiFetch<ApiVehicle['tag']>(`/vehicles/tags/${vehicleId}/reissue/`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   addTag: (data: { tag_serial: string; tid?: string; epc?: string }) =>
-    apiFetch<{ id: string; tag_serial: string; tid: string | null; epc: string }>('/vehicles/tags/', {
+    apiFetch<{ id: number; tag_serial: string; tid: string | null; epc: string }>('/vehicles/tags/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  suspend: (vehicleUuid: string) =>
-    apiFetch<ApiVehicle>(`/vehicles/${vehicleUuid}/suspend/`, {
+  suspend: (vehicleId: number) =>
+    apiFetch<ApiVehicle>(`/vehicles/${vehicleId}/suspend/`, {
       method: 'POST',
       body: JSON.stringify({ action: 'suspend' }),
     }),
 
-  activate: (vehicleUuid: string) =>
-    apiFetch<ApiVehicle>(`/vehicles/${vehicleUuid}/suspend/`, {
+  activate: (vehicleId: number) =>
+    apiFetch<ApiVehicle>(`/vehicles/${vehicleId}/suspend/`, {
       method: 'POST',
       body: JSON.stringify({ action: 'activate' }),
     }),
 
   availableTags: (params?: { search?: string }) => {
     const qs = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
-    return apiFetch<{ id: string; tag_serial: string; epc: string }[]>(`/vehicles/tags/available/${qs}`);
+    return apiFetch<{ id: number; tag_serial: string; epc: string }[]>(`/vehicles/tags/available/${qs}`);
   },
 
   uploadTagInventory: async (file: File) => {
@@ -249,7 +249,7 @@ export interface LaneReport {
 }
 
 export interface PlazaReport {
-  id: string;
+  id: number;
   plaza_id: number;
   name: string;
   is_active: boolean;
@@ -267,13 +267,13 @@ export interface DailyReport {
 
 // ─── Toll types ───────────────────────────────────────────────────────────────
 export interface Lane {
-  id: string;
+  id: number;
   lane_number: number;
   is_active: boolean;
 }
 
 export interface Plaza {
-  id: string;
+  id: number;
   /** Operator-assigned plaza number (Plaza.plaza_id). Replaced `code`. */
   plaza_id: number;
   name: string;
@@ -284,13 +284,13 @@ export interface Plaza {
 }
 
 export interface TollRate {
-  id: string;
+  id: number;
   /** fare_matrix row. Field names mirror the table: from_plaza / to_plaza /
    *  category_index / fare. `category` IS the integer category_index. */
-  from_plaza: string;
+  from_plaza: number;
   from_plaza_name: string;
   from_plaza_display_id: string;
-  to_plaza: string;
+  to_plaza: number;
   to_plaza_name: string;
   to_plaza_display_id: string;
   category: number;
@@ -302,7 +302,7 @@ export interface TollRate {
 }
 
 export interface VehicleCategory {
-  id: string;
+  id: number;
   category_index: number;
   code: string;
   name: string;
@@ -311,7 +311,7 @@ export interface VehicleCategory {
 }
 
 export interface TollTrip {
-  id: string;
+  id: number;
   plate_number: string;
   entry_plaza_name: string;
   exit_plaza_name?: string;
@@ -340,13 +340,13 @@ export interface StatsData {
 
 // ─── Tolls API ────────────────────────────────────────────────────────────────
 export const tollsApi = {
-  entry: (data: { tag_serial: string; plaza_id: string; lane_id?: string }) =>
+  entry: (data: { tag_serial: string; plaza_id: number; lane_id?: number }) =>
     apiFetch<TollTrip>('/tolls/entry/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  exit: (data: { tag_serial: string; plaza_id: string; lane_id?: string }) =>
+  exit: (data: { tag_serial: string; plaza_id: number; lane_id?: number }) =>
     apiFetch<TollTrip>('/tolls/exit/', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -357,7 +357,7 @@ export const tollsApi = {
   rates: () => apiFetch<TollRate[]>('/tolls/rates/'),
   vehicleCategories: () => apiFetch<VehicleCategory[]>('/tolls/vehicle-categories/'),
 
-  trips: (vehicleUuid: string) => apiFetch<TollTrip[]>(`/tolls/trips/${vehicleUuid}/`),
+  trips: (vehicleId: number) => apiFetch<TollTrip[]>(`/tolls/trips/${vehicleId}/`),
 
   adminTrips: (params?: { status?: string }) => {
     const qs = params?.status ? `?status=${params.status}` : '';
@@ -369,39 +369,39 @@ export const tollsApi = {
   adminCreatePlaza: (data: { name: string; plaza_id: number; latitude?: string; longitude?: string; is_active?: boolean }) =>
     apiFetch<Plaza>('/tolls/admin/plazas/', { method: 'POST', body: JSON.stringify(data) }),
 
-  adminUpdatePlaza: (id: string, data: { is_active?: boolean; name?: string }) =>
+  adminUpdatePlaza: (id: number, data: { is_active?: boolean; name?: string }) =>
     apiFetch<Plaza>(`/tolls/admin/plazas/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  adminCreateLane: (plazaId: string, data: { lane_number: number; is_active?: boolean }) =>
+  adminCreateLane: (plazaId: number, data: { lane_number: number; is_active?: boolean }) =>
     apiFetch<Lane>(`/tolls/admin/plazas/${plazaId}/lanes/`, { method: 'POST', body: JSON.stringify(data) }),
 
   adminCreateRate: (data: {
-    from_plaza: string;
-    to_plaza: string;
+    from_plaza: number;
+    to_plaza: number;
     category: number;
     fare: string;
   }) => apiFetch<TollRate>('/tolls/admin/rates/', { method: 'POST', body: JSON.stringify(data) }),
 
-  adminUpdateRate: (id: string, data: {
-    from_plaza?: string;
-    to_plaza?: string;
+  adminUpdateRate: (id: number, data: {
+    from_plaza?: number;
+    to_plaza?: number;
     category?: number;
     fare?: string;
   }) => apiFetch<TollRate>(`/tolls/admin/rates/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  adminDeleteRate: (id: string) =>
+  adminDeleteRate: (id: number) =>
     apiFetch<null>(`/tolls/admin/rates/${id}/`, { method: 'DELETE' }),
 
-  adminDeletePlaza: (id: string) =>
+  adminDeletePlaza: (id: number) =>
     apiFetch<null>(`/tolls/admin/plazas/${id}/`, { method: 'DELETE' }),
 
   stats: () => apiFetch<StatsData>('/tolls/admin/stats/'),
 
-  closeTrip: (tripId: string) =>
+  closeTrip: (tripId: number) =>
     apiFetch<TollTrip>(`/tolls/admin/trips/${tripId}/close/`, { method: 'POST' }),
 
-  refundTrip: (tripId: string) =>
-    apiFetch<{ trip_id: string; plate_number: string; refunded_amount: string; new_balance: string }>(
+  refundTrip: (tripId: number) =>
+    apiFetch<{ trip_id: number; plate_number: string; refunded_amount: string; new_balance: string }>(
       `/tolls/admin/trips/${tripId}/refund/`, { method: 'POST' }
     ),
 
@@ -420,7 +420,7 @@ export const tollsApi = {
 
 // ─── Account types ────────────────────────────────────────────────────────────
 export interface Account {
-  id: string;
+  id: number;
   plate_number: string;
   vehicle_type: string;
   balance: string;
@@ -429,7 +429,7 @@ export interface Account {
 }
 
 export interface ApiTransaction {
-  id: string;
+  id: number;
   transaction_type: string;
   amount: string;
   balance_before: string;
@@ -486,14 +486,14 @@ export interface CashTopupResult {
 
 // ─── Accounts API ─────────────────────────────────────────────────────────────
 export const accountsApi = {
-  byVehicle: (vehicleUuid: string) => apiFetch<Account>(`/accounts/vehicle/${vehicleUuid}/`),
+  byVehicle: (vehicleId: number) => apiFetch<Account>(`/accounts/vehicle/${vehicleId}/`),
 
-  transactions: (accountUuid: string, params?: { type?: string; page?: number }) => {
+  transactions: (accountId: number, params?: { type?: string; page?: number }) => {
     const qs = params
       ? '?' + new URLSearchParams(params as Record<string, string>).toString()
       : '';
     return apiFetch<{ results: ApiTransaction[]; count: number; next?: string; previous?: string }>(
-      `/accounts/${accountUuid}/transactions/${qs}`
+      `/accounts/${accountId}/transactions/${qs}`
     );
   },
 
@@ -533,8 +533,8 @@ export const accountsApi = {
     }),
 
   transferBalance: (data: {
-    source_vehicle_id: string;
-    target_vehicle_id: string;
+    source_vehicle_id: number;
+    target_vehicle_id: number;
     cnic: string;
     phone: string;
     name: string;
@@ -547,7 +547,7 @@ export const accountsApi = {
 
 // ─── Payment types ────────────────────────────────────────────────────────────
 export interface TopupRequest {
-  id: string;
+  id: number;
   amount: string;
   status: string;
   jazzcash_txn_id?: string;
@@ -557,18 +557,18 @@ export interface TopupRequest {
 
 // ─── Payments API ─────────────────────────────────────────────────────────────
 export const paymentsApi = {
-  initiate: (data: { account_id: string; amount: number }) =>
+  initiate: (data: { account_id: number; amount: number }) =>
     apiFetch<TopupRequest>('/payments/topup/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  callback: (data: { pp_TxnRefNo: string; pp_ResponseCode: string; topup_id: string }) =>
+  callback: (data: { pp_TxnRefNo: string; pp_ResponseCode: string; topup_id: number }) =>
     apiFetch<TopupRequest>('/payments/jazzcash/callback/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  history: (accountUuid: string) =>
-    apiFetch<TopupRequest[]>(`/payments/history/${accountUuid}/`),
+  history: (accountId: number) =>
+    apiFetch<TopupRequest[]>(`/payments/history/${accountId}/`),
 };

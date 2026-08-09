@@ -1,4 +1,3 @@
-import uuid
 from django.db import models
 
 
@@ -25,7 +24,6 @@ class TransactionSource(models.TextChoices):
 
 
 class Account(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vehicle = models.OneToOneField('vehicles.Vehicle', on_delete=models.CASCADE, related_name='account')
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='accounts')
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -40,7 +38,6 @@ class Account(models.Model):
 
 
 class Transaction(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions')
     toll_lane = models.ForeignKey(
         'tolls.TollLane', null=True, blank=True,

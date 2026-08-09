@@ -1,4 +1,3 @@
-import uuid
 from django.db import models
 
 
@@ -34,7 +33,6 @@ class VehicleCategory(models.Model):
     VehicleType choice value so an existing vehicles.vehicle_type string maps
     straight onto a category without touching the Vehicle table.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     category_index = models.IntegerField(
         unique=True,
         help_text="Stable numeric key referenced by fare_matrix.category_index",
@@ -72,7 +70,6 @@ class TagStatus(models.TextChoices):
 
 
 class Vehicle(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(
         'users.User', on_delete=models.PROTECT, related_name='vehicles'
     )
@@ -91,7 +88,6 @@ class Vehicle(models.Model):
 
 
 class Tag(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tag_serial = models.CharField(max_length=24, unique=True)
     tid = models.CharField(max_length=24, null=True, blank=True, unique=True)
     epc = models.CharField(max_length=24, blank=True, default='')
@@ -135,7 +131,6 @@ class TagAssignment(models.Model):
     tag_serial is denormalised so history survives a tag row being deleted —
     an audit trail that disappears with its subject is not an audit trail.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tag = models.ForeignKey(
         'Tag', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='assignments',
@@ -214,7 +209,6 @@ class UnregisteredInventoryStatus(models.TextChoices):
 
 class UnregisteredInventory(models.Model):
     """Unregistered inventory - tags waiting for booth assignment and activation."""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tag_serial = models.CharField(max_length=50, unique=True)
     tid = models.CharField(max_length=50, unique=True)
     epc = models.CharField(max_length=100, blank=True, default='')
@@ -263,7 +257,6 @@ class UnregisteredInventory(models.Model):
 
 class BoothInventoryAssignment(models.Model):
     """Track booth assignments for unregistered inventory."""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     inventory = models.ForeignKey(
         UnregisteredInventory, on_delete=models.CASCADE, related_name='booth_assignments'
     )
@@ -291,7 +284,6 @@ class BoothInventoryAssignment(models.Model):
 
 class TagActivation(models.Model):
     """Record of tag activation when first scanned at booth."""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tag_serial = models.CharField(max_length=50, unique=True)
     tid = models.CharField(max_length=50, unique=True)
 

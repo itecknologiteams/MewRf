@@ -81,22 +81,43 @@ def _guarded(master_cur, name, sql, rows):
 
 
 def _resync_sequence(cur, table: str, column: str = 'id') -> None:
-    """Realign a serial sequence after inserting rows with explicit ids.
+    """Realign a table's id sequence after inserting rows with explicit ids.
 
     The sync upserts rows using the ids the other side assigned, which bypasses
-    the sequence completely — it stays where it was while the data moves ahead.
-    The next locally-created row then reuses an id that is already taken and the
-    INSERT dies with "duplicate key value violates unique constraint <t>_pkey".
-    Seen in the wild: a booth that had pulled users could not register a new one.
+    the sequence entirely — it stays where it was while the data moves ahead.
+    The next locally-created row then reuses a taken id and the INSERT dies with
+    "duplicate key value violates unique constraint <table>_pkey". Seen in the
+    wild on `users` before every table had an integer key.
 
-    Only integer-PK tables need this. Everything else the sync touches (vehicles,
-    tags, accounts, plazas, trips, fares) uses UUIDs, which have no sequence.
+    Since primary keys became integers this applies to EVERY synced table, not
+    just users — which is why _resync_all() below runs after each pass.
     """
     cur.execute(
         "SELECT setval(pg_get_serial_sequence(%s, %s), "
         "       GREATEST(COALESCE((SELECT MAX(" + column + ") FROM " + table + "), 1), 1))",
         (f"public.{table}", column),
     )
+
+
+# Every table this service moves rows for. All have integer primary keys now, so
+# all of them need their sequence realigned after an upsert with explicit ids.
+SYNCED_TABLES = (
+    'users', 'vehicles', 'tags', 'tag_assignments', 'accounts',
+    'plazas', 'toll_lanes', 'toll_rates', 'vehicle_categories',
+    'fare_matrix', 'toll_trips', 'transactions',
+)
+
+
+def _resync_all(cur) -> None:
+    """Realign every synced table's sequence. Cheap (one setval each) and safe
+    to run every cycle — setval to MAX(id) is idempotent."""
+    for table in SYNCED_TABLES:
+        try:
+            _resync_sequence(cur, table)
+        except Exception:
+            # A table may not exist yet on a partially-migrated peer. Never let
+            # sequence maintenance abort a sync cycle.
+            log.debug("sequence resync skipped for %s", table, exc_info=True)
 
 
 # ── users ─────────────────────────────────────────────────────────────────────
@@ -126,8 +147,6 @@ def push_users(local_cur, master_cur, since: datetime) -> int:
             updated_at  = EXCLUDED.updated_at
         WHERE users.updated_at < EXCLUDED.updated_at
     """, rows)
-    # Same hazard in reverse: master receives booth-assigned ids.
-    _resync_sequence(master_cur, 'users')
     return len(rows)
 
 
@@ -272,7 +291,7 @@ def push_toll_trips(local_cur, master_cur, since: datetime) -> int:
 
     trip_ids = [str(r[0]) for r in rows]
     master_cur.execute(
-        "SELECT id FROM toll_trips WHERE id = ANY(%s::uuid[]) AND exit_time IS NOT NULL",
+        "SELECT id FROM toll_trips WHERE id = ANY(%s::bigint[]) AND exit_time IS NOT NULL",
         (trip_ids,),
     )
     already_closed = {str(r[0]) for r in master_cur.fetchall()}
@@ -328,7 +347,7 @@ def push_transactions(local_cur, master_cur, since: datetime) -> int:
     # is a transient ordering issue, not a reason to drop money records — raise
     # so the watermark holds and the same rows are retried next cycle.
     account_ids = [str(r[1]) for r in rows]
-    master_cur.execute("SELECT id FROM accounts WHERE id = ANY(%s::uuid[])", (account_ids,))
+    master_cur.execute("SELECT id FROM accounts WHERE id = ANY(%s::bigint[])", (account_ids,))
     existing = {str(r[0]) for r in master_cur.fetchall()}
     missing = [a for a in account_ids if a not in existing]
     if missing:
@@ -391,6 +410,10 @@ def run_push() -> dict:
                     if count:
                         _set_last_push(lc, table, _now())
                     summary[table] = count
+
+                # Master received booth-assigned ids across every table above —
+                # same sequence hazard in reverse.
+                _resync_all(mc)
 
         log.info("[push] done — %s", summary)
     except Exception as exc:

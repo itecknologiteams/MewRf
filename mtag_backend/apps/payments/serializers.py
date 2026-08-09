@@ -10,5 +10,5 @@ class TopupRequestSerializer(serializers.ModelSerializer):
 
 
 class InitiateTopupSerializer(serializers.Serializer):
-    account_id = serializers.UUIDField()
+    account_id = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=100)

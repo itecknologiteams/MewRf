@@ -580,8 +580,8 @@ class CacheReader:
 
     def get_rate(
         self,
-        entry_plaza_id: str,
-        exit_plaza_id: str,
+        entry_plaza_id: int,
+        exit_plaza_id: int,
         vehicle_type: str,
     ) -> Optional[float]:
         """

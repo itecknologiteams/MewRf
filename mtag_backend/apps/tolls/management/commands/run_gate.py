@@ -22,14 +22,17 @@ from django.core.management.base import BaseCommand, CommandError
 log = logging.getLogger('apps.tolls.gate')
 
 
-def resolve_plaza_lane(plaza_id: str, plaza_uuid: str, lane_number: str, lane_id: str):
-    """Resolve config's plaza_id/lane_number to the DB UUIDs the gate needs.
+def resolve_plaza_lane(plaza_id: str, plaza_row_id: str, lane_number: str, lane_id: str):
+    """Resolve config's plaza_id/lane_number to the DB row ids the gate needs.
 
     `plaza_id` is the operator-assigned plaza number from Plaza.plaza_id (this
-    replaced the old `plaza_code`). `plaza_uuid` is the raw Plaza.id escape
+    replaced the old `plaza_code`). `plaza_row_id` is the raw Plaza.id escape
     hatch, used only when plaza_id is not set.
 
-    Returns (plaza_uuid, lane_id) — GateController addresses rows by UUID.
+    Returns (plaza_row_id, lane_id) as ints — both PKs are integers, so they are
+    returned as ints rather than strings. A stringified id ("3") would still
+    satisfy the Django ORM but compares unequal to 3 in the SQLite offline cache
+    and lands as text in the bigint columns the sync pushes.
     """
     from apps.tolls.models import Plaza, TollLane
 
@@ -44,8 +47,8 @@ def resolve_plaza_lane(plaza_id: str, plaza_uuid: str, lane_number: str, lane_id
         raise CommandError(
             f"plaza_id = '{plaza_id}' looks like a UUID.\n"
             "In this config, plaza_id is now the operator-assigned plaza number "
-            "(e.g. plaza_id = 3). Use the plaza_uuid key if you really do want to "
-            "pin this booth to a raw Plaza.id."
+            "(e.g. plaza_id = 3). Use the plaza_row_id key if you really do want "
+            "to pin this booth to a raw Plaza.id."
         )
 
     # Resolve plaza
@@ -58,30 +61,44 @@ def resolve_plaza_lane(plaza_id: str, plaza_uuid: str, lane_number: str, lane_id
                 f"Available plaza_ids: {_available()}"
             )
         try:
-            plaza_uuid = str(Plaza.objects.get(plaza_id=number).id)
+            plaza_row_id = Plaza.objects.get(plaza_id=number).id
         except Plaza.DoesNotExist:
             raise CommandError(
                 f"Plaza with plaza_id {number} not found in DB.\n"
                 f"Available plaza_ids: {_available()}"
             )
-    elif not plaza_uuid or plaza_uuid == '00000000-0000-0000-0000-000000000000':
+    elif not plaza_row_id:
         raise CommandError(
             f"Set plaza_id (e.g. plaza_id = 3) in config.\n"
             f"Available plaza_ids: {_available()}"
         )
-
-    # Resolve lane. NB: TollLane.plaza_id is Django's FK column and holds the
-    # Plaza UUID — it is not Plaza.plaza_id, the integer resolved above.
-    if lane_number and not lane_id:
+    else:
         try:
-            lane = TollLane.objects.get(plaza_id=plaza_uuid, lane_number=int(lane_number))
-            lane_id = str(lane.id)
-        except TollLane.DoesNotExist:
+            plaza_row_id = int(plaza_row_id)
+        except ValueError:
             raise CommandError(
-                f"Lane {lane_number} not found for plaza {plaza_id or plaza_uuid}."
+                f"plaza_row_id '{plaza_row_id}' in [gate] is not an integer.\n"
+                "Plaza ids are integers now — prefer plaza_id (the operator-"
+                f"assigned number). Available plaza_ids: {_available()}"
             )
 
-    return plaza_uuid, lane_id or None
+    # Resolve lane. NB: TollLane.plaza_id is Django's FK column and holds the
+    # Plaza row id — it is not Plaza.plaza_id, the number resolved above.
+    if lane_number and not lane_id:
+        try:
+            lane = TollLane.objects.get(plaza_id=plaza_row_id, lane_number=int(lane_number))
+            lane_id = lane.id
+        except TollLane.DoesNotExist:
+            raise CommandError(
+                f"Lane {lane_number} not found for plaza {plaza_id or plaza_row_id}."
+            )
+    elif lane_id:
+        try:
+            lane_id = int(lane_id)
+        except ValueError:
+            raise CommandError(f"lane_id '{lane_id}' in [gate] is not an integer.")
+
+    return plaza_row_id, lane_id or None
 
 
 class Command(BaseCommand):
@@ -128,7 +145,8 @@ class Command(BaseCommand):
 
         gate_mode   = cfg.get('gate', 'mode',       fallback='entry').strip().lower()
         plaza_id    = cfg.get('gate', 'plaza_id',   fallback='').strip()
-        plaza_uuid  = cfg.get('gate', 'plaza_uuid', fallback='').strip()
+        plaza_row_id = cfg.get('gate', 'plaza_row_id',
+                               fallback=cfg.get('gate', 'plaza_uuid', fallback='')).strip()
         lane_id     = cfg.get('gate', 'lane_id',    fallback='').strip() or None
         lane_number = cfg.get('gate', 'lane_number', fallback='').strip() or None
         reader_host = cfg.get('scanner', 'reader_host', fallback='192.168.78.8')
@@ -170,16 +188,16 @@ class Command(BaseCommand):
                 "[TEST MODE] DB checks DISABLED — barrier will open for every scan"
             ))
         else:
-            plaza_uuid, lane_id = resolve_plaza_lane(plaza_id, plaza_uuid, lane_number, lane_id)
+            plaza_row_id, lane_id = resolve_plaza_lane(plaza_id, plaza_row_id, lane_number, lane_id)
 
         self.stdout.write(self.style.SUCCESS(
             f"[gate] Mode: {gate_mode.upper()} | Plaza: {plaza_id or 'TEST'} "
-            f"({plaza_uuid or 'TEST'}) | Lane: {lane_id or 'unset'}"
+            f"({plaza_row_id or 'TEST'}) | Lane: {lane_id or 'unset'}"
         ))
 
         gate = GateController(
             gate_mode=gate_mode,
-            plaza_id=plaza_uuid,
+            plaza_id=plaza_row_id,
             lane_id=lane_id,
             serial_port=serial_port,
             serial_baud=serial_baud,

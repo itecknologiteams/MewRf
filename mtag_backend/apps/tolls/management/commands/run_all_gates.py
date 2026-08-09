@@ -86,7 +86,7 @@ class Command(BaseCommand):
 
         for section in booth_sections:
             plaza_id    = get(section, 'plaza_id', '').strip()
-            plaza_uuid  = get(section, 'plaza_uuid', '').strip()
+            plaza_row_id = get(section, 'plaza_row_id', '').strip() or get(section, 'plaza_uuid', '').strip()
             lane_number = get(section, 'lane_number', '').strip() or None
             lane_id     = get(section, 'lane_id', '').strip() or None
 
@@ -98,14 +98,14 @@ class Command(BaseCommand):
                 continue
 
             try:
-                plaza_uuid, lane_id = resolve_plaza_lane(plaza_id, plaza_uuid, lane_number, lane_id)
+                plaza_row_id, lane_id = resolve_plaza_lane(plaza_id, plaza_row_id, lane_number, lane_id)
             except CommandError as exc:
                 self.stdout.write(self.style.WARNING(f"  [{section}] {exc} — skipping"))
                 continue
 
             gate = GateController(
                 gate_mode=gate_mode,
-                plaza_id=plaza_uuid,
+                plaza_id=plaza_row_id,
                 lane_id=lane_id,
                 serial_port=get(section, 'serial_port', '/dev/ttyUSB0'),
                 serial_baud=int(get(section, 'serial_baud', '115200')),

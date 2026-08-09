@@ -78,17 +78,18 @@ class OfflineExitService:
         db_path: Optional[str],
         plaza_id: int,
         lane_number: int,
-        plaza_uuid: str,
-        lane_id: Optional[str],
+        plaza_row_id: int,
+        lane_id: Optional[int],
     ) -> None:
         self.db_path: str = init_db(db_path or get_db_path())
         # plaza_id = operator-assigned plaza number (Plaza.plaza_id), used for
-        # the idempotency key. plaza_uuid = Plaza.id, used for the UUID-typed
-        # plaza columns in the local SQLite cache.
+        # the idempotency key. plaza_row_id = Plaza.id, used for the FK columns
+        # in the local SQLite cache. Coerced to int so cached rows compare equal
+        # to the integers the sync pushes into the bigint columns upstream.
         self.plaza_id: int = int(plaza_id)
         self.lane_number: int = int(lane_number)
-        self.plaza_uuid: str = plaza_uuid
-        self.lane_id: Optional[str] = lane_id
+        self.plaza_row_id: int = int(plaza_row_id)
+        self.lane_id: Optional[int] = int(lane_id) if lane_id is not None else None
         self._reader = CacheReader(self.db_path)
         self._lock = threading.Lock()
 
@@ -125,7 +126,7 @@ class OfflineExitService:
                 'exit',
                 tag_serial,
                 vehicle_plate,
-                self.plaza_uuid,
+                self.plaza_row_id,
                 self.lane_id,
                 result,
                 reason,
@@ -214,7 +215,7 @@ class OfflineExitService:
                         """,
                         (
                             idempotency_key, tag_serial, vehicle_id, plate_number,
-                            self.plaza_uuid, self.lane_id, now_iso, now_iso, now_iso,
+                            self.plaza_row_id, self.lane_id, now_iso, now_iso, now_iso,
                         ),
                     )
                     event_id_row = conn.execute(
@@ -353,7 +354,7 @@ class OfflineExitService:
                         """,
                         (
                             idempotency_key, tag_serial, vehicle_id, plate_number,
-                            self.plaza_uuid, self.lane_id, now_iso, now_iso, now_iso,
+                            self.plaza_row_id, self.lane_id, now_iso, now_iso, now_iso,
                         ),
                     )
                     inserted = True

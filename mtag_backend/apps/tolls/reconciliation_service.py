@@ -238,7 +238,7 @@ class ReconciliationService:
         event_id: int = event['id']
         idempotency_key: str = event['idempotency_key']
         tag_serial: str = event['tag_serial']
-        exit_plaza_id: str = event['exit_plaza_id']
+        exit_plaza_id: int = event['exit_plaza_id']
         exit_lane_id: Optional[str] = event.get('exit_lane_id')
         exit_time_str: str = event['exit_time']
 
