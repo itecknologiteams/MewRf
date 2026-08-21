@@ -28,6 +28,28 @@ PLAZAS = [
     (107, 'Mai Niyari'),
 ]
 
+# Lane numbers actually installed at each plaza, keyed by plaza_id.
+#
+# These are the operator's real lane numbers, NOT a count. They are sparse and
+# do not start at 1 — plaza 001 runs 4,5,10,11,12,13 — so the old
+# `range(1, --lanes+1)` seeding produced lanes that exist nowhere on the ground
+# while omitting every real one. A booth whose rfid_config.ini names lane 37
+# could not resolve it, and run_gate refuses to start without its lane.
+#
+# lane_number is unique per plaza, not globally (unique_together on
+# plaza+lane_number), which is what lets lane 10 exist at both 001 and 002.
+LANES = {
+    1:   (4, 5, 10, 11, 12, 13),   # Shahfaisal Main
+    2:   (6, 7, 8, 10),            # Kathor Main
+    101: (18, 19),                 # Shafaisal-1
+    102: (24,),                    # Shafaisal-2
+    103: (27, 28),                 # Korangi 1
+    104: (21,),                    # Korangi 2
+    105: (30, 31),                 # Quaidabad (105)
+    106: (33,),                    # Quaidabad (106)
+    107: (37, 38),                 # Mai Niyari
+}
+
 # Pre-existing plazas from the old Malir Expressway seed are renumbered into this
 # range by migration 0007 so they can never collide with a real plaza_id above
 # (old KPT would otherwise have taken 1, which belongs to Shahfaisal Main).

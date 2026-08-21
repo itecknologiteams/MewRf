@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The FCM default channel id, referenced from AndroidManifest.xml.
+
+      Android 8+ drops any notification whose channel does not exist, silently and with
+      nothing in logcat, so this must be present before the first message can arrive. The
+      Firebase SDK creates the channel from this id.
+
+      Deliberately NOT translated: a channel id is an identifier, and a localised one would
+      create a second, empty channel the moment the device language changed — leaving the
+      user's "off" choice on the old channel and notifications arriving again.
+
+      MUST match the channel_id the server sends in the `android.notification` block of every
+      message (apps/notifications/services.py). A message that NAMES a channel ignores this
+      manifest default, and Android 8+ silently discards a notification whose channel does
+      not exist — no error, nothing in logcat, nothing on screen. Two plausible-looking ids
+      that merely differ is a fully wired push system that delivers nothing.
+    -->
+    <string name="notification_channel_money" translatable="false">mtag_transactions</string>
+</resources>

@@ -1,0 +1,42 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock.bak
+
+# Generated. NOT committed — CI runs build_runner and gen-l10n, so a stale generated file
+# can never disagree with its source.
+*.g.dart
+*.freezed.dart
+lib/l10n/generated/
+l10n_untranslated.json
+
+# Golden test failures (the diff images, not the goldens themselves).
+test/**/failures/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+**/android/captures/
+
+# iOS
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
+ios/Podfile.lock
+
+# Secrets — never commit a keystore or a pin list.
+*.jks
+*.keystore

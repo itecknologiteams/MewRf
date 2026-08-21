@@ -1,0 +1,80 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "total_balance": "1292.00",
+    "account_count": 2,
+    "vehicle_count": 2,
+    "tag_count": 1,
+    "month_toll_total": "120.00",
+    "month_toll_count": 1,
+    "accounts": [
+      {
+        "id": 2,
+        "vehicle_id": 2,
+        "plate_number": "BAR1654",
+        "vehicle_type": "truck_2axle",
+        "balance": "42.00",
+        "balance_updated_at": "2026-08-20T21:54:24.658078+05:00",
+        "created_at": "2026-08-20T21:54:24.658085+05:00"
+      },
+      {
+        "id": 1,
+        "vehicle_id": 1,
+        "plate_number": "FIX1654",
+        "vehicle_type": "car",
+        "balance": "1250.00",
+        "balance_updated_at": "2026-08-20T21:54:24.655110+05:00",
+        "created_at": "2026-08-20T21:54:24.655117+05:00"
+      }
+    ],
+    "recent_transactions": [
+      {
+        "id": 3,
+        "transaction_type": "refund",
+        "amount": "60.00",
+        "service_charge": "0.00",
+        "balance_before": "310.00",
+        "balance_after": "370.00",
+        "status": "success",
+        "source": null,
+        "tag_serial": "",
+        "reference_id": null,
+        "processed_at": "2026-08-20T21:54:24.660853+05:00",
+        "account_id": 1,
+        "plate_number": "FIX1654"
+      },
+      {
+        "id": 2,
+        "transaction_type": "topup",
+        "amount": "1000.00",
+        "service_charge": "0.00",
+        "balance_before": "370.00",
+        "balance_after": "1370.00",
+        "status": "success",
+        "source": "topup_jazzcash",
+        "tag_serial": "SER165424169081",
+        "reference_id": null,
+        "processed_at": "2026-08-20T21:54:24.660392+05:00",
+        "account_id": 1,
+        "plate_number": "FIX1654"
+      },
+      {
+        "id": 1,
+        "transaction_type": "toll_deduction",
+        "amount": "120.00",
+        "service_charge": "0.00",
+        "balance_before": "1370.00",
+        "balance_after": "1250.00",
+        "status": "success",
+        "source": "offline_exit_sync",
+        "tag_serial": "SER165424169081",
+        "reference_id": null,
+        "processed_at": "2026-08-20T21:54:24.658545+05:00",
+        "account_id": 1,
+        "plate_number": "FIX1654"
+      }
+    ],
+    "generated_at": "2026-08-20T16:54:24.687962Z"
+  }
+}

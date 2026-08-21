@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The toll LAN has no TLS at all. `config.settings.lan` deliberately sets
+         SESSION_COOKIE_SECURE = False for exactly this reason, so without cleartext the
+         browser/OS discards the session cookie: login returns 200, the cookie never
+         lands, and the next request is anonymous — which the UI reports as "invalid
+         phone number or password".
+
+         Present in the FLAVOUR, not the debug build type, because operators test the
+         LAN with release builds. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

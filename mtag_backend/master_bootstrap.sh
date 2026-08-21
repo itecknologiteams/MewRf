@@ -32,7 +32,7 @@ req DB_PASSWORD
 req ALLOWED_HOST
 
 DB_NAME="${DB_NAME:-master_tag_db}"
-DB_USER="${DB_USER:-postgres}"
+DB_USER="${DB_USER:-rfid}"        # application role, NOT a superuser
 CORS_ORIGINS="${CORS_ORIGINS:-}"
 
 echo "=== Master bootstrap — db=$DB_NAME host=$ALLOWED_HOST ==="
@@ -77,6 +77,26 @@ pip install -q -r requirements.txt
 # Generated inline rather than copied from a template: master's values are few
 # and specific, and an existing SECRET_KEY must survive a re-deploy.
 echo "--- writing .env ---"
+# This file is rewritten wholesale, so anything set by hand on master and not
+# named here is lost. Carry the credentials forward explicitly: a redeploy that
+# silently blanked JAZZCASH_* would take payments down with no error anywhere,
+# and the same now applies to the FCM keys.
+# `|| true` — a missing key makes grep exit 1, which under `set -e` would abort
+# the deploy inside the command substitution.
+old_env() { [ -f .env ] && { grep -aE "^$1=" .env | tail -1 | cut -d= -f2- || true; } || true; }
+OLD_JAZZCASH_MERCHANT_ID="$(old_env JAZZCASH_MERCHANT_ID)"
+OLD_JAZZCASH_PASSWORD="$(old_env JAZZCASH_PASSWORD)"
+OLD_JAZZCASH_INTEGRITY_SALT="$(old_env JAZZCASH_INTEGRITY_SALT)"
+OLD_JAZZCASH_RETURN_URL="$(old_env JAZZCASH_RETURN_URL)"
+OLD_FCM_PROJECT_ID="$(old_env FCM_PROJECT_ID)"
+OLD_FCM_CREDENTIALS_FILE="$(old_env FCM_CREDENTIALS_FILE)"
+OLD_USER_SELF_REGISTRATION_ENABLED="$(old_env USER_SELF_REGISTRATION_ENABLED)"
+: "${OLD_USER_SELF_REGISTRATION_ENABLED:=False}"
+OLD_OTP_PUSH_TO_REQUESTING_DEVICE="$(old_env OTP_PUSH_TO_REQUESTING_DEVICE)"
+: "${OLD_OTP_PUSH_TO_REQUESTING_DEVICE:=False}"
+OLD_OTP_PUSH_SUPPRESSES_SMS="$(old_env OTP_PUSH_SUPPRESSES_SMS)"
+: "${OLD_OTP_PUSH_SUPPRESSES_SMS:=False}"
+
 if [ -f .env ] && grep -q '^SECRET_KEY=..*' .env; then
   SECRET_KEY="$(grep '^SECRET_KEY=' .env | head -1 | cut -d= -f2-)"
   echo "    (reusing existing SECRET_KEY)"
@@ -88,6 +108,9 @@ fi
 cat > .env <<ENV
 DJANGO_SETTINGS_MODULE=config.settings.lan
 SECRET_KEY=${SECRET_KEY}
+# ALLOWED_HOST may be a comma-separated list (public,LAN) — it is spliced in as-is.
+# Master answers on both interfaces and a missing entry makes Django 400 every
+# request from that address before any view or CORS rule runs.
 ALLOWED_HOSTS=localhost,127.0.0.1,${ALLOWED_HOST}
 CORS_ALLOWED_ORIGINS=${CORS_ORIGINS}
 
@@ -112,63 +135,225 @@ MASTER_DB_PASSWORD=${DB_PASSWORD}
 # against itself.
 ANPR_GATE_ENABLED=False
 
-JAZZCASH_MERCHANT_ID=
-JAZZCASH_PASSWORD=
-JAZZCASH_INTEGRITY_SALT=
-JAZZCASH_RETURN_URL=
+JAZZCASH_MERCHANT_ID=${OLD_JAZZCASH_MERCHANT_ID}
+JAZZCASH_PASSWORD=${OLD_JAZZCASH_PASSWORD}
+JAZZCASH_INTEGRITY_SALT=${OLD_JAZZCASH_INTEGRITY_SALT}
+JAZZCASH_RETURN_URL=${OLD_JAZZCASH_RETURN_URL}
+
+# Push notifications (FCM HTTP v1). Blank on a LAN-only deployment, where every
+# send is skipped and /notifications/status/ reports push_available=false.
+# FCM_CREDENTIALS_FILE is a PATH to the service-account JSON, never the key.
+FCM_PROJECT_ID=${OLD_FCM_PROJECT_ID}
+FCM_CREDENTIALS_FILE=${OLD_FCM_CREDENTIALS_FILE}
+
+# Anonymous self-registration. Off unless it was already on — that endpoint has
+# no phone verification, so enabling it lets anyone create users against numbers
+# they do not own.
+USER_SELF_REGISTRATION_ENABLED=${OLD_USER_SELF_REGISTRATION_ENABLED}
+
+# ── OTP delivery ─────────────────────────────────────────────────────────────
+# Both listed here so a deploy PRESERVES them. This file is rewritten wholesale on
+# every run, and only keys named in this template survive — a value appended by hand
+# is silently dropped on the next deploy, which is exactly how dev OTP push stopped
+# working after appearing to have been configured correctly.
+#
+# DEVELOPMENT ONLY. Delivers the code to whatever device asked for it, which in
+# production is a one-step account takeover: nothing about the request proves the
+# caller's handset belongs to the number they typed. config.settings.production
+# refuses to boot with it on.
+OTP_PUSH_TO_REQUESTING_DEVICE=${OLD_OTP_PUSH_TO_REQUESTING_DEVICE}
+
+# Skip the SMS when a push demonstrably reached a device already bound to the
+# account. Off by default: a bound device may be one the holder no longer carries,
+# and there is no password reset without an OTP.
+OTP_PUSH_SUPPRESSES_SMS=${OLD_OTP_PUSH_SUPPRESSES_SMS}
 ENV
 
 # ── 3. Local Postgres ─────────────────────────────────────────────────────
 echo "--- configuring Postgres ---"
 
-# `sudo -u postgres psql` only works when pg_hba.conf grants the postgres OS
-# user peer/trust on the local socket. On a host configured for md5/scram it
-# prompts for a password instead and the deploy dies here. So: prefer a TCP
-# connection with the password we were given, and fall back to peer only if
-# that fails (first-ever bootstrap, before any password is set).
-psql_admin() {
-  if PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres        -tAc 'SELECT 1' >/dev/null 2>&1; then
-    PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" "$@"
-  else
-    sudo -u postgres psql "$@"
-  fi
-}
+# Two DISTINCT roles, deliberately not the same one:
+#
+#   DB_ADMIN_USER  a superuser (postgres) used only for cluster-level DDL here:
+#                  creating the app role and the database. Never written to .env.
+#   DB_USER        the application role (RFID). Owns master_tag_db, and is what
+#                  Django on master and every booth actually connects as.
+#
+# Keeping them apart means booths hold credentials that cannot create or drop
+# databases, cannot touch other databases, and cannot alter roles — while the
+# superuser password never leaves this machine.
+DB_ADMIN_USER="${DB_ADMIN_USER:-postgres}"
 
-if PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres \
-     -tAc 'SELECT 1' >/dev/null 2>&1; then
-  # The credentials already work. Do NOT run ALTER USER: rotating master's
-  # password silently breaks every booth whose .env carries the old one, and
-  # booths only discover it when a vehicle is already at the barrier.
-  echo "    ${DB_USER} password already valid — leaving it unchanged"
-else
-  echo "!!! ${DB_USER} cannot authenticate with the configured DB_PASSWORD." >&2
-  echo "!!!   Setting it now. EVERY BOOTH's MASTER_DB_PASSWORD must match this," >&2
-  echo "!!!   or its sync will fail to reach master." >&2
-  if [ "$DB_USER" = "postgres" ]; then
-    sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
-  else
-    sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
-      sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
-  fi
+# Role names are CASE-SENSITIVE once quoted, and every identifier below is
+# quoted — so DB_USER is used verbatim. This deployment's role is lower-case
+# `rfid`, which is exactly what an unquoted `CREATE USER RFID` produces, since
+# Postgres folds unquoted identifiers to lower case. Passing "RFID" here would
+# look for a different role and fail with `role "RFID" does not exist`.
+# Reaching Postgres as a superuser is done two ways, in this order, because
+# masters differ in how pg_hba.conf is set up:
+#
+#   1. sudo -u postgres psql   works when pg_hba grants the postgres OS user
+#                              peer/trust on the local socket.
+#   2. TCP with a password     needed when pg_hba requires md5/scram even
+#                              locally — which is how THIS master is configured:
+#                              `sudo -u postgres psql` there prompts
+#                              "Password for user postgres:" and hangs.
+#
+# -w on every attempt is what makes this safe to probe: psql then fails instead
+# of stopping to prompt, so detection is deterministic and a wrong guess cannot
+# leave the deploy waiting on a terminal.
+ADMIN_MODE=""
+if sudo -n -u "$DB_ADMIN_USER" psql -w -tAc 'SELECT 1' >/dev/null 2>&1; then
+  ADMIN_MODE="peer"
+elif [ -n "${DB_ADMIN_PASSWORD:-}" ] && \
+     PGPASSWORD="$DB_ADMIN_PASSWORD" psql -w -h localhost -U "$DB_ADMIN_USER" \
+       -d postgres -tAc 'SELECT 1' >/dev/null 2>&1; then
+  ADMIN_MODE="tcp"
 fi
 
-psql_admin -lqt | cut -d '|' -f1 | grep -qw "${DB_NAME}" || \
-  PGPASSWORD="$DB_PASSWORD" createdb -h localhost -U "$DB_USER" -O "${DB_USER}" "${DB_NAME}" 2>/dev/null || \
-  sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+psql_super() {
+  case "$ADMIN_MODE" in
+    peer) sudo -n -u "$DB_ADMIN_USER" psql -w -v ON_ERROR_STOP=1 "$@" ;;
+    tcp)  PGPASSWORD="$DB_ADMIN_PASSWORD" psql -w -h localhost \
+            -U "$DB_ADMIN_USER" -v ON_ERROR_STOP=1 "$@" ;;
+  esac
+}
+
+if [ -z "$ADMIN_MODE" ]; then
+  echo "!!! Cannot reach Postgres as the $DB_ADMIN_USER superuser." >&2
+  echo "!!!   Tried: sudo -u $DB_ADMIN_USER psql (peer/trust), and a TCP" >&2
+  echo "!!!   connection with DB_ADMIN_PASSWORD${DB_ADMIN_PASSWORD:+ (which was set)}." >&2
+  echo "!!!" >&2
+  echo "!!!   Superuser access is needed to create the ${DB_USER} role and" >&2
+  echo "!!!   ${DB_NAME}. Either set DB_ADMIN_PASSWORD in deploy_master.sh to" >&2
+  echo "!!!   the $DB_ADMIN_USER password, or grant the $DB_ADMIN_USER OS user" >&2
+  echo "!!!   peer access in pg_hba.conf." >&2
+  exit 1
+fi
+echo "    superuser access via ${ADMIN_MODE}"
+
+# Create the app role if absent; only set its password when it cannot already
+# authenticate. Rotating it unprompted would break every booth carrying the old
+# one, and booths discover that with a vehicle already at the barrier.
+if psql_super -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${DB_USER}'" | grep -q 1; then
+  if PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "$DB_USER" -d postgres \
+       -tAc 'SELECT 1' >/dev/null 2>&1; then
+    echo "    role ${DB_USER} exists and its password is valid — unchanged"
+  else
+    echo "!!! Role ${DB_USER} exists but cannot authenticate with DB_PASSWORD." >&2
+    echo "!!!   Resetting it. EVERY BOOTH's DB_PASSWORD/MASTER_DB_PASSWORD must" >&2
+    echo "!!!   match the new value or its gate stops working." >&2
+    psql_super -c "ALTER ROLE \"${DB_USER}\" WITH LOGIN PASSWORD '${DB_PASSWORD}';" >/dev/null
+  fi
+else
+  echo "    creating role ${DB_USER}"
+  # No CREATEDB/CREATEROLE/SUPERUSER: this role only needs to use its own
+  # database. Booths hold this password, so it is the one to keep unprivileged.
+  psql_super -c "CREATE ROLE \"${DB_USER}\" WITH LOGIN PASSWORD '${DB_PASSWORD}';" >/dev/null
+fi
+
+# Database, owned by the app role so Django can run migrations against it.
+if psql_super -lqt | cut -d '|' -f1 | grep -qw "${DB_NAME}"; then
+  echo "    database ${DB_NAME} exists"
+else
+  echo "    creating database ${DB_NAME} owned by ${DB_USER}"
+  psql_super -c "CREATE DATABASE \"${DB_NAME}\" OWNER \"${DB_USER}\";" >/dev/null
+fi
+
+# A database created earlier (by postgres) has postgres-owned tables, which the
+# app role can read but not ALTER — so migrations would fail partway. Move
+# ownership of the database and everything already in its public schema.
+echo "--- ensuring ${DB_USER} owns ${DB_NAME} and its objects ---"
+psql_super -c "ALTER DATABASE \"${DB_NAME}\" OWNER TO \"${DB_USER}\";" >/dev/null
+psql_super -d "${DB_NAME}" -q <<SQL
+GRANT ALL ON SCHEMA public TO "${DB_USER}";
+DO \$do\$
+DECLARE r record;
+BEGIN
+  -- Tables/views first. ALTER TABLE ... OWNER also moves any sequence the table
+  -- owns (serial/identity columns), which is why those must NOT be altered
+  -- directly: Postgres rejects that with "Sequence ... is linked to table ...",
+  -- and one such error would abort this whole block leaving nothing transferred.
+  FOR r IN SELECT c.relname, c.relkind FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m')
+  LOOP
+    EXECUTE format('ALTER %s public.%I OWNER TO %I',
+                   CASE r.relkind WHEN 'v' THEN 'VIEW'
+                                  WHEN 'm' THEN 'MATERIALIZED VIEW'
+                                  ELSE 'TABLE' END,
+                   r.relname, '${DB_USER}');
+  END LOOP;
+
+  -- Then only standalone sequences — ones no table column depends on.
+  FOR r IN SELECT c.relname FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'public' AND c.relkind = 'S'
+             AND NOT EXISTS (
+               SELECT 1 FROM pg_depend d
+               WHERE d.objid = c.oid
+                 AND d.classid = 'pg_class'::regclass
+                 AND d.deptype IN ('a','i')
+             )
+  LOOP
+    EXECUTE format('ALTER SEQUENCE public.%I OWNER TO %I', r.relname, '${DB_USER}');
+  END LOOP;
+END
+\$do\$;
+SQL
 
 # Booths reach this Postgres over the LAN, so it must listen beyond loopback.
 # Warn rather than edit postgresql.conf/pg_hba.conf — that is a security call.
-LISTEN="$(psql_admin -tAc 'SHOW listen_addresses' 2>/dev/null || echo '?')"
+LISTEN="$(psql_super -tAc 'SHOW listen_addresses' 2>/dev/null || echo '?')"
 if [ "$LISTEN" = "localhost" ] || [ "$LISTEN" = "127.0.0.1" ]; then
   echo "!!! WARNING: Postgres listen_addresses='${LISTEN}' — booths CANNOT reach it." >&2
   echo "!!!   Set listen_addresses='*' in postgresql.conf and add a pg_hba.conf" >&2
-  echo "!!!   line for the booth subnet, then restart postgresql." >&2
+  echo "!!!   line for the booth subnets granting ${DB_USER} access to ${DB_NAME}," >&2
+  echo "!!!   then restart postgresql. Booths are online-only: no link, no gate." >&2
 fi
 
 # ── 4. Migrate ────────────────────────────────────────────────────────────
 # Deliberately NOT followed by any TRUNCATE. Master owns plazas/lanes/rates/tags.
+
+# manage.py falls back to config.settings.local when the shell does not export
+# this. .env sets it, but .env is only read from inside the settings module —
+# far too late to pick which one loads. Without this, every command below ran
+# under dev settings: DEBUG on, and master_pg aliased to the local database.
+export DJANGO_SETTINGS_MODULE=config.settings.lan
+echo "--- settings module: $DJANGO_SETTINGS_MODULE ---"
+
+# The integer-PK refactor replaced the migration history. A database still
+# recording the old migrations cannot be migrated in place — Postgres cannot
+# cast uuid to bigint, and the replayed initials collide with existing tables.
+# Say so plainly instead of dying later on a confusing DuplicateColumn.
+echo "--- checking migration history ---"
+ORPHANS="$(python - <<'PY' 2>/dev/null || true
+import django
+django.setup()
+from django.db import connection
+from django.db.migrations.loader import MigrationLoader
+try:
+    loader = MigrationLoader(connection, ignore_no_migrations=True)
+    disk = set(loader.disk_migrations)
+    print("\n".join(f"{a}.{n}" for (a, n) in sorted(loader.applied_migrations)
+                    if (a, n) not in disk and a not in ("contenttypes", "auth",
+                        "admin", "sessions", "token_blacklist")))
+except Exception:
+    pass
+PY
+)"
+if [ -n "$ORPHANS" ]; then
+  echo "!!! This database records migrations that no longer exist in the code:" >&2
+  echo "$ORPHANS" | sed 's/^/!!!   /' >&2
+  echo "!!!" >&2
+  echo "!!! Master predates the integer-PK refactor and has no in-place upgrade" >&2
+  echo "!!! path. Back it up, drop ${DB_NAME}, recreate it and re-run this script." >&2
+  echo "!!! Every booth must then be redeployed with --recreate-db as well." >&2
+  exit 3
+fi
+
 echo "--- running migrations ---"
-python manage.py migrate
+python manage.py migrate --noinput
 
 echo "--- collecting static files (admin + DRF UI) ---"
 python manage.py collectstatic --noinput >/dev/null

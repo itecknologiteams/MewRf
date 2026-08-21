@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 2,
+      "plate_number": "BAR1654",
+      "entry_plaza_name": "Fixture Main Toll Plaza",
+      "exit_plaza_name": null,
+      "entry_time": "2026-08-20T21:54:24.669074+05:00",
+      "exit_time": null,
+      "charge_amount": null,
+      "balance_before": null,
+      "balance_after": null,
+      "status": "active",
+      "duration_minutes": null
+    }
+  ],
+  "meta": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "total_pages": 1,
+    "current_page": 1
+  }
+}

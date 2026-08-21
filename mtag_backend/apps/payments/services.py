@@ -194,7 +194,22 @@ class JazzCashService:
             'topup_id': str(topup.id),
         }
         payload['pp_SecureHash'] = _secure_hash(payload)
-        return {'success': True, 'topup_id': str(topup.id), 'jazzcash_payload': payload}
+
+        # pp_Password is a MERCHANT credential and must never leave the server.
+        # This payload is returned to the caller — a mobile app on a stranger's
+        # phone — so shipping it meant anyone who installed the app could read
+        # the merchant password out of a response body and transact as us. It
+        # still goes into the hash above, because that is computed here.
+        #
+        # Consequence: this payload is NOT a complete JazzCash Hosted Checkout
+        # form (which requires pp_Password). Flow B therefore cannot be finished
+        # by having the client POST this anywhere — the redirect leg has to be
+        # built server-side, which is the correct shape regardless. There is also
+        # no checkout URL in this response and JAZZCASH_VERIFY_HASH is off with
+        # the hashing formula unconfirmed, so Flow B is incomplete either way.
+        # See mtag_user_app/README.md § "What is stubbed".
+        client_payload = {k: v for k, v in payload.items() if k != 'pp_Password'}
+        return {'success': True, 'topup_id': str(topup.id), 'jazzcash_payload': client_payload}
 
     @staticmethod
     @db_transaction.atomic

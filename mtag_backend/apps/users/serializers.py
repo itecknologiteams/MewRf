@@ -51,6 +51,26 @@ class UserDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'uuid', 'created_at']
 
 
+class SelfProfileUpdateSerializer(serializers.ModelSerializer):
+    """What a user may change about THEMSELVES via PATCH /auth/me/.
+
+    UserDetailSerializer marks only id/uuid/created_at read-only, so it accepted
+    writes to `user_role` and `status` — and MeView.patch handed it request.data
+    directly. `PATCH /auth/me/ {"user_role": "admin"}` therefore promoted any tag
+    holder to admin, unlocking every /admin/* endpoint in the project. `status`
+    let a blocked account unblock itself, and `phone` is the USERNAME_FIELD, so
+    rewriting it took over login identity.
+
+    Admin role/status changes still go through UserDetailSerializer on
+    AdminUserDetailView, which is IsAdmin — that is the only place those fields
+    should ever be writable.
+    """
+
+    class Meta:
+        model = User
+        fields = ['full_name', 'cnic']
+
+
 class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

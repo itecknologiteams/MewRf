@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 1,
+      "from_plaza": 1,
+      "from_plaza_name": "Fixture Main Toll Plaza",
+      "from_plaza_display_id": "9001",
+      "to_plaza": 2,
+      "to_plaza_name": "Fixture Interchange",
+      "to_plaza_display_id": "9101",
+      "category": 901,
+      "category_name": "Car / Jeep / Taxi / Pickup",
+      "category_code": "car",
+      "fare": "100.00",
+      "created_at": "2026-08-20T21:54:24.648680+05:00",
+      "updated_at": "2026-08-20T21:54:24.648686+05:00"
+    },
+    {
+      "id": 3,
+      "from_plaza": 1,
+      "from_plaza_name": "Fixture Main Toll Plaza",
+      "from_plaza_display_id": "9001",
+      "to_plaza": 2,
+      "to_plaza_name": "Fixture Interchange",
+      "to_plaza_display_id": "9101",
+      "category": 905,
+      "category_name": "2 Axle Truck",
+      "category_code": "truck_2axle",
+      "fare": "350.00",
+      "created_at": "2026-08-20T21:54:24.653297+05:00",
+      "updated_at": "2026-08-20T21:54:24.653303+05:00"
+    },
+    {
+      "id": 2,
+      "from_plaza": 2,
+      "from_plaza_name": "Fixture Interchange",
+      "from_plaza_display_id": "9101",
+      "to_plaza": 1,
+      "to_plaza_name": "Fixture Main Toll Plaza",
+      "to_plaza_display_id": "9001",
+      "category": 901,
+      "category_name": "Car / Jeep / Taxi / Pickup",
+      "category_code": "car",
+      "fare": "120.00",
+      "created_at": "2026-08-20T21:54:24.652735+05:00",
+      "updated_at": "2026-08-20T21:54:24.652745+05:00"
+    }
+  ]
+}

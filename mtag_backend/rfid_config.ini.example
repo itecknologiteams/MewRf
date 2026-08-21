@@ -43,9 +43,19 @@ antenna_power = 20
 ; Seconds between reader inventory polls
 scan_interval = 1.0
 
-; Software RSSI filter — tags below this dBm are ignored (0 = disabled)
+; Software RSSI filter — accept a tag only while its signal sits inside this
+; band, in dBm (0 = disabled). Use it to reject adjacent-lane vehicles. A
+; stationary tag still wanders a few dB, so leave ~5 dB of margin below the
+; weakest reading you want to keep.
 rssi_filter = 0
 rssi_filter_max = 0
+
+; Jitter tolerance for the two thresholds above. The gate compares the median
+; of the last `rssi_window` reads of a tag, and a tag already accepted has to
+; fall `rssi_hysteresis` dB clear of the band before it is dropped. Both are
+; inert while rssi_filter and rssi_filter_max are 0.
+rssi_window = 5
+rssi_hysteresis = 3.0
 
 [barrier]
 ; Serial port the barrier controller is wired to on THIS machine

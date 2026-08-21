@@ -1,0 +1,58 @@
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "lib/l10n/generated/**"
+  errors:
+    # A missing localisation is a shipped English string inside an Urdu build.
+    missing_required_param: error
+    missing_return: error
+    todo: ignore
+
+linter:
+  rules:
+    # ── On, and load-bearing ─────────────────────────────────────────────────
+    # Money is Decimal and dates are DateTime; a dynamic call on either is how a
+    # balance silently becomes a double.
+    avoid_dynamic_calls: true
+    prefer_const_constructors: true
+
+    # ── Off, with reasons ────────────────────────────────────────────────────
+
+    # Every public member is documented where the documentation says something a
+    # reader could not get from the signature. Requiring a doc comment on all of
+    # them produces "/// The plate number." above `final String plateNumber;`,
+    # which is noise that trains people to skip doc comments.
+    public_member_api_docs: false
+
+    # 80 columns. This codebase explains WHY in prose above the code, and hard
+    # wrapping those paragraphs at 80 makes them harder to read, not easier.
+    lines_longer_than_80_chars: false
+
+    # Incompatible with Riverpod 3, not a style choice. `Provider.family<T, Arg>`
+    # returns `ProviderFamily`, which lives in riverpod's `lib/src` and is NOT
+    # exported by flutter_riverpod — so satisfying this rule requires either an
+    # `implementation_imports` violation or an un-writable type. The inferred type
+    # is correct and complete; the annotation is the thing that cannot be written.
+    specify_nonobvious_property_types: false
+    omit_obvious_property_types: false
+
+    # Doc comments deliberately reference names from other libraries — a serializer
+    # in the Django backend, a class this file does not import. Those references
+    # are the most useful part of the comment (they say where to go and verify),
+    # and importing a library purely so a doc comment resolves is worse.
+    comment_references: false
+
+    # Fire-and-forget is the correct shape for a UI callback: `onPressed:` returns
+    # void, and the alternative is `unawaited(...)` wrapped around every button in
+    # the app. Errors are handled inside the called methods, which is where the
+    # UI-facing failure state lives. `unawaited_futures` stays ON, so a dropped
+    # future inside an async function — where awaiting IS possible — still fails.
+    discarded_futures: false
+
+    # pubspec dependencies are grouped by purpose (state / routing / network /
+    # models / storage / platform) with a comment explaining each group. That
+    # ordering carries information; alphabetical does not.
+    sort_pub_dependencies: false

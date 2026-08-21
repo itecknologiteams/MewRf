@@ -1,0 +1,153 @@
+name: mtag_user_app
+description: >-
+  M-Tag User App — the consumer wallet for the M-Tag electronic toll collection
+  system on the Malir Expressway (Shahra-e-Bhutto), Karachi. Check balance, top
+  up, and review tags, trips and transactions.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ── State ───────────────────────────────────────────────────────────────────
+  # Riverpod 3, providers written by hand rather than generated with `@riverpod`.
+  #
+  # Not a preference — a resolvable-version problem as of this writing:
+  # riverpod_generator 4.x requires analyzer ^13, while json_serializable 6.x and
+  # freezed 3.x are pinned to analyzer 8–11. pub cannot satisfy both, so the choice
+  # is codegen for MODELS or codegen for PROVIDERS. Models win: there are ~20 DTOs
+  # whose fromJson/==/copyWith is pure boilerplate and a hand-written `==` that
+  # misses a field is a silently stale widget, whereas a hand-written provider is a
+  # few extra lines with nothing to get subtly wrong. Revisit when the analyzer
+  # constraints converge; the provider bodies port to `@riverpod` unchanged.
+  flutter_riverpod: ^3.4.2
+
+  # ── Routing ─────────────────────────────────────────────────────────────────
+  go_router: ^17.0.0
+
+  # ── Network ─────────────────────────────────────────────────────────────────
+  # The backend puts JWTs in httpOnly cookies (LoginView pops `access`/`refresh`
+  # out of the body and Set-Cookies them), so the client MUST be cookie-based —
+  # there is no token to attach to a header. PersistCookieJar keeps the session
+  # across restarts; see core/network/cookie_store.dart.
+  dio: ^5.7.0
+  dio_cookie_manager: ^3.1.1
+  cookie_jar: ^4.0.8
+  # SHA-256 for the prod flavour's certificate pins.
+  crypto: ^3.0.6
+
+  # ── Models ──────────────────────────────────────────────────────────────────
+  freezed_annotation: any
+  # Required by freezed's generated code (it emits @JsonKey). The
+  # json_serializable BUILDER is deliberately absent: see the `fromApi` note in
+  # core/models/user.dart — a generated parser cannot express this API's shape and
+  # would fail silently rather than loudly.
+  json_annotation: ^4.9.0
+  # Money is DecimalField server-side and arrives as a JSON string ("1250.00").
+  # `double` cannot represent 0.01 exactly, so it is never used for money here.
+  decimal: ^3.0.2
+
+  # ── Storage ─────────────────────────────────────────────────────────────────
+  # drift: the offline cache. Every write is stamped so the UI can state how old
+  # a cached balance is — a balance shown without its age is a lie.
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.26
+  path_provider: ^2.1.5
+  # The cookie-jar encryption key and the remembered phone. Never
+  # SharedPreferences for these.
+  flutter_secure_storage: ^9.2.4
+  # Non-sensitive UI preferences only (theme mode, locale).
+  shared_preferences: ^2.3.4
+
+  # ── Platform ────────────────────────────────────────────────────────────────
+  intl: any
+  # Opens the JazzCash app (the aggregator flow) and the support dialler — which IS
+  # this app's account-recovery path, since the backend has no password reset.
+  url_launcher: ^6.3.1
+  local_auth: ^2.3.0
+  package_info_plus: ^8.1.2
+  # ── Push ────────────────────────────────────────────────────────────────────
+  # Real-time money alerts. The SERVER decides what is worth notifying — a post_save
+  # signal on Transaction, sent on_commit — so the client only registers a token and
+  # reacts to what arrives. It never composes a notification from a local guess.
+  #
+  # Both packages are safe to ship WITHOUT a Firebase config file: the Gradle plugin is
+  # applied conditionally (see android/app/build.gradle.kts) and Firebase.initializeApp
+  # is guarded, so a build with no google-services.json runs with push simply
+  # unavailable rather than crashing on launch.
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
+  flutter_local_notifications: ^22.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  very_good_analysis: ^10.3.0
+  build_runner: ^2.4.14
+  freezed: any
+  drift_dev: ^2.22.1
+  mocktail: ^1.0.4
+  # Pinned floor, not decoration: pub happily resolved source_gen 3.1.0 alongside
+  # analyzer 8.4.1, where source_gen calls DartObjectImpl.getInvocation() — a method
+  # analyzer 8.4.1 removed. The build script then fails to COMPILE, which reads as
+  # "codegen is broken" rather than "two transitive deps disagree". source_gen 4.1+
+  # is the first line that supports analyzer 8.x properly.
+  source_gen: ^4.1.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  # Listed file by file, not as a directory. `assets/images/` would bundle every file in
+  # the folder — including design references dropped there — into every user's download.
+  assets:
+    # The trimmed derivatives are what the app renders. The supplied logo.png carries
+    # asymmetric transparent padding (271px left, 104px right), so centring it put the
+    # visible mark off-centre against centred text. Trimmed once at build-prep rather than
+    # nudged with an Offset at every call site.
+    - assets/images/logo_light.png
+    - assets/images/logo_dark.png
+
+  # Bundled, not fetched. google_fonts downloads at runtime, and these users are
+  # on patchy mobile data or a toll LAN with no internet at all — a font that
+  # fails to load takes the whole visual language with it.
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Nunito-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Nunito-Bold.ttf
+          weight: 700
+    # Nunito has no Arabic-script glyphs, so every Urdu string would render as
+    # tofu or as whatever the device happens to have — different on every phone,
+    # and absent on some. Bundled and wired as fontFamilyFallback so Urdu is
+    # deterministic. Naskh-style rather than Nastaliq deliberately: Nastaliq
+    # needs roughly 2x the line height and would break every card in the app.
+    # The TID, tag serials and plaza codes. Bundled rather than asking for the platform
+    # 'monospace' family: that resolves to whatever the OS ships (and to NOTHING in a
+    # widget test, where it rendered as tofu boxes), so the one string a customer retypes
+    # into a payment app was drawn in an unknown face. JetBrains Mono is chosen for its
+    # dotted zero — mistaking 0 for O in a TID credits a stranger's tag.
+    - family: Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/NotoSansArabic-Bold.ttf
+          weight: 700

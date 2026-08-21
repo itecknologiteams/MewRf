@@ -11,10 +11,11 @@ from utils.response import success_response, error_response
 from .models import Vehicle, Tag, TagStatus, UnregisteredInventory, UnregisteredInventoryStatus, TagActivation
 from .serializers import (
     VehicleSerializer, VehicleCreateSerializer, TagSerializer, TagReissueSerializer, normalize_plate,
+    MyVehicleSerializer,
     UnregisteredInventorySerializer, UnregisteredInventoryListSerializer, BoothAssignmentSerializer,
     TagActivationQuickCreateSerializer, TagActivationLinkExistingSerializer, TagActivationSerializer
 )
-from apps.users.permissions import IsOperator, IsAdmin
+from apps.users.permissions import IsOperator, IsAdmin, is_privileged, scope_to_owner
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +43,53 @@ class VehicleListCreateView(APIView):
         return error_response("Registration failed", errors=serializer.errors)
 
 
+class MyVehicleListView(APIView):
+    """GET /vehicles/my/ — everything the authenticated tag holder owns.
+
+    The consumer app's bootstrap call. `GET /vehicles/` is IsOperator, so before
+    this existed a tag holder had no way at all to enumerate their own vehicles:
+    they would have had to already know the ids they were looking for.
+
+    Vehicles with no tag are returned with tag=null rather than dropped — a tag
+    reissue in progress is exactly the state a worried holder opens the app to
+    check, so hiding the vehicle would be the wrong answer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        vehicles = (
+            Vehicle.objects
+            .select_related('tag', 'account')
+            .filter(owner=request.user)
+            .order_by('-registered_at')
+        )
+        return success_response(data=MyVehicleSerializer(vehicles, many=True).data)
+
+
 class VehicleDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         try:
-            vehicle = Vehicle.objects.select_related('tag', 'owner').get(pk=pk)
+            vehicle = scope_to_owner(
+                Vehicle.objects.select_related('tag', 'owner'), request.user
+            ).get(pk=pk)
             return success_response(data=VehicleSerializer(vehicle).data)
         except Vehicle.DoesNotExist:
             return error_response("Vehicle not found", status_code=404)
 
     def patch(self, request, pk):
+        # Editing a vehicle is an operator action, not a self-service one.
+        # vehicle_type IS the fare class, so a consumer allowed to patch their own
+        # vehicle could re-declare a 4-axle truck as a car and pay car fares — a
+        # revenue hole, not merely a data-integrity one. plate_number is equally
+        # load-bearing: it is what an ANPR dispute is resolved against.
+        if not is_privileged(request.user):
+            return error_response(
+                "Vehicle details can only be changed by an operator. "
+                "Contact support to correct your vehicle record.",
+                status_code=403,
+            )
         try:
             vehicle = Vehicle.objects.get(pk=pk)
             serializer = VehicleSerializer(vehicle, data=request.data, partial=True)
@@ -69,9 +106,9 @@ class VehicleByPlateView(APIView):
 
     def get(self, request, plate_number):
         try:
-            vehicle = Vehicle.objects.select_related('tag', 'owner').get(
-                plate_number=normalize_plate(plate_number)
-            )
+            vehicle = scope_to_owner(
+                Vehicle.objects.select_related('tag', 'owner'), request.user
+            ).get(plate_number=normalize_plate(plate_number))
             return success_response(data=VehicleSerializer(vehicle).data)
         except Vehicle.DoesNotExist:
             return error_response("Vehicle not found", status_code=404)

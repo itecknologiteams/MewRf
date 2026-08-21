@@ -9,22 +9,25 @@ class AccountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Account
-        fields = ['id', 'plate_number', 'vehicle_type', 'balance', 'balance_updated_at', 'created_at']
-        read_only_fields = ['id', 'plate_number', 'vehicle_type', 'balance', 'balance_updated_at', 'created_at']
+        fields = ['id', 'vehicle_id', 'plate_number', 'vehicle_type', 'balance',
+                  'balance_updated_at', 'created_at']
+        read_only_fields = fields
 
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
+        # `source` is exposed because a toll deduction taken at an offline booth
+        # reaches this table on the next 30s sync, so it can surface in history
+        # minutes after the trip. Without source the client cannot tell a
+        # late-arriving offline deduction from a real-time one, and would be
+        # implying the history is live when it isn't.
         fields = [
-            'id', 'transaction_type', 'amount',
+            'id', 'transaction_type', 'amount', 'service_charge',
             'balance_before', 'balance_after',
-            'status', 'tag_serial', 'reference_id', 'processed_at'
+            'status', 'source', 'tag_serial', 'reference_id', 'processed_at'
         ]
-        read_only_fields = [
-            'id', 'transaction_type', 'amount', 'balance_before',
-            'balance_after', 'status', 'tag_serial', 'reference_id', 'processed_at'
-        ]
+        read_only_fields = fields
 
 
 class TransferSerializer(serializers.Serializer):

@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 1,
+      "plaza_id": 9001,
+      "name": "Fixture Main Toll Plaza",
+      "latitude": "24.850000",
+      "longitude": "67.100000",
+      "is_active": true,
+      "lanes": []
+    },
+    {
+      "id": 2,
+      "plaza_id": 9101,
+      "name": "Fixture Interchange",
+      "latitude": null,
+      "longitude": null,
+      "is_active": true,
+      "lanes": []
+    }
+  ]
+}

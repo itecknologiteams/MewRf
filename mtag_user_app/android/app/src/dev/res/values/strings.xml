@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher label, per flavour, so a tester can tell a LAN build from a
+         production one on the home screen without opening it. -->
+    <string name="app_name">M-Tag dev</string>
+</resources>

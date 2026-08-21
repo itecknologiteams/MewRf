@@ -30,6 +30,14 @@ export default function Profile() {
   // Profile data
   const [profileData, setProfileData] = useState<MeResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const profileInitials =
+    (profileData?.full_name || user?.full_name || user?.name || 'User')
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase() || 'U';
   const [editName, setEditName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -205,22 +213,22 @@ export default function Profile() {
     <div className="animate-fade-in-up">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Profile & Wallet</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
+        <h1 className="text-2xl font-bold text-ink">Profile & Wallet</h1>
+        <p className="text-sm text-ink-muted mt-1">
           Manage your account and wallet balance
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-[var(--bg-elevated)] p-1 rounded-xl w-fit mb-6 border border-[var(--border-custom)]">
+      <div className="flex gap-1 bg-elevated p-1 rounded-xl w-fit mb-6 border border-line">
         {(['wallet', 'profile', 'security'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === tab
-                ? 'bg-[var(--accent-blue)] text-white shadow-sm'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                ? 'bg-brand text-brand-on'
+                : 'text-ink-muted hover:text-ink'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -236,7 +244,7 @@ export default function Profile() {
       {activeTab === 'wallet' && (
         <div className="space-y-6">
           {/* Balance Card */}
-          <div className="bg-gradient-to-br from-[var(--accent-blue)] to-[#6366F1] rounded-2xl p-8 text-white shadow-lg">
+          <div className="bg-gradient-to-br from-brand to-brand-strong rounded-2xl p-8 text-white shadow-lg">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
                 <p className="text-sm text-white/70 mb-1">Total Balance (All Vehicles)</p>
@@ -244,7 +252,7 @@ export default function Profile() {
                   {loadingAccounts ? (
                     <span className="text-2xl">Loading...</span>
                   ) : (
-                    <CountUp end={totalBalance} duration={1.5} prefix="PKR " separator="," decimals={2} />
+                    <CountUp end={totalBalance} duration={1.5} prefix="PKR" separator="," decimals={2} />
                   )}
                 </p>
                 <p className="text-xs text-white/50 mt-2">{accounts.length} account{accounts.length !== 1 ? 's' : ''}</p>
@@ -265,10 +273,10 @@ export default function Profile() {
 
           {/* Account Selector */}
           {accounts.length > 0 && (
-            <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-5 shadow-sm">
+            <div className="bg-surface border border-line rounded-xl skeu-card p-5">
               <div className="flex items-center gap-3 mb-4">
-                <Car className="w-5 h-5 text-[var(--accent-cyan)]" />
-                <h3 className="text-base font-semibold text-[var(--text-primary)]">Select Account</h3>
+                <Car className="w-5 h-5 text-info" />
+                <h3 className="text-base font-semibold text-ink">Select Account</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {accounts.map((account) => (
@@ -277,14 +285,14 @@ export default function Profile() {
                     onClick={() => setSelectedAccountId(account.id)}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       selectedAccountId === account.id
-                        ? 'bg-[var(--accent-blue)]/10 border-[var(--accent-blue)]/40'
-                        : 'bg-[var(--bg-elevated)] border-[var(--border-custom)] hover:border-[var(--accent-blue)]/20'
+                        ? 'bg-brand/10 border-brand/40'
+                        : 'bg-elevated border-line hover:border-brand/20'
                     }`}
                   >
-                    <p className="text-sm font-mono font-bold text-[var(--text-primary)]">{account.plate_number}</p>
-                    <p className="text-xs text-[var(--text-secondary)] capitalize mt-0.5">{account.vehicle_type}</p>
+                    <p className="text-sm font-mono font-bold text-ink">{account.plate_number}</p>
+                    <p className="text-xs text-ink-muted capitalize mt-0.5">{account.vehicle_type}</p>
                     <p className={`text-base font-semibold mt-2 ${
-                      selectedAccountId === account.id ? 'text-[var(--accent-blue)]' : 'text-[var(--text-primary)]'
+                      selectedAccountId === account.id ? 'text-brand' : 'text-ink'
                     }`}>
                       PKR {parseFloat(account.balance).toLocaleString()}
                     </p>
@@ -295,25 +303,25 @@ export default function Profile() {
           )}
 
           {/* Recharge Section */}
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
+          <div className="bg-surface border border-line rounded-xl skeu-card p-6">
             <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 bg-[var(--accent-emerald)]/10 rounded-lg">
-                <Zap className="w-5 h-5 text-[var(--accent-emerald)]" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <Zap className="w-5 h-5 text-success" />
               </div>
-              <h3 className="text-base font-semibold text-[var(--text-primary)]">Recharge Wallet</h3>
+              <h3 className="text-base font-semibold text-ink">Recharge Wallet</h3>
             </div>
 
             {accounts.length === 0 ? (
-              <p className="text-sm text-[var(--text-secondary)]">No accounts found. Register a vehicle first.</p>
+              <p className="text-sm text-ink-muted">No accounts found. Register a vehicle first.</p>
             ) : (
               <>
                 {accounts.length > 1 && (
                   <div className="mb-4">
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Recharge Account</label>
+                    <label className="block text-xs font-medium text-ink-muted mb-1.5">Recharge Account</label>
                     <select
                       value={selectedAccountId}
                       onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-emerald)]"
+                      className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink outline-none focus:border-success"
                     >
                       {accounts.map((a) => (
                         <option key={a.id} value={a.id}>
@@ -325,21 +333,21 @@ export default function Profile() {
                 )}
 
                 {selectedAccount && (
-                  <p className="text-sm text-[var(--text-secondary)] mb-4">
-                    Current balance: <span className="font-semibold text-[var(--text-primary)]">PKR {parseFloat(selectedAccount.balance).toLocaleString()}</span>
+                  <p className="text-sm text-ink-muted mb-4">
+                    Current balance: <span className="font-semibold text-ink">PKR {parseFloat(selectedAccount.balance).toLocaleString()}</span>
                   </p>
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative flex-1">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-secondary)]">PKR</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-ink-muted">PKR</span>
                     <input
                       type="number"
                       value={rechargeAmount}
                       onChange={(e) => setRechargeAmount(e.target.value)}
                       placeholder="Enter amount (min 100)"
                       min="100"
-                      className="w-full pl-14 pr-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-emerald)] focus:ring-2 focus:ring-[var(--accent-emerald)]/20 transition-all"
+                      className="w-full pl-14 pr-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-success focus:ring-2 focus:ring-success/20 transition-all"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -350,8 +358,8 @@ export default function Profile() {
                         onClick={() => setRechargeAmount(amount.toString())}
                         className={`px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
                           rechargeAmount === amount.toString()
-                            ? 'bg-[var(--accent-emerald)] text-white'
-                            : 'bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            ? 'bg-brand text-brand-on'
+                            : 'bg-elevated border border-line text-ink-muted hover:text-ink'
                         }`}
                       >
                         {amount.toLocaleString()}
@@ -361,7 +369,7 @@ export default function Profile() {
                   <button
                     onClick={handleRecharge}
                     disabled={isRecharging || !rechargeAmount || !selectedAccountId}
-                    className="px-6 py-3 bg-[var(--accent-emerald)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="px-6 py-3 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {isRecharging ? (
                       <>
@@ -382,50 +390,50 @@ export default function Profile() {
 
           {/* Topup History */}
           {selectedAccountId && (
-            <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-custom)]">
+            <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-line">
                 <div className="flex items-center gap-2">
-                  <History className="w-5 h-5 text-[var(--accent-blue)]" />
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Recharge History</h3>
+                  <History className="w-5 h-5 text-brand" />
+                  <h3 className="text-base font-semibold text-ink">Recharge History</h3>
                 </div>
                 <button
                   onClick={() => fetchTopupHistory(Number(selectedAccountId))}
-                  className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  className="text-sm text-ink-muted hover:text-ink transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
               </div>
               {loadingHistory ? (
                 <div className="flex items-center justify-center py-10">
-                  <Loader2 className="w-6 h-6 animate-spin text-[var(--accent-blue)]" />
+                  <Loader2 className="w-6 h-6 animate-spin text-brand" />
                 </div>
               ) : topupHistory.length === 0 ? (
-                <div className="px-6 py-10 text-center text-sm text-[var(--text-secondary)]">
+                <div className="px-6 py-10 text-center text-sm text-ink-muted">
                   No recharge history found
                 </div>
               ) : (
-                <div className="divide-y divide-[var(--border-custom)]">
+                <div className="divide-y divide-line">
                   {topupHistory.map((topup) => (
-                    <div key={topup.id} className="flex items-center justify-between px-6 py-4 hover:bg-[var(--bg-elevated)] transition-colors">
+                    <div key={topup.id} className="flex items-center justify-between px-6 py-4 hover:bg-elevated transition-colors">
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                           topup.status === 'completed'
-                            ? 'bg-[var(--accent-emerald)]/10'
+                            ? 'bg-success/10'
                             : topup.status === 'failed'
-                            ? 'bg-[var(--accent-rose)]/10'
-                            : 'bg-[var(--accent-amber)]/10'
+                            ? 'bg-danger/10'
+                            : 'bg-warning/10'
                         }`}>
                           <CreditCard className={`w-5 h-5 ${
                             topup.status === 'completed'
-                              ? 'text-[var(--accent-emerald)]'
+                              ? 'text-success'
                               : topup.status === 'failed'
-                              ? 'text-[var(--accent-rose)]'
-                              : 'text-[var(--accent-amber)]'
+                              ? 'text-danger'
+                              : 'text-warning'
                           }`} />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-[var(--text-primary)]">Wallet Recharge</p>
-                          <p className="text-xs text-[var(--text-secondary)]">
+                          <p className="text-sm font-medium text-ink">Wallet Recharge</p>
+                          <p className="text-xs text-ink-muted">
                             {new Date(topup.requested_at).toLocaleDateString('en-PK', {
                               day: 'numeric',
                               month: 'short',
@@ -437,15 +445,15 @@ export default function Profile() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-[var(--accent-emerald)]">
+                        <p className="text-sm font-semibold text-success">
                           +PKR {parseFloat(topup.amount).toLocaleString()}
                         </p>
                         <span className={`text-xs font-medium capitalize ${
                           topup.status === 'completed'
-                            ? 'text-[var(--accent-emerald)]'
+                            ? 'text-success'
                             : topup.status === 'failed'
-                            ? 'text-[var(--accent-rose)]'
-                            : 'text-[var(--accent-amber)]'
+                            ? 'text-danger'
+                            : 'text-warning'
                         }`}>
                           {topup.status}
                         </span>
@@ -461,68 +469,68 @@ export default function Profile() {
 
       {activeTab === 'security' && (
         <div className="max-w-md">
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm p-6">
+          <div className="bg-surface border border-line rounded-xl skeu-card p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 bg-[var(--accent-amber)]/10 rounded-lg">
-                <KeyRound className="w-5 h-5 text-[var(--accent-amber)]" />
+              <div className="p-2.5 bg-warning/10 rounded-lg">
+                <KeyRound className="w-5 h-5 text-warning" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-[var(--text-primary)]">Change Password</h3>
-                <p className="text-xs text-[var(--text-secondary)]">Use a strong password with 8+ characters</p>
+                <h3 className="text-base font-semibold text-ink">Change Password</h3>
+                <p className="text-xs text-ink-muted">Use a strong password with 8+ characters</p>
               </div>
             </div>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Current Password</label>
+                <label className="block text-sm font-medium text-ink mb-1.5">Current Password</label>
                 <div className="relative">
                   <input
                     type={showOld ? 'text' : 'password'}
                     value={pwForm.old_password}
                     onChange={(e) => setPwForm(f => ({ ...f, old_password: e.target.value }))}
                     placeholder="Enter current password"
-                    className="w-full px-4 py-3 pr-10 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-amber)] focus:ring-2 focus:ring-[var(--accent-amber)]/20 transition-all"
+                    className="w-full px-4 py-3 pr-10 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-warning focus:ring-2 focus:ring-warning/20 transition-all"
                   />
-                  <button type="button" onClick={() => setShowOld(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]">
+                  <button type="button" onClick={() => setShowOld(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle">
                     {showOld ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">New Password</label>
+                <label className="block text-sm font-medium text-ink mb-1.5">New Password</label>
                 <div className="relative">
                   <input
                     type={showNew ? 'text' : 'password'}
                     value={pwForm.new_password}
                     onChange={(e) => setPwForm(f => ({ ...f, new_password: e.target.value }))}
                     placeholder="Min 8 characters"
-                    className="w-full px-4 py-3 pr-10 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-amber)] focus:ring-2 focus:ring-[var(--accent-amber)]/20 transition-all"
+                    className="w-full px-4 py-3 pr-10 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-warning focus:ring-2 focus:ring-warning/20 transition-all"
                   />
-                  <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]">
+                  <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle">
                     {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Confirm New Password</label>
+                <label className="block text-sm font-medium text-ink mb-1.5">Confirm New Password</label>
                 <input
                   type="password"
                   value={pwForm.confirm}
                   onChange={(e) => setPwForm(f => ({ ...f, confirm: e.target.value }))}
                   placeholder="Repeat new password"
-                  className={`w-full px-4 py-3 bg-[var(--bg-elevated)] border rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:ring-2 transition-all ${
+                  className={`w-full px-4 py-3 bg-elevated border rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:ring-2 transition-all ${
                     pwForm.confirm && pwForm.confirm !== pwForm.new_password
-                      ? 'border-[var(--accent-rose)] focus:ring-[var(--accent-rose)]/20'
-                      : 'border-[var(--border-custom)] focus:border-[var(--accent-amber)] focus:ring-[var(--accent-amber)]/20'
+                      ? 'border-danger focus:ring-danger/20'
+                      : 'border-line focus:border-warning focus:ring-warning/20'
                   }`}
                 />
                 {pwForm.confirm && pwForm.confirm !== pwForm.new_password && (
-                  <p className="text-xs text-[var(--accent-rose)] mt-1">Passwords do not match</p>
+                  <p className="text-xs text-danger mt-1">Passwords do not match</p>
                 )}
               </div>
               <button
                 type="submit"
                 disabled={pwLoading || !pwForm.old_password || !pwForm.new_password || pwForm.new_password !== pwForm.confirm}
-                className="w-full py-3 bg-[var(--accent-amber)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-3 bg-warning/12 text-warning border border-warning/40 text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {pwLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
                 {pwLoading ? 'Updating…' : 'Update Password'}
@@ -534,82 +542,83 @@ export default function Profile() {
 
       {activeTab === 'profile' && (
         <div className="max-w-2xl">
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
             {/* Profile Header */}
-            <div className="relative h-32 bg-gradient-to-r from-[var(--accent-blue)] to-[#6366F1]">
+            <div className="relative h-32 bg-gradient-to-r from-brand to-brand-strong">
               <div className="absolute -bottom-12 left-6">
-                <img
-                  src="/avatar.jpg"
-                  alt="Profile"
-                  className="w-24 h-24 rounded-full object-cover border-4 border-[var(--bg-surface)] ring-2 ring-[var(--accent-blue)]/20"
-                />
+                <span
+                  aria-hidden="true"
+                  className="grid place-items-center w-24 h-24 rounded-full bg-elevated text-brand-ink dark:text-brand text-2xl font-bold border-4 border-surface ring-2 ring-brand/35"
+                >
+                  {profileInitials}
+                </span>
               </div>
             </div>
             <div className="pt-16 px-6 pb-6">
               {loadingProfile ? (
                 <div className="flex items-center gap-3">
-                  <Loader2 className="w-5 h-5 animate-spin text-[var(--accent-blue)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">Loading profile...</span>
+                  <Loader2 className="w-5 h-5 animate-spin text-brand" />
+                  <span className="text-sm text-ink-muted">Loading profile...</span>
                 </div>
               ) : (
                 <>
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">{profileData?.full_name}</h2>
-                  <p className="text-sm text-[var(--text-secondary)] capitalize">{profileData?.user_role} Account</p>
+                  <h2 className="text-xl font-bold text-ink">{profileData?.full_name}</h2>
+                  <p className="text-sm text-ink-muted capitalize">{profileData?.user_role} Account</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6">
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-[var(--bg-elevated)] rounded-lg">
-                        <Shield className="w-4 h-4 text-[var(--accent-blue)]" />
+                      <div className="p-2 bg-elevated rounded-lg">
+                        <Shield className="w-4 h-4 text-brand" />
                       </div>
                       <div>
-                        <p className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">CNIC</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{profileData?.cnic || '—'}</p>
+                        <p className="text-xs text-ink-muted uppercase tracking-wider">CNIC</p>
+                        <p className="text-sm font-medium text-ink">{profileData?.cnic || '—'}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-[var(--bg-elevated)] rounded-lg">
-                        <Phone className="w-4 h-4 text-[var(--accent-cyan)]" />
+                      <div className="p-2 bg-elevated rounded-lg">
+                        <Phone className="w-4 h-4 text-info" />
                       </div>
                       <div>
-                        <p className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">Phone</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{profileData?.phone || '—'}</p>
+                        <p className="text-xs text-ink-muted uppercase tracking-wider">Phone</p>
+                        <p className="text-sm font-medium text-ink">{profileData?.phone || '—'}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-[var(--bg-elevated)] rounded-lg">
-                        <Wallet className="w-4 h-4 text-[var(--accent-amber)]" />
+                      <div className="p-2 bg-elevated rounded-lg">
+                        <Wallet className="w-4 h-4 text-warning" />
                       </div>
                       <div>
-                        <p className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">Total Balance</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">PKR {totalBalance.toLocaleString()}</p>
+                        <p className="text-xs text-ink-muted uppercase tracking-wider">Total Balance</p>
+                        <p className="text-sm font-medium text-ink">PKR {totalBalance.toLocaleString()}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-[var(--bg-elevated)] rounded-lg">
-                        <Car className="w-4 h-4 text-[var(--accent-emerald)]" />
+                      <div className="p-2 bg-elevated rounded-lg">
+                        <Car className="w-4 h-4 text-success" />
                       </div>
                       <div>
-                        <p className="text-xs text-[var(--text-secondary)] uppercase tracking-wider">Vehicles</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{vehicles.length} registered</p>
+                        <p className="text-xs text-ink-muted uppercase tracking-wider">Vehicles</p>
+                        <p className="text-sm font-medium text-ink">{vehicles.length} registered</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Edit Name */}
-                  <div className="mt-6 pt-6 border-t border-[var(--border-custom)]">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Edit Profile</h3>
+                  <div className="mt-6 pt-6 border-t border-line">
+                    <h3 className="text-sm font-semibold text-ink mb-4">Edit Profile</h3>
                     <div className="flex gap-3">
                       <input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         placeholder="Full name"
-                        className="flex-1 px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+                        className="flex-1 px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                       />
                       <button
                         onClick={handleSaveProfile}
                         disabled={isSavingProfile || !editName.trim()}
-                        className="flex items-center gap-2 px-5 py-3 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                        className="flex items-center gap-2 px-5 py-3 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
                       >
                         {isSavingProfile ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -622,20 +631,20 @@ export default function Profile() {
                   </div>
 
                   {/* Account Statistics */}
-                  <div className="mt-6 pt-6 border-t border-[var(--border-custom)]">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Account Statistics</h3>
+                  <div className="mt-6 pt-6 border-t border-line">
+                    <h3 className="text-sm font-semibold text-ink mb-4">Account Statistics</h3>
                     <div className="grid grid-cols-3 gap-4">
-                      <div className="bg-[var(--bg-elevated)] rounded-xl p-4 text-center">
-                        <p className="text-xl font-bold text-[var(--accent-blue)]">{vehicles.length}</p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">Vehicles</p>
+                      <div className="bg-elevated rounded-xl p-4 text-center">
+                        <p className="text-xl font-bold text-brand">{vehicles.length}</p>
+                        <p className="text-xs text-ink-muted mt-1">Vehicles</p>
                       </div>
-                      <div className="bg-[var(--bg-elevated)] rounded-xl p-4 text-center">
-                        <p className="text-xl font-bold text-[var(--accent-emerald)]">{accounts.length}</p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">Accounts</p>
+                      <div className="bg-elevated rounded-xl p-4 text-center">
+                        <p className="text-xl font-bold text-success">{accounts.length}</p>
+                        <p className="text-xs text-ink-muted mt-1">Accounts</p>
                       </div>
-                      <div className="bg-[var(--bg-elevated)] rounded-xl p-4 text-center">
-                        <p className="text-xl font-bold text-[var(--accent-cyan)] capitalize">{profileData?.status || '—'}</p>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">Status</p>
+                      <div className="bg-elevated rounded-xl p-4 text-center">
+                        <p className="text-xl font-bold text-info capitalize">{profileData?.status || '—'}</p>
+                        <p className="text-xs text-ink-muted mt-1">Status</p>
                       </div>
                     </div>
                   </div>

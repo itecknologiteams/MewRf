@@ -2,9 +2,11 @@ from django.urls import path
 from .views import (
     AccountDetailView, TransactionListView, AdminAccountListView, TransferView,
     OperatorTopupView, PlateTopupView, TopupLookupView, CashTopupView,
+    MyAccountSummaryView,
 )
 
 urlpatterns = [
+    path('my/summary/', MyAccountSummaryView.as_view(), name='my-account-summary'),
     path('vehicle/<int:vehicle_id>/', AccountDetailView.as_view(), name='account-detail'),
     path('<int:account_id>/transactions/', TransactionListView.as_view(), name='transaction-list'),
     path('admin/all/', AdminAccountListView.as_view(), name='admin-accounts'),

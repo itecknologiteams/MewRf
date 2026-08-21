@@ -143,11 +143,40 @@
         },
 
         {
+          "name": "My Vehicles (consumer bootstrap)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.length) {",
+                  "    pm.collectionVariables.set('vehicle_id', res.data[0].id);",
+                  "    if (res.data[0].account_id) {",
+                  "        pm.collectionVariables.set('account_id', res.data[0].account_id);",
+                  "    }",
+                  "    console.log('vehicle_id / account_id saved from /vehicles/my/');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/vehicles/my/", "host": ["{{base_url}}"], "path": ["api","v1","vehicles","my",""] },
+            "description": "IsAuthenticated. The M-Tag User App's bootstrap call: every vehicle the caller owns, each with its tag (tid/epc included), account_id and balance. GET /api/v1/vehicles/ is IsOperator, so a consumer must use this."
+          }
+        },
+
+        {
           "name": "Vehicle by Plate Number",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/vehicles/plate/ABC-123/", "host": ["{{base_url}}"], "path": ["api","v1","vehicles","plate","ABC-123",""] }
+            "url": { "raw": "{{base_url}}/api/v1/vehicles/plate/ABC-123/", "host": ["{{base_url}}"], "path": ["api","v1","vehicles","plate","ABC-123",""] },
+            "description": "Scoped to the caller's own vehicles for role=user; operators and admins see any plate. A plate you do not own returns 404, not 403."
           }
         },
 
@@ -198,6 +227,16 @@
     {
       "name": "3. Accounts & Balance",
       "item": [
+
+        {
+          "name": "My Summary (consumer dashboard)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/accounts/my/summary/", "host": ["{{base_url}}"], "path": ["api","v1","accounts","my","summary",""] },
+            "description": "One call for the consumer dashboard: total_balance (a SUM across per-vehicle wallets, not a user balance), account/vehicle/tag counts, month-to-date tolls, every account, and the 10 most recent transactions across all of them."
+          }
+        },
 
         {
           "name": "Account Detail (by Vehicle)",

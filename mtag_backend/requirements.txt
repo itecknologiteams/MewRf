@@ -18,3 +18,8 @@ pyusb==1.3.1
 six==1.17.0
 gmssl==3.2.2
 hid==1.0.9
+
+# FCM HTTP v1 push. The legacy server-key API was shut down by Google in June 2024, so v1 +
+# a service account is the only working path — and that needs OAuth2 token minting.
+google-auth==2.56.3
+drf-spectacular>=0.30.0

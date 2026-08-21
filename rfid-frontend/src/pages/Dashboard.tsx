@@ -133,8 +133,8 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-[var(--accent-blue)]" />
-          <p className="text-sm text-[var(--text-secondary)]">Loading dashboard...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-brand" />
+          <p className="text-sm text-ink-muted">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -145,24 +145,24 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
+          <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
+          <p className="text-sm text-ink-muted mt-1">
             Welcome back, {user?.full_name || user?.name || 'User'}
           </p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => navigate('/register')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             Add Vehicle
           </button>
           <button
             onClick={() => navigate('/topup')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-elevated border border-line text-ink text-sm font-medium rounded-xl hover:bg-surface transition-colors"
           >
-            <Zap className="w-4 h-4 text-[var(--accent-amber)]" />
+            <Zap className="w-4 h-4 text-warning" />
             Topup
           </button>
         </div>
@@ -173,20 +173,20 @@ export default function Dashboard() {
         {kpiCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.title} className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-5 shadow-sm hover:shadow-md hover:border-[var(--accent-blue)]/30 transition-all duration-300">
+            <div key={card.title} className="bg-surface border border-line rounded-xl skeu-card skeu-lift p-5 hover:border-brand/30 transition-all duration-300">
               <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 rounded-lg" style={{ backgroundColor: `${card.color}15` }}>
+                <div className="p-2.5 rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${card.color} 12%, transparent)` }}>
                   <Icon className="w-5 h-5" style={{ color: card.color }} />
                 </div>
-                <div className="flex items-center gap-1 text-xs font-medium text-[var(--accent-emerald)]">
+                <div className="flex items-center gap-1 text-xs font-medium text-success">
                   <ArrowUpRight className="w-3.5 h-3.5" />
                   {card.change}
                 </div>
               </div>
-              <p className="text-2xl font-bold text-[var(--text-primary)]">
+              <p className="text-2xl font-bold text-ink">
                 <CountUp end={card.value} duration={2} prefix={card.prefix} suffix={card.suffix} separator="," />
               </p>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">{card.title}</p>
+              <p className="text-sm text-ink-muted mt-1">{card.title}</p>
             </div>
           );
         })}
@@ -195,10 +195,10 @@ export default function Dashboard() {
       {/* Charts — admin only, driven by real stats */}
       {isAdmin && stats && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
+          <div className="lg:col-span-2 bg-surface border border-line rounded-xl skeu-card p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-base font-semibold text-[var(--text-primary)]">Monthly Toll Collection</h3>
-              <span className="text-xs text-[var(--accent-emerald)] bg-[var(--accent-emerald)]/10 px-3 py-1 rounded-full">
+              <h3 className="text-base font-semibold text-ink">Monthly Toll Collection</h3>
+              <span className="text-xs text-success bg-success/10 px-3 py-1 rounded-full">
                 Live Data
               </span>
             </div>
@@ -234,10 +234,10 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
+          <div className="bg-surface border border-line rounded-xl skeu-card p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-base font-semibold text-[var(--text-primary)]">Daily Transactions</h3>
-              <span className="text-xs text-[var(--text-secondary)] bg-[var(--bg-elevated)] px-3 py-1 rounded-full">
+              <h3 className="text-base font-semibold text-ink">Daily Transactions</h3>
+              <span className="text-xs text-ink-muted bg-elevated px-3 py-1 rounded-full">
                 This Week
               </span>
             </div>
@@ -262,12 +262,12 @@ export default function Dashboard() {
       )}
 
       {/* Recent Trips */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-custom)]">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">Recent Trips</h3>
+      <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-line">
+          <h3 className="text-base font-semibold text-ink">Recent Trips</h3>
           <button
             onClick={() => navigate('/trips')}
-            className="text-sm text-[var(--accent-blue)] hover:underline"
+            className="text-sm text-brand hover:underline"
           >
             View All
           </button>
@@ -275,33 +275,33 @@ export default function Dashboard() {
         <div className="overflow-x-auto">
           {recentTrips.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <Receipt className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-3" />
-              <p className="text-sm text-[var(--text-secondary)]">No trips found</p>
+              <Receipt className="w-10 h-10 text-ink-subtle mx-auto mb-3" />
+              <p className="text-sm text-ink-muted">No trips found</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="bg-[var(--bg-elevated)]">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Plate</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Entry Plaza</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Exit Plaza</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Entry Time</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Charge</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Status</th>
+                <tr className="bg-elevated">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Plate</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Entry Plaza</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Exit Plaza</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Entry Time</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Charge</th>
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {recentTrips.map((trip, index) => (
                   <tr
                     key={trip.id}
-                    className={`border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)] transition-all duration-200 ${
+                    className={`border-b border-line hover:bg-elevated transition-all duration-200 ${
                       index === 0 ? 'animate-stream-in' : ''
                     }`}
                   >
-                    <td className="px-6 py-4 text-sm font-mono text-[var(--text-primary)]">{trip.plate_number}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-primary)]">{trip.entry_plaza_name}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{trip.exit_plaza_name || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                    <td className="px-6 py-4 text-sm font-mono text-ink">{trip.plate_number}</td>
+                    <td className="px-6 py-4 text-sm text-ink">{trip.entry_plaza_name}</td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">{trip.exit_plaza_name || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">
                       {new Date(trip.entry_time).toLocaleDateString('en-PK', {
                         day: 'numeric',
                         month: 'short',
@@ -309,17 +309,17 @@ export default function Dashboard() {
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-[var(--text-primary)] text-right">
+                    <td className="px-6 py-4 text-sm font-semibold text-ink text-right">
                       {trip.charge_amount ? `PKR ${parseFloat(trip.charge_amount).toLocaleString()}` : '—'}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
                           trip.status === 'completed'
-                            ? 'bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)] border-[var(--accent-emerald)]/20'
+                            ? 'bg-success/10 text-success border-success/20'
                             : trip.status === 'active'
-                            ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border-[var(--accent-blue)]/20'
-                            : 'bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] border-[var(--accent-rose)]/20'
+                            ? 'bg-brand/10 text-brand border-brand/20'
+                            : 'bg-danger/10 text-danger border-danger/20'
                         }`}
                       >
                         {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}

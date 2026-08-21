@@ -1,0 +1,606 @@
+{
+  "@@locale": "en",
+  "appName": "M-Tag",
+  "appTagline": "Malir Expressway",
+  "actionRetry": "Retry",
+  "actionCancel": "Cancel",
+  "actionClose": "Close",
+  "actionDone": "Done",
+  "actionSave": "Save",
+  "actionCopy": "Copy",
+  "actionCopied": "Copied",
+  "actionViewAll": "View all",
+  "actionTopUp": "Top Up",
+  "actionRefresh": "Refresh",
+  "actionCallSupport": "Call support",
+  "actionNotNow": "Not now",
+  "actionContinue": "Continue",
+  "actionBack": "Back",
+  "navHome": "Home",
+  "navTags": "Tags",
+  "navActivity": "Activity",
+  "navProfile": "Profile",
+  "loginTitle": "Welcome back",
+  "loginSubtitle": "Sign in to your M-Tag account",
+  "loginPhoneLabel": "Phone number",
+  "loginPhoneHint": "03XX XXX XXXX",
+  "loginPasswordLabel": "Password",
+  "loginPasswordHint": "Enter your password",
+  "loginSubmit": "Sign in",
+  "loginRememberPhone": "Remember my number",
+  "loginPhoneRequired": "Enter your phone number",
+  "loginPhoneInvalid": "Enter a valid Pakistani mobile number, e.g. 0300 123 4567",
+  "loginPasswordRequired": "Enter your password",
+  "loginForgotPassword": "Forgotten your password?",
+  "loginForgotPasswordBody": "There is no self-service password reset yet. Call support on {phone} and they will help you sign in.",
+  "@loginForgotPasswordBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "loginBlockedTitle": "This account is blocked",
+  "loginBlockedBody": "Your M-Tag account has been blocked. Call support on {phone} to have it reviewed — signing in again will not help until it is unblocked.",
+  "@loginBlockedBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "loginThrottledTitle": "Too many attempts",
+  "loginThrottledBody": "You can try again in {seconds} seconds.",
+  "@loginThrottledBody": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "loginNoAccountTitle": "Do not have an account?",
+  "loginNoAccountBody": "M-Tag accounts are created at a toll booth when your tag is fitted. Visit any plaza with your CNIC and vehicle registration.",
+  "splashChecking": "Checking your session",
+  "splashOfflineTitle": "Cannot reach M-Tag",
+  "splashOfflineBody": "You are still signed in — we just could not reach the server. Check your connection and try again.",
+  "staffAccountTitle": "This is a staff account",
+  "staffAccountBody": "{name} is an {role} account. This app is for tag holders. Use the operator portal for booth and admin work.",
+  "@staffAccountBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "staffAccountSignOut": "Sign in with a different account",
+  "dashboardGreeting": "Hello, {name}",
+  "@dashboardGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardTotalAcrossTags": "{count, plural, =0{No tags yet} =1{Balance on 1 tag} other{Total across {count} tags}}",
+  "@dashboardTotalAcrossTags": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardTotalIsASum": "A sum of your separate tag balances — each tag is charged from its own balance.",
+  "dashboardTotalPartial": "Partial — one or more balances could not be loaded.",
+  "dashboardStatTags": "Tags",
+  "dashboardStatVehicles": "Vehicles",
+  "dashboardStatMonthTolls": "Tolls this month",
+  "dashboardStatMonthTollsPartial": "at least",
+  "dashboardRecentActivity": "Recent activity",
+  "dashboardYourTags": "Your tags",
+  "dashboardNoTagsTitle": "No tags yet",
+  "dashboardNoTagsBody": "When a tag is fitted to your vehicle at a booth, it appears here.",
+  "lowBalanceTitle": "{plate} cannot enter",
+  "@lowBalanceTitle": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "lowBalanceBody": "Balance is {balance} — the barrier needs Rs. {minimum} minimum.",
+  "@lowBalanceBody": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "lowBalanceManyTitle": "{count} tags cannot enter",
+  "@lowBalanceManyTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lowBalanceManyBody": "{plates} are below the Rs. {minimum} minimum needed to open the barrier.",
+  "@lowBalanceManyBody": {
+    "placeholders": {
+      "plates": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "lowBalanceSoonTitle": "Top up soon",
+  "lowBalanceSoonBody": "{count, plural, =1{{plates} is running low. Entry needs at least Rs. {minimum}.} other{{plates} are running low. Entry needs at least Rs. {minimum}.}}",
+  "@lowBalanceSoonBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "plates": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "tagsTitle": "My Tags",
+  "tagsSubtitle": "{count, plural, =1{1 tag} other{{count} tags}}",
+  "@tagsSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tagSerial": "Tag serial",
+  "tagTid": "TID",
+  "tagTidExplainer": "The number you enter in the JazzCash app to top up.",
+  "tagStatus": "Status",
+  "tagIssued": "Issued",
+  "tagExpiry": "Expires",
+  "tagLastScanned": "Last scanned",
+  "tagNeverScanned": "Never scanned",
+  "tagLinkedVehicle": "Vehicle",
+  "tagNoTagFitted": "No tag fitted",
+  "tagNoTagFittedBody": "This vehicle has no tag right now — usually a reissue in progress. Ask at a booth.",
+  "tagExpiringSoon": "Expires in {days, plural, =0{today} =1{1 day} other{{days} days}}",
+  "@tagExpiringSoon": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "tagExpired": "Expired",
+  "tagNotUsable": "Not usable at a plaza",
+  "tagUsable": "Usable",
+  "tagStatusActive": "Active",
+  "tagStatusExpired": "Expired",
+  "tagStatusSuspended": "Suspended",
+  "tagStatusDeactivated": "Deactivated",
+  "tagStatusUnknown": "Unknown",
+  "tagsEmptyTitle": "No tags yet",
+  "tagsEmptyBody": "Tags are fitted at a toll booth. Once yours is fitted it appears here with its balance.",
+  "vehiclesTitle": "My Vehicles",
+  "vehicleFareClass": "Fare class",
+  "vehicleStatus": "Status",
+  "vehicleRegistered": "Registered",
+  "vehicleBalance": "Balance",
+  "vehicleTrips": "Trips",
+  "vehicleStatusActive": "Active",
+  "vehicleStatusInactive": "Inactive",
+  "vehicleStatusSuspended": "Suspended",
+  "vehicleStatusUnknown": "Unknown",
+  "vehiclesEmptyTitle": "No vehicles",
+  "vehiclesEmptyBody": "Vehicles are registered at a toll booth when your tag is fitted.",
+  "vehiclesUnavailableTitle": "Cannot list your vehicles",
+  "vehiclesUnavailableBody": "This server does not yet support listing your own vehicles. Ask at a booth, or update the M-Tag server.",
+  "vehicleTypeCar": "Car / Jeep / Taxi / Pickup",
+  "vehicleTypeWagon": "Wagon / Hiace",
+  "vehicleTypeCoach": "Coach / Coaster / Mini Bus",
+  "vehicleTypeLargeBus": "Large Bus",
+  "vehicleTypeTruck2Axle": "2 Axle Truck",
+  "vehicleTypeTruck3Axle": "3 Axle Truck",
+  "vehicleTypeTruck4Axle": "4 or More Axle Truck",
+  "vehicleTypeMotorcycle": "Motorcycle",
+  "vehicleTypeMotorcycleNotPermitted": "Motorcycles are not permitted on the expressway.",
+  "vehicleTypeUnknown": "Unknown class",
+  "transactionsTitle": "Activity",
+  "transactionsFilterAll": "All",
+  "transactionsFilterTolls": "Tolls",
+  "transactionsFilterTopups": "Top-ups",
+  "transactionsFilterRefunds": "Refunds",
+  "transactionTypeToll": "Toll",
+  "transactionTypeTopup": "Top-up",
+  "transactionTypeRefund": "Refund",
+  "transactionTypeTransferIn": "Transfer in",
+  "transactionTypeTransferOut": "Transfer out",
+  "transactionTypeUnknown": "Transaction",
+  "transactionStatusFailed": "Failed",
+  "transactionStatusPending": "Pending",
+  "transactionSyncedFromBooth": "Synced from booth",
+  "transactionSyncedFromBoothExplainer": "This was charged at a booth that was offline, and reached us later.",
+  "transactionBalanceAfter": "Bal. {balance}",
+  "@transactionBalanceAfter": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "transactionsNotRealtime": "Charges can appear a few minutes after a trip — booths sync every 30 seconds.",
+  "transactionsEmptyTitle": "No activity yet",
+  "transactionsEmptyBody": "Trips and top-ups appear here once you have used your tag.",
+  "transactionsEmptyFilteredTitle": "Nothing matches this filter",
+  "transactionsEmptyFilteredBody": "Try a different filter.",
+  "tripsTitle": "Trips",
+  "tripEntry": "Entry",
+  "tripExit": "Exit",
+  "tripDuration": "Duration",
+  "tripFare": "Fare",
+  "tripLiveTitle": "On the expressway now",
+  "tripLiveBody": "Entered {plaza} at {time}. The fare is charged when you exit.",
+  "@tripLiveBody": {
+    "placeholders": {
+      "plaza": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "tripLiveElapsed": "{duration} so far",
+  "@tripLiveElapsed": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "tripStatusFailed": "Failed",
+  "tripsEmptyTitle": "No trips yet",
+  "tripsEmptyBody": "Your journeys on the expressway appear here.",
+  "faresTitle": "Fares",
+  "faresSubtitle": "Check the toll between two plazas",
+  "faresFrom": "From",
+  "faresTo": "To",
+  "faresSwap": "Swap direction",
+  "faresDirectionNote": "Fares are set per direction, so {from} to {to} can differ from the reverse.",
+  "@faresDirectionNote": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "faresVehicleClass": "Fare class",
+  "faresYourVehicle": "Your {plate}",
+  "@faresYourVehicle": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "faresResult": "Toll",
+  "faresNotSetTitle": "No fare set",
+  "faresNotSetBody": "The operator has not published a fare for this direction and fare class.",
+  "faresPickPlazas": "Choose a start and an end plaza.",
+  "faresMotorcycleTitle": "Not permitted",
+  "faresMotorcycleBody": "Motorcycles are not permitted on the expressway, so no toll applies.",
+  "faresEmptyTitle": "No fares published",
+  "faresEmptyBody": "The fare table is empty on this server.",
+  "topupTitle": "Top Up",
+  "topupChooseMethod": "How would you like to pay?",
+  "topupForVehicle": "Topping up {plate}",
+  "@topupForVehicle": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "topupCurrentBalance": "Current balance",
+  "topupAmount": "Amount",
+  "topupAmountCustom": "Other amount",
+  "topupMinimum": "Minimum top-up amount is Rs. {minimum}",
+  "@topupMinimum": {
+    "placeholders": {
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "topupBalanceAfter": "Balance after top-up: {balance}",
+  "@topupBalanceAfter": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "topupMethodJazzCashApp": "JazzCash app",
+  "topupMethodJazzCashAppSubtitle": "Pay from your JazzCash wallet using your tag's TID. Works today.",
+  "topupMethodJazzCashCheckout": "Pay in this app",
+  "topupMethodJazzCashCheckoutSubtitle": "Card or wallet checkout, without leaving M-Tag.",
+  "topupMethodEasypaisa": "Easypaisa",
+  "topupMethodEasypaisaSubtitle": "Not available yet.",
+  "topupMethodCard": "Debit or credit card",
+  "topupMethodCardSubtitle": "Not available yet.",
+  "topupMethodCash": "Cash at a booth",
+  "topupMethodCashSubtitle": "Pay an operator at any plaza and get a printed receipt.",
+  "topupBadgeWorksNow": "Works now",
+  "topupBadgeComingSoon": "Coming soon",
+  "topupBadgeUnavailable": "Not set up",
+  "topupJazzCashStepsTitle": "Top up from the JazzCash app",
+  "topupJazzCashStep1": "Open the JazzCash app on your phone.",
+  "topupJazzCashStep2": "Choose Bill Payments, then M-Tag.",
+  "topupJazzCashStep3": "Enter your TID exactly as shown below.",
+  "topupJazzCashStep4": "Check that your name and plate appear, then enter the amount and pay.",
+  "topupJazzCashStep5": "Come back here — your balance updates on its own once JazzCash confirms.",
+  "topupJazzCashOpenApp": "Open JazzCash",
+  "topupJazzCashOpenAppFailed": "Could not open the JazzCash app. Open it from your home screen instead.",
+  "topupJazzCashNoTidTitle": "TID not available",
+  "topupJazzCashNoTidBody": "This server does not report your tag's TID, so we cannot show you what to enter in JazzCash. Ask at a booth for your TID, or pay cash there.",
+  "topupJazzCashAmountNote": "You enter the amount in the JazzCash app, not here.",
+  "topupCheckoutUnavailableTitle": "In-app payment is not set up",
+  "topupCheckoutUnavailableBody": "This build has no payment checkout configured, so we cannot take a card payment here. Use the JazzCash app or pay cash at a booth.",
+  "topupCheckoutOpening": "Opening secure payment",
+  "topupCheckoutCancelled": "Payment was cancelled. Nothing has been charged.",
+  "topupCashTitle": "Pay cash at a booth",
+  "topupCashBody": "Any plaza operator can top up your tag. Bring your tag or TID and the amount in cash — they will print you a receipt.",
+  "topupCashWhatToBring": "What to bring",
+  "topupCashBringTag": "Your tag, or its TID written down",
+  "topupCashBringPlate": "Your registration number ({plate})",
+  "@topupCashBringPlate": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "topupCashBringCash": "Cash — the operator issues a printed receipt",
+  "topupCashPlazas": "Toll plazas",
+  "topupEasypaisaComingSoonTitle": "Easypaisa is not available yet",
+  "topupEasypaisaComingSoonBody": "M-Tag does not accept Easypaisa yet. You can top up from the JazzCash app, or pay cash at any plaza.",
+  "topupCardComingSoonTitle": "Card payments are not available yet",
+  "topupCardComingSoonBody": "We cannot take card payments yet. Use the JazzCash app, or pay cash at any plaza.",
+  "topupSubmitting": "Creating your top-up",
+  "topupWaitingTitle": "Waiting for payment confirmation",
+  "topupWaitingBody": "We have recorded a top-up of {amount}. Your balance updates as soon as the payment is confirmed — this can take a minute.",
+  "@topupWaitingBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topupConfirmedTitle": "Top-up confirmed",
+  "topupConfirmedBody": "{amount} has been added.",
+  "@topupConfirmedBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topupFailedTitle": "Top-up did not go through",
+  "topupTimedOutTitle": "Still waiting",
+  "topupTimedOutBody": "We have not had confirmation yet. If the payment went through, your balance will update automatically — you do not need to pay again.",
+  "topupPendingListTitle": "Pending top-ups",
+  "topupPendingRow": "{amount} — waiting for confirmation",
+  "@topupPendingRow": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topupNeverCreditedLocally": "Balances are always read from the server, never estimated here.",
+  "profileTitle": "Profile",
+  "profileName": "Name",
+  "profilePhone": "Phone",
+  "profileCnic": "CNIC",
+  "profileNotProvided": "Not provided",
+  "profilePhoneChangeNote": "To change your phone number or CNIC on file, visit a booth.",
+  "profileEditName": "Edit name",
+  "profileChangePassword": "Change password",
+  "profileCurrentPassword": "Current password",
+  "profileNewPassword": "New password",
+  "profileConfirmPassword": "Confirm new password",
+  "profilePasswordTooShort": "Use at least 8 characters",
+  "profilePasswordMismatch": "The two passwords do not match",
+  "profilePasswordChanged": "Password changed",
+  "profileAppearance": "Appearance",
+  "profileThemeSystem": "Follow system",
+  "profileThemeLight": "Light",
+  "profileThemeDark": "Dark",
+  "profileLanguage": "Language",
+  "profileLanguageEnglish": "English",
+  "profileLanguageUrdu": "اردو",
+  "profileSecurity": "Security",
+  "profileBiometricLock": "Unlock with biometrics",
+  "profileBiometricLockSubtitle": "Ask for your fingerprint or face when opening M-Tag.",
+  "profileBiometricUnavailable": "This device has no biometric unlock set up.",
+  "profileBiometricPrompt": "Unlock M-Tag",
+  "profileSupport": "Support",
+  "profileSupportPhone": "Call {phone}",
+  "@profileSupportPhone": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAppVersion": "Version {version}",
+  "@profileAppVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "profileSignOut": "Log out",
+  "profileSignOutConfirmTitle": "Log out of M-Tag?",
+  "profileSignOutConfirmBody": "You will need your phone number and password to sign back in.",
+  "profileNameUpdated": "Name updated",
+  "errorNetwork": "No connection. Check your mobile data or WiFi and try again.",
+  "errorTimeout": "The server took too long to answer. Try again.",
+  "errorUnauthorised": "Your session has ended. Please sign in again.",
+  "errorForbidden": "You do not have access to this.",
+  "errorNotFound": "We could not find that.",
+  "errorThrottled": "Too many requests. Wait a moment and try again.",
+  "errorValidation": "Please check what you entered.",
+  "errorServer": "Something went wrong on our side. Try again shortly.",
+  "errorMalformed": "We got an unexpected reply from the server. If you are on a public WiFi, try mobile data.",
+  "errorUnknown": "Something went wrong. Try again.",
+  "offlineShowingSaved": "Showing saved data from {time}",
+  "@offlineShowingSaved": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "offlineBalanceAge": "Balance as of {time}",
+  "@offlineBalanceAge": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "loading": "Loading",
+  "unknownValue": "—",
+  "navPlazas": "Plazas",
+  "plazasTitle": "Toll Plazas",
+  "plazasSubtitle": "Every plaza on the expressway, and what a trip there costs your vehicle.",
+  "plazasFromLabel": "Travelling from",
+  "plazasAllPlazas": "All plazas",
+  "plazasFaresFrom": "Fares from {plaza}",
+  "@plazasFaresFrom": {
+    "placeholders": {
+      "plaza": {
+        "type": "String"
+      }
+    }
+  },
+  "plazasIsOrigin": "Your starting point",
+  "plazasNoLanes": "No lanes listed",
+  "plazasLaneCount": "{count, plural, =1{1 lane} other{{count} lanes}}",
+  "@plazasLaneCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "plazasOpenFareTable": "Full fare table",
+  "privacyPolicy": "Privacy Policy",
+  "privacyPolicyUnavailable": "The privacy policy is not published yet. Call support on {phone} and they will send it to you.",
+  "@privacyPolicyUnavailable": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "tagPassLabel": "M-TAG PASS",
+  "unlockTitle": "Welcome back",
+  "unlockFingerprint": "Unlock with fingerprint",
+  "unlockFace": "Unlock with Face ID",
+  "unlockGeneric": "Unlock with biometrics",
+  "unlockReason": "Unlock your M-Tag wallet",
+  "unlockUsePassword": "Use password instead",
+  "unlockFailed": "Not recognised. Try again, or use your password.",
+  "unlockLockedOut": "Too many attempts. Biometric unlock is disabled for a moment — use your password.",
+  "unlockSubtitle": "Your session is still active. Confirm it is you.",
+  "onboardingTitle1": "Drive straight through",
+  "onboardingBody1": "Your tag is read at the gantry. No stopping, no cash, no queue.",
+  "onboardingTitle2": "Always know your balance",
+  "onboardingBody2": "Every toll and top-up, per vehicle, the moment it lands.",
+  "onboardingTitle3": "Top up from anywhere",
+  "onboardingBody3": "Add balance from your phone, or with cash at any booth.",
+  "onboardingGetStarted": "Set up my account",
+  "onboardingHaveAccount": "I already have a password",
+  "onboardingSkip": "Skip",
+  "onboardingNext": "Next",
+  "helpTitle": "What can I do here?",
+  "helpBody": "Your M-Tag account is created at a toll booth when your tag is fitted — using the phone number you gave the operator.\n\n• Set up my account — if you have a tag but no password yet. We send a code to that number and you choose a password.\n\n• I already have a password — sign in normally.\n\nNo tag yet? Visit any plaza with your CNIC and vehicle registration.",
+  "phoneEntryTitle": "What's your number?",
+  "phoneEntryBody": "Enter the mobile number you gave the booth when your tag was fitted. We'll send a 4-digit code to confirm it's you.",
+  "phoneEntryContinue": "Send code",
+  "otpTitle": "Let's verify your number",
+  "otpBody": "We've sent a 4-digit code to your phone.\nIt'll auto-verify once entered.",
+  "otpBodyConsole": "This server has no SMS gateway, so the code was written to the server log instead.",
+  "otpNotReceived": "Didn't receive the code?",
+  "otpResend": "Resend",
+  "otpResendIn": "Resend in {seconds}s",
+  "@otpResendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "otpVerifying": "Verifying",
+  "otpVerified": "Verified Successfully",
+  "otpVerifiedBody": "Your number has been verified.",
+  "otpVerifiedSecure": "Verified and Secure",
+  "otpAttemptsLeft": "{count, plural, =1{1 attempt left} other{{count} attempts left}}",
+  "@otpAttemptsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "setPasswordTitle": "Choose a password",
+  "setPasswordBody": "This is what you'll use to sign in from now on. At least 8 characters.",
+  "setPasswordLabel": "New password",
+  "setPasswordConfirmLabel": "Confirm password",
+  "setPasswordSubmit": "Save and continue",
+  "setPasswordTooShort": "Use at least 8 characters",
+  "setPasswordMismatch": "Those two do not match",
+  "phoneAlreadySetUpTitle": "You already have a password",
+  "phoneAlreadySetUpBody": "This number is already set up, so there's no need to verify it again. Sign in with the password you chose.\n\nForgotten it? Call support and they'll help you reset it.",
+  "phoneAlreadySetUpSignIn": "Go to sign in",
+  "activitySegmentPayments": "Payments",
+  "activitySegmentTrips": "Trips",
+  "tripsFilterAll": "All",
+  "tripsFilterLive": "On road",
+  "tripsFilterCompleted": "Completed",
+  "tripsLiveBannerTitle": "On the expressway now",
+  "tripsCountLabel": "{count, plural, =0{No trips} =1{1 trip} other{{count} trips}}",
+  "@tripsCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tripsStaleNotice": "Showing your last saved trips — could not reach the server.",
+  "pushBalanceUpdated": "Your balance was updated.",
+  "actionView": "View",
+  "otpBodyPush": "We sent a 4-digit code to your phone, and as a notification to the M-Tag app on your other signed-in device.",
+  "resetPhoneTitle": "Reset your password",
+  "resetPhoneBody": "Enter your registered mobile number and we'll send a 4-digit code to confirm it's you.",
+  "resetSignedOutElsewhere": "You've been signed out on your other devices.",
+  "loginForgotPasswordReset": "Reset with a code"
+}

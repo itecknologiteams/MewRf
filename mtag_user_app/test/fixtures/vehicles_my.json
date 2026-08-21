@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 2,
+      "plate_number": "BAR1654",
+      "vehicle_type": "truck_2axle",
+      "status": "active",
+      "registered_at": "2026-08-20T21:54:24.657612+05:00",
+      "tag": null,
+      "account_id": 2,
+      "balance": "42.00",
+      "balance_updated_at": "2026-08-20T16:54:24.658078Z"
+    },
+    {
+      "id": 1,
+      "plate_number": "FIX1654",
+      "vehicle_type": "car",
+      "status": "active",
+      "registered_at": "2026-08-20T21:54:24.653790+05:00",
+      "tag": {
+        "id": 1,
+        "tag_serial": "SER165424169081",
+        "tid": "E280117165424169081",
+        "epc": "EPC165424169081",
+        "issued_at": "2026-08-20T21:54:24.656307+05:00",
+        "expiry_date": "2099-12-31",
+        "status": "active",
+        "last_scanned_at": "2026-08-20T21:54:24.656114+05:00",
+        "is_valid": true
+      },
+      "account_id": 1,
+      "balance": "1250.00",
+      "balance_updated_at": "2026-08-20T16:54:24.655110Z"
+    }
+  ]
+}

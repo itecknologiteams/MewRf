@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="animate-slide-in-right flex items-start gap-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-custom)] shadow-lg p-4 min-w-[320px] max-w-[400px]"
+            className="animate-slide-in-right flex items-start gap-3 rounded-xl bg-surface border border-line shadow-lg p-4 min-w-[320px] max-w-[400px]"
             style={{
               borderLeftWidth: '4px',
               borderLeftColor:
@@ -43,23 +43,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             }}
           >
             {toast.type === 'success' && (
-              <CheckCircle className="w-5 h-5 text-[var(--accent-emerald)] shrink-0 mt-0.5" />
+              <CheckCircle className="w-5 h-5 text-success shrink-0 mt-0.5" />
             )}
             {toast.type === 'error' && (
-              <AlertCircle className="w-5 h-5 text-[var(--accent-rose)] shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
             )}
             {toast.type === 'info' && (
-              <Info className="w-5 h-5 text-[var(--accent-blue)] shrink-0 mt-0.5" />
+              <Info className="w-5 h-5 text-brand shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{toast.title}</p>
+              <p className="text-sm font-semibold text-ink">{toast.title}</p>
               {toast.message && (
-                <p className="text-xs text-[var(--text-secondary)] mt-1">{toast.message}</p>
+                <p className="text-xs text-ink-muted mt-1">{toast.message}</p>
               )}
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              className="text-ink-subtle hover:text-ink transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

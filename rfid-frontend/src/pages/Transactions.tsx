@@ -119,12 +119,12 @@ export default function Transactions() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'toll_deduction': return 'bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] border-[var(--accent-rose)]/20';
-      case 'topup': return 'bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)] border-[var(--accent-emerald)]/20';
-      case 'refund': return 'bg-[var(--accent-amber)]/10 text-[var(--accent-amber)] border-[var(--accent-amber)]/20';
-      case 'transfer_out': return 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border-[var(--accent-blue)]/20';
-      case 'transfer_in': return 'bg-[var(--accent-cyan)]/10 text-[var(--accent-cyan)] border-[var(--accent-cyan)]/20';
-      default: return 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-custom)]';
+      case 'toll_deduction': return 'bg-danger/10 text-danger border-danger/20';
+      case 'topup': return 'bg-success/10 text-success border-success/20';
+      case 'refund': return 'bg-warning/10 text-warning border-warning/20';
+      case 'transfer_out': return 'bg-brand/10 text-brand border-brand/20';
+      case 'transfer_in': return 'bg-info/10 text-info border-info/20';
+      default: return 'bg-elevated text-ink-muted border-line';
     }
   };
 
@@ -144,15 +144,15 @@ export default function Transactions() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Transaction History</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
+          <h1 className="text-2xl font-bold text-ink">Transaction History</h1>
+          <p className="text-sm text-ink-muted mt-1">
             {loading ? 'Loading...' : `${filtered.length} transactions • Total: PKR ${totalAmount.toLocaleString()}`}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={fetchTransactions}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-secondary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors self-start"
+            className="flex items-center gap-2 px-4 py-2.5 bg-elevated border border-line text-ink-muted text-sm font-medium rounded-xl hover:bg-surface transition-colors self-start"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -160,7 +160,7 @@ export default function Transactions() {
           <button
             onClick={exportCSV}
             disabled={loading || filtered.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--accent-emerald)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity self-start disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity self-start disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -169,24 +169,24 @@ export default function Transactions() {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-4 mb-6 shadow-sm">
+      <div className="bg-surface border border-line rounded-xl skeu-card p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search transactions..."
-              className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors ${
               showFilters
-                ? 'bg-[var(--accent-blue)]/10 border-[var(--accent-blue)]/30 text-[var(--accent-blue)]'
-                : 'bg-[var(--bg-elevated)] border-[var(--border-custom)] text-[var(--text-secondary)]'
+                ? 'bg-brand/10 border-brand/30 text-brand'
+                : 'bg-elevated border-line text-ink-muted'
             }`}
           >
             <Filter className="w-4 h-4" />
@@ -195,13 +195,13 @@ export default function Transactions() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-[var(--border-custom)] animate-fade-in-up">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-line animate-fade-in-up">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Type</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Type</label>
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-lg text-sm text-[var(--text-primary)] outline-none"
+                className="w-full px-3 py-2 bg-elevated border border-line rounded-lg text-sm text-ink outline-none"
               >
                 {TYPE_OPTIONS.map((t) => (
                   <option key={t} value={t}>{t === 'All' ? 'All Types' : getTypeLabel(t)}</option>
@@ -209,26 +209,26 @@ export default function Transactions() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">From Date</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">From Date</label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle" />
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-lg text-sm text-[var(--text-primary)] outline-none"
+                  className="w-full pl-10 pr-3 py-2 bg-elevated border border-line rounded-lg text-sm text-ink outline-none"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">To Date</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">To Date</label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle" />
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-lg text-sm text-[var(--text-primary)] outline-none"
+                  className="w-full pl-10 pr-3 py-2 bg-elevated border border-line rounded-lg text-sm text-ink outline-none"
                 />
               </div>
             </div>
@@ -240,7 +240,7 @@ export default function Transactions() {
                   setDateTo('');
                   setSearch('');
                 }}
-                className="px-3 py-2 text-sm text-[var(--accent-rose)] hover:bg-[var(--accent-rose)]/10 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm text-danger hover:bg-danger/10 rounded-lg transition-colors"
               >
                 Reset All
               </button>
@@ -250,31 +250,31 @@ export default function Transactions() {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-[var(--accent-blue)]" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand" />
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="bg-[var(--bg-elevated)]">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">ID</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Type</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Tag Serial</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Date & Time</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Amount</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Balance After</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Status</th>
+                <tr className="bg-elevated">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">ID</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Type</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Tag Serial</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Date & Time</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Amount</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Balance After</th>
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center">
-                      <FileDown className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-3" />
-                      <p className="text-sm text-[var(--text-secondary)]">No transactions found</p>
+                      <FileDown className="w-10 h-10 text-ink-subtle mx-auto mb-3" />
+                      <p className="text-sm text-ink-muted">No transactions found</p>
                       <button
                         onClick={() => {
                           setTypeFilter('All');
@@ -282,7 +282,7 @@ export default function Transactions() {
                           setDateTo('');
                           setSearch('');
                         }}
-                        className="text-sm text-[var(--accent-blue)] mt-2 hover:underline"
+                        className="text-sm text-brand mt-2 hover:underline"
                       >
                         Clear filters
                       </button>
@@ -292,9 +292,9 @@ export default function Transactions() {
                   filtered.map((tx) => (
                     <tr
                       key={tx.id}
-                      className="border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)] hover:translate-x-1 transition-all duration-200 cursor-pointer"
+                      className="border-b border-line hover:bg-elevated hover:translate-x-1 transition-all duration-200 cursor-pointer"
                     >
-                      <td className="px-6 py-4 text-sm font-mono text-[var(--text-primary)]">
+                      <td className="px-6 py-4 text-sm font-mono text-ink">
                         #{tx.id}
                       </td>
                       <td className="px-6 py-4">
@@ -302,10 +302,10 @@ export default function Transactions() {
                           {getTypeLabel(tx.transaction_type)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm font-mono text-[var(--text-secondary)]">
+                      <td className="px-6 py-4 text-sm font-mono text-ink-muted">
                         {tx.tag_serial || '—'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                      <td className="px-6 py-4 text-sm text-ink-muted">
                         {new Date(tx.processed_at).toLocaleDateString('en-PK', {
                           day: 'numeric',
                           month: 'short',
@@ -316,23 +316,23 @@ export default function Transactions() {
                       <td className="px-6 py-4 text-sm font-semibold text-right">
                         <span className={
                           tx.transaction_type === 'topup' || tx.transaction_type === 'refund' || tx.transaction_type === 'transfer_in'
-                            ? 'text-[var(--accent-emerald)]'
-                            : 'text-[var(--accent-rose)]'
+                            ? 'text-success'
+                            : 'text-danger'
                         }>
                           {tx.transaction_type === 'toll_deduction' || tx.transaction_type === 'transfer_out' ? '-' : '+'}PKR {parseFloat(tx.amount).toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-[var(--text-primary)] text-right">
+                      <td className="px-6 py-4 text-sm text-ink text-right">
                         PKR {parseFloat(tx.balance_after || '0').toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span
                           className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
                             tx.status === 'completed' || tx.status === 'success'
-                              ? 'bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)] border-[var(--accent-emerald)]/20'
+                              ? 'bg-success/10 text-success border-success/20'
                               : tx.status === 'failed'
-                              ? 'bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] border-[var(--accent-rose)]/20'
-                              : 'bg-[var(--accent-amber)]/10 text-[var(--accent-amber)] border-[var(--accent-amber)]/20'
+                              ? 'bg-danger/10 text-danger border-danger/20'
+                              : 'bg-warning/10 text-warning border-warning/20'
                           }`}
                         >
                           {tx.status}

@@ -2,6 +2,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { BrandLogo, BrandLockup } from '@/components/BrandLogo';
 import {
   LayoutDashboard,
   CreditCard,
@@ -61,6 +62,15 @@ export default function DashboardLayout() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === 'admin';
+  const displayName = user?.full_name || user?.name || 'User';
+  const initials =
+    displayName
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase() || 'U';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -79,26 +89,18 @@ export default function DashboardLayout() {
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-body)]">
+    <div className="min-h-screen bg-canvas">
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-full w-[280px] bg-[var(--bg-body)] border-r border-[var(--border-custom)] transform transition-transform duration-300 ease-out ${
+        className={`fixed top-0 left-0 z-40 h-full w-[280px] flex flex-col bg-surface border-r border-line transform transition-transform duration-300 ease-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-[var(--border-custom)]">
-          <img src="/logo.png" alt="Logo" className="w-10 h-10" />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-bold text-[var(--text-primary)] leading-tight">
-              Smart Expressway
-            </h1>
-            <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">
-              Toll System
-            </p>
-          </div>
+        <div className="shrink-0 px-5 py-5 border-b border-line">
+          <BrandLockup />
         </div>
 
-        <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)]">
+        <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -106,19 +108,24 @@ export default function DashboardLayout() {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 relative group ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 relative group overflow-hidden ${
                   isActive
-                    ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
+                    ? 'bg-brand/10 text-brand-ink dark:text-brand'
+                    : 'text-ink-muted hover:bg-elevated hover:text-ink'
                 }`}
               >
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[var(--accent-blue)] rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-7 bg-brand rounded-r-full" />
                 )}
-                <Icon className={`w-5 h-5 ${isActive ? 'text-[var(--accent-blue)]' : ''}`} />
-                {item.label}
+                <Icon
+                  className={`w-5 h-5 shrink-0 transition-colors ${
+                    isActive ? 'text-brand' : 'text-ink-subtle group-hover:text-ink-muted'
+                  }`}
+                />
+                <span className="truncate">{item.label}</span>
                 {item.adminOnly && (
-                  <span className="ml-auto text-[10px] bg-[var(--accent-amber)]/20 text-[var(--accent-amber)] px-1.5 py-0.5 rounded-full">
+                  <span className="ml-auto shrink-0 text-[10px] font-semibold bg-role/15 text-role px-1.5 py-0.5 rounded-full">
                     Admin
                   </span>
                 )}
@@ -127,10 +134,10 @@ export default function DashboardLayout() {
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[var(--border-custom)]">
+        <div className="shrink-0 p-4 border-t border-line">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--accent-rose)] transition-all duration-200"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-ink-muted hover:bg-danger/10 hover:text-danger transition-colors duration-200"
           >
             <LogOut className="w-5 h-5" />
             Sign Out
@@ -149,18 +156,21 @@ export default function DashboardLayout() {
       {/* Main content */}
       <div className="lg:ml-[280px]">
         {/* Top navbar */}
-        <header className="sticky top-0 z-20 h-16 bg-[var(--bg-surface)]/80 backdrop-blur-xl border-b border-[var(--border-custom)] flex items-center justify-between px-4 lg:px-8">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-20 h-16 bg-surface/85 backdrop-blur-xl border-b border-line flex items-center justify-between px-4 lg:px-8">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]"
+              aria-label="Open navigation"
+              className="lg:hidden p-2 rounded-lg text-ink-muted hover:bg-elevated transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="hidden md:flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-emerald)] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent-emerald)]"></span>
+            {/* The sidebar lockup is off-screen on mobile, so the mark rides here. */}
+            <BrandLogo className="h-6 lg:hidden" />
+            <div className="hidden md:flex items-center gap-2 rounded-full bg-success/10 pl-2 pr-3 py-1 text-xs font-medium text-success">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
               </span>
               Live System Active
             </div>
@@ -171,17 +181,19 @@ export default function DashboardLayout() {
             <div className="relative">
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors"
+                aria-label="Search"
+                aria-expanded={searchOpen}
+                className="p-2 rounded-lg text-ink-muted hover:bg-elevated hover:text-brand transition-colors"
               >
                 <Search className="w-5 h-5" />
               </button>
               {searchOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-xl p-3 animate-fade-in-up">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-surface border border-line rounded-xl skeu-card p-3 animate-fade-in-up">
                   <input
                     autoFocus
                     type="text"
                     placeholder="Search transactions, vehicles..."
-                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:ring-2 focus:ring-[var(--accent-blue)]/30"
+                    className="w-full px-3 py-2 bg-elevated border border-line rounded-lg text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35"
                   />
                 </div>
               )}
@@ -190,40 +202,45 @@ export default function DashboardLayout() {
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="p-2 rounded-lg text-ink-muted hover:bg-elevated hover:text-brand transition-colors"
             >
               {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
             {/* Notifications */}
-            <button className="relative p-2 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors">
+            <button
+              aria-label="Notifications"
+              className="relative p-2 rounded-lg text-ink-muted hover:bg-elevated hover:text-brand transition-colors"
+            >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[var(--accent-rose)] rounded-full" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full ring-2 ring-surface" />
             </button>
 
             {/* Profile */}
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-[var(--bg-elevated)] transition-colors"
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
+                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-elevated transition-colors"
               >
-                <img
-                  src="/avatar.jpg"
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-[var(--border-custom)]"
-                />
-                <ChevronDown className="w-4 h-4 text-[var(--text-tertiary)] hidden sm:block" />
+                <span
+                  aria-hidden="true"
+                  className="w-8 h-8 rounded-full bg-brand text-brand-on grid place-items-center text-xs font-bold ring-2 ring-brand/25"
+                >
+                  {initials}
+                </span>
+                <ChevronDown className="w-4 h-4 text-ink-subtle hidden sm:block" />
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-xl py-2 animate-fade-in-up">
-                  <div className="px-4 py-3 border-b border-[var(--border-custom)]">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      {user?.full_name || user?.name || 'User'}
-                    </p>
-                    <p className="text-xs text-[var(--text-secondary)]">{user?.phone}</p>
+                <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-line rounded-xl skeu-card py-2 animate-fade-in-up">
+                  <div className="px-4 py-3 border-b border-line">
+                    <p className="text-sm font-semibold text-ink truncate">{displayName}</p>
+                    <p className="text-xs text-ink-muted">{user?.phone}</p>
                     {user?.role && (
-                      <span className="inline-block mt-1 text-[10px] bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] px-2 py-0.5 rounded-full capitalize">
+                      <span className="inline-block mt-1.5 text-[10px] font-semibold bg-brand/10 text-brand-ink dark:text-brand px-2 py-0.5 rounded-full capitalize">
                         {user.role}
                       </span>
                     )}
@@ -233,7 +250,7 @@ export default function DashboardLayout() {
                       navigate('/profile');
                       setProfileOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-elevated hover:text-ink transition-colors"
                   >
                     <User className="w-4 h-4" />
                     Profile
@@ -243,18 +260,18 @@ export default function DashboardLayout() {
                       toggleTheme();
                       setProfileOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-elevated hover:text-ink transition-colors"
                   >
                     {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                     {isDark ? 'Light Mode' : 'Dark Mode'}
                   </button>
-                  <div className="border-t border-[var(--border-custom)] mt-1 pt-1">
+                  <div className="border-t border-line mt-1 pt-1">
                     <button
                       onClick={() => {
                         logout();
                         setProfileOpen(false);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--accent-rose)] hover:bg-[var(--bg-elevated)] transition-colors"
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-danger hover:bg-danger/10 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       Sign Out

@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    VehicleListCreateView, VehicleDetailView, VehicleByPlateView, TagReissueView,
+    VehicleListCreateView, MyVehicleListView, VehicleDetailView, VehicleByPlateView, TagReissueView,
     AvailableTagsView, TagInventoryUploadView, TagCreateView, TagBulkCreateView,
     TagExistsCheckView, TagScanBufferView, ScanDebugView, VehicleSuspendView,
     InventoryUploadView, InventoryListView, BoothAssignmentView,
@@ -9,6 +9,9 @@ from .views import (
 
 urlpatterns = [
     path('', VehicleListCreateView.as_view(), name='vehicle-list'),
+    # Before '<int:pk>/' so the literal always wins, even though 'my' could never
+    # match an int converter today.
+    path('my/', MyVehicleListView.as_view(), name='my-vehicles'),
     path('<int:pk>/', VehicleDetailView.as_view(), name='vehicle-detail'),
     path('<int:pk>/suspend/', VehicleSuspendView.as_view(), name='vehicle-suspend'),
     path('plate/<str:plate_number>/', VehicleByPlateView.as_view(), name='vehicle-by-plate'),

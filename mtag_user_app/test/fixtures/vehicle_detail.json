@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": 1,
+    "plate_number": "FIX1654",
+    "vehicle_type": "car",
+    "status": "active",
+    "registered_at": "2026-08-20T21:54:24.653790+05:00",
+    "owner_id": 1,
+    "owner_phone": "03001654241",
+    "owner_name": "Fixture Holder",
+    "tag": {
+      "id": 1,
+      "tag_serial": "SER165424169081",
+      "tid": "E280117165424169081",
+      "epc": "EPC165424169081",
+      "issued_at": "2026-08-20T21:54:24.656307+05:00",
+      "expiry_date": "2099-12-31",
+      "status": "active",
+      "last_scanned_at": "2026-08-20T21:54:24.656114+05:00",
+      "is_valid": true
+    }
+  }
+}

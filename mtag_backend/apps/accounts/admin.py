@@ -11,7 +11,7 @@ class AccountAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ['account', 'transaction_type', 'amount', 'balance_after', 'status', 'processed_at']
+    list_display = ['account', 'transaction_type', 'amount', 'service_charge', 'balance_after', 'status', 'processed_at']
     list_filter = ['transaction_type', 'status']
     search_fields = ['account__vehicle__plate_number', 'tag_serial']
     readonly_fields = ['processed_at']

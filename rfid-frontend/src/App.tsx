@@ -23,13 +23,13 @@ import BoothAssignmentPage from '@/pages/BoothAssignmentPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login"replace />;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />;
+  if (!isAuthenticated) return <Navigate to="/login"replace />;
+  if (user?.role !== 'admin') return <Navigate to="/dashboard"replace />;
   return <>{children}</>;
 }
 

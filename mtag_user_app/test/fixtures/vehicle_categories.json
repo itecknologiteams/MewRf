@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 1,
+      "category_index": 901,
+      "code": "car",
+      "name": "Car / Jeep / Taxi / Pickup",
+      "description": "",
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "category_index": 905,
+      "code": "truck_2axle",
+      "name": "2 Axle Truck",
+      "description": "",
+      "is_active": true
+    }
+  ]
+}

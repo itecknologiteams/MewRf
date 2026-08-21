@@ -29,9 +29,9 @@ interface InventoryItem {
 }
 
 const statusColors: Record<string, string> = {
-  unregistered: 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]',
-  booth_assigned: 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]',
-  activated: 'bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)]',
+  unregistered: 'bg-elevated text-ink-muted',
+  booth_assigned: 'bg-brand/10 text-brand',
+  activated: 'bg-success/10 text-success',
 };
 
 const statusLabels: Record<string, string> = {
@@ -120,18 +120,18 @@ export default function InventoryManagement() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Inventory Management</h1>
+          <h1 className="text-3xl font-bold text-ink">Inventory Management</h1>
           <div className="flex gap-3">
             <button
               onClick={() => fetchInventory(currentPage)}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded-xl hover:bg-[var(--bg-elevated)]"
+              className="flex items-center gap-2 px-4 py-2 bg-elevated text-ink rounded-xl hover:bg-elevated"
             >
               <RefreshCw size={18} />
               Refresh
             </button>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-blue)] text-white rounded-xl hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 bg-brand text-brand-on rounded-xl hover:opacity-90"
             >
               <Upload size={18} />
               Upload CSV
@@ -140,15 +140,15 @@ export default function InventoryManagement() {
         </div>
 
         {/* Filters */}
-        <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <h2 className="font-semibold text-ink flex items-center gap-2">
               <Filter size={20} />
               Filters
             </h2>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="text-[var(--accent-blue)] hover:text-[var(--accent-blue)]"
+              className="text-brand hover:text-brand"
             >
               {showFilters ? 'Hide' : 'Show'}
             </button>
@@ -157,22 +157,22 @@ export default function InventoryManagement() {
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Search</label>
+                <label className="block text-sm font-medium text-ink-muted mb-2">Search</label>
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Tag serial or TID..."
-                  className="w-full px-3 py-2 border border-[var(--border-custom)] rounded-xl focus:ring-2 focus:ring-[var(--accent-blue)]/20 focus:border-[var(--accent-blue)]"
+                  className="w-full px-3 py-2 border border-line rounded-xl focus:ring-2 focus:ring-brand/35 focus:border-brand"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Status</label>
+                <label className="block text-sm font-medium text-ink-muted mb-2">Status</label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border-custom)] rounded-xl focus:ring-2 focus:ring-[var(--accent-blue)]/20 focus:border-[var(--accent-blue)]"
+                  className="w-full px-3 py-2 border border-line rounded-xl focus:ring-2 focus:ring-brand/35 focus:border-brand"
                 >
                   <option>All</option>
                   <option value="unregistered">Unregistered</option>
@@ -182,11 +182,11 @@ export default function InventoryManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Booth</label>
+                <label className="block text-sm font-medium text-ink-muted mb-2">Booth</label>
                 <select
                   value={boothFilter}
                   onChange={(e) => setBoothFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border-custom)] rounded-xl focus:ring-2 focus:ring-[var(--accent-blue)]/20 focus:border-[var(--accent-blue)]"
+                  className="w-full px-3 py-2 border border-line rounded-xl focus:ring-2 focus:ring-brand/35 focus:border-brand"
                 >
                   <option>All</option>
                   {Array.from({ length: 7 }, (_, i) => (
@@ -198,11 +198,11 @@ export default function InventoryManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Vehicle Type</label>
+                <label className="block text-sm font-medium text-ink-muted mb-2">Vehicle Type</label>
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border-custom)] rounded-xl focus:ring-2 focus:ring-[var(--accent-blue)]/20 focus:border-[var(--accent-blue)]"
+                  className="w-full px-3 py-2 border border-line rounded-xl focus:ring-2 focus:ring-brand/35 focus:border-brand"
                 >
                   <option>All</option>
                   <option value="car">Car</option>
@@ -217,95 +217,95 @@ export default function InventoryManagement() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-4">
+          <div className="bg-surface rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[var(--text-secondary)] text-sm">Total Tags</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{inventory.length}</p>
+                <p className="text-ink-muted text-sm">Total Tags</p>
+                <p className="text-2xl font-bold text-ink">{inventory.length}</p>
               </div>
-              <FileText className="text-[var(--text-tertiary)]" size={24} />
+              <FileText className="text-ink-subtle" size={24} />
             </div>
           </div>
 
-          <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-4">
+          <div className="bg-surface rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[var(--text-secondary)] text-sm">Unregistered</p>
-                <p className="text-2xl font-bold text-[var(--text-secondary)]">
+                <p className="text-ink-muted text-sm">Unregistered</p>
+                <p className="text-2xl font-bold text-ink-muted">
                   {inventory.filter((i) => i.status === 'unregistered').length}
                 </p>
               </div>
-              <AlertCircle className="text-[var(--text-tertiary)]" size={24} />
+              <AlertCircle className="text-ink-subtle" size={24} />
             </div>
           </div>
 
-          <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-4">
+          <div className="bg-surface rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[var(--text-secondary)] text-sm">Activated</p>
-                <p className="text-2xl font-bold text-[var(--accent-emerald)]">
+                <p className="text-ink-muted text-sm">Activated</p>
+                <p className="text-2xl font-bold text-success">
                   {inventory.filter((i) => i.status === 'activated').length}
                 </p>
               </div>
-              <CheckCircle className="text-[var(--accent-emerald)]" size={24} />
+              <CheckCircle className="text-success" size={24} />
             </div>
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-xl shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="animate-spin text-[var(--accent-blue)]" size={32} />
+              <Loader2 className="animate-spin text-brand" size={32} />
             </div>
           ) : inventory.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="text-[var(--text-tertiary)] mb-2" size={32} />
-              <p className="text-[var(--text-secondary)]">No inventory found</p>
+              <AlertCircle className="text-ink-subtle mb-2" size={32} />
+              <p className="text-ink-muted">No inventory found</p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border-custom)]">
+                  <thead className="bg-elevated border-b border-line">
                     <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Tag Serial</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">TID</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Plate</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Type</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Status</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Booth</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Created</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Tag Serial</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">TID</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Plate</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Type</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Status</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Booth</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Created</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inventory.map((item) => (
-                      <tr key={item.id} className="border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)]">
-                        <td className="px-6 py-4 text-sm text-[var(--text-primary)] font-mono">{item.tag_serial}</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)] font-mono">{item.tid.substring(0, 8)}...</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{item.vehicle_plate || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)] capitalize">{item.vehicle_type}</td>
+                      <tr key={item.id} className="border-b border-line hover:bg-elevated">
+                        <td className="px-6 py-4 text-sm text-ink font-mono">{item.tag_serial}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted font-mono">{item.tid.substring(0, 8)}...</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{item.vehicle_plate || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted capitalize">{item.vehicle_type}</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[item.status]}`}>
                             {statusLabels[item.status]}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                        <td className="px-6 py-4 text-sm text-ink-muted">
                           {item.status === 'activated' && item.first_activated_booth_id ? (
                             <span className="flex items-center gap-1">
-                              <CheckCircle size={16} className="text-[var(--accent-emerald)]" />
+                              <CheckCircle size={16} className="text-success" />
                               Booth {item.first_activated_booth_id}
                             </span>
                           ) : item.status === 'booth_assigned' ? (
                             <span className="flex items-center gap-1">
-                              <Clock size={16} className="text-[var(--accent-blue)]" />
+                              <Clock size={16} className="text-brand" />
                               Booth {item.booth_assigned_id}
                             </span>
                           ) : (
-                            <span className="text-[var(--text-tertiary)]">-</span>
+                            <span className="text-ink-subtle">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                        <td className="px-6 py-4 text-sm text-ink-muted">
                           {new Date(item.created_at).toLocaleDateString()}
                         </td>
                       </tr>
@@ -315,15 +315,15 @@ export default function InventoryManagement() {
               </div>
 
               {/* Pagination */}
-              <div className="flex justify-between items-center px-6 py-4 bg-[var(--bg-elevated)] border-t border-[var(--border-custom)]">
-                <div className="text-sm text-[var(--text-secondary)]">
+              <div className="flex justify-between items-center px-6 py-4 bg-elevated border-t border-line">
+                <div className="text-sm text-ink-muted">
                   Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => fetchInventory(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="flex items-center gap-1 px-3 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-2 bg-elevated text-ink rounded disabled:opacity-50"
                   >
                     <ChevronLeft size={18} />
                     Previous
@@ -331,7 +331,7 @@ export default function InventoryManagement() {
                   <button
                     onClick={() => fetchInventory(currentPage + 1)}
                     disabled={currentPage >= totalPages}
-                    className="flex items-center gap-1 px-3 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-2 bg-elevated text-ink rounded disabled:opacity-50"
                   >
                     Next
                     <ChevronRight size={18} />
@@ -346,10 +346,10 @@ export default function InventoryManagement() {
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-6 border-b border-[var(--border-custom)]">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Upload Inventory</h2>
-              <button onClick={() => setShowUploadModal(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
+          <div className="bg-surface border border-line rounded-xl skeu-card max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b border-line">
+              <h2 className="text-xl font-bold text-ink">Upload Inventory</h2>
+              <button onClick={() => setShowUploadModal(false)} className="text-ink-subtle hover:text-ink-muted">
                 <X size={24} />
               </button>
             </div>
@@ -357,17 +357,17 @@ export default function InventoryManagement() {
             <div className="p-6">
               {uploadResult ? (
                 <div className="space-y-4">
-                  <div className="bg-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/30 rounded-xl p-4">
-                    <p className="font-semibold text-[var(--accent-emerald)]">Upload Successful!</p>
-                    <p className="text-sm text-[var(--accent-emerald)] mt-1">Added: {uploadResult.added} tags</p>
+                  <div className="bg-success/10 border border-success/30 rounded-xl p-4">
+                    <p className="font-semibold text-success">Upload Successful!</p>
+                    <p className="text-sm text-success mt-1">Added: {uploadResult.added} tags</p>
                     {uploadResult.skipped > 0 && (
-                      <p className="text-sm text-[var(--accent-amber)] mt-1">Skipped: {uploadResult.skipped} duplicates</p>
+                      <p className="text-sm text-warning mt-1">Skipped: {uploadResult.skipped} duplicates</p>
                     )}
                   </div>
                   {uploadResult.errors.length > 0 && (
-                    <div className="bg-[var(--accent-rose)]/10 border border-[var(--accent-rose)]/30 rounded-xl p-4">
-                      <p className="font-semibold text-[var(--accent-rose)] text-sm">Errors:</p>
-                      <ul className="text-xs text-[var(--accent-rose)] mt-2 space-y-1">
+                    <div className="bg-danger/10 border border-danger/30 rounded-xl p-4">
+                      <p className="font-semibold text-danger text-sm">Errors:</p>
+                      <ul className="text-xs text-danger mt-2 space-y-1">
                         {uploadResult.errors.slice(0, 3).map((err: string, i: number) => (
                           <li key={i}>• {err}</li>
                         ))}
@@ -378,21 +378,21 @@ export default function InventoryManagement() {
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">CSV File</label>
+                    <label className="block text-sm font-medium text-ink-muted mb-2">CSV File</label>
                     <input
                       type="file"
                       accept=".csv"
                       onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 border border-[var(--border-custom)] rounded-xl"
+                      className="w-full px-3 py-2 border border-line rounded-xl"
                     />
-                    <p className="text-xs text-[var(--text-secondary)] mt-2">
+                    <p className="text-xs text-ink-muted mt-2">
                       Required columns: tag_serial, tid, epc, vehicle_plate, vehicle_type, vehicle_color
                     </p>
                   </div>
 
                   <button
                     onClick={downloadTemplate}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded-xl hover:bg-[var(--bg-elevated)]"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-elevated text-ink rounded-xl hover:bg-elevated"
                   >
                     <Download size={18} />
                     Download Template
@@ -401,14 +401,14 @@ export default function InventoryManagement() {
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowUploadModal(false)}
-                      className="flex-1 px-4 py-2 border border-[var(--border-custom)] text-[var(--text-secondary)] rounded-xl hover:bg-[var(--bg-elevated)]"
+                      className="flex-1 px-4 py-2 border border-line text-ink-muted rounded-xl hover:bg-elevated"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleUpload}
                       disabled={!uploadFile || isUploading}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-blue)] text-white rounded-xl hover:opacity-90 disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-brand text-brand-on rounded-xl hover:opacity-90 disabled:opacity-50"
                     >
                       {isUploading && <Loader2 className="animate-spin" size={18} />}
                       Upload

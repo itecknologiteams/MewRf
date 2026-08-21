@@ -14,7 +14,7 @@ from .serializers import (
     TollTripSerializer, TollLaneSerializer, PlazaCreateSerializer, LaneCreateSerializer,
 )
 from .services import EntryService, ExitService, invalidate_rate_cache
-from apps.users.permissions import IsAdmin, IsOperator
+from apps.users.permissions import IsAdmin, IsOperator, scope_to_owner
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,51 @@ class TripHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, vehicle_id):
-        trips = TollTrip.objects.select_related(
-            'entry_plaza', 'exit_plaza'
+        trips = scope_to_owner(
+            TollTrip.objects.select_related('entry_plaza', 'exit_plaza'),
+            request.user,
+            'vehicle__owner',
         ).filter(vehicle_id=vehicle_id).order_by('-entry_time')
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(trips, request)
+        return paginator.get_paginated_response(TollTripSerializer(page, many=True).data)
+
+
+class MyTripListView(APIView):
+    """GET /tolls/trips/my/ — every trip across all of the caller's vehicles.
+
+    The consumer app had no way to ask this. `trips/<vehicle_id>/` is per vehicle, so
+    showing a holder their journey history meant the client first fetching /vehicles/my/
+    and then issuing one request per vehicle — and then trying to merge N independently
+    paginated streams into one ordered list, which cannot be done correctly: page 1 of two
+    vehicles is not the first page of the union.
+
+    Ordering is by entry_time DESC with `id` as a tiebreak. Without the tiebreak two trips
+    sharing an entry_time (the same instant is entirely possible across two plazas) can
+    swap places between page 1 and page 2, which either duplicates a row or hides one.
+
+    `status` narrows to one TripStatus; anything else is refused rather than ignored, so a
+    typo surfaces as an error instead of silently returning everything.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        trips = scope_to_owner(
+            TollTrip.objects.select_related('entry_plaza', 'exit_plaza', 'vehicle'),
+            request.user,
+            'vehicle__owner',
+        )
+
+        status = (request.query_params.get('status') or '').strip().lower()
+        if status:
+            valid = {choice for choice, _ in TripStatus.choices}
+            if status not in valid:
+                return error_response(
+                    f"status must be one of: {', '.join(sorted(valid))}"
+                )
+            trips = trips.filter(status=status)
+
+        trips = trips.order_by('-entry_time', '-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(trips, request)
         return paginator.get_paginated_response(TollTripSerializer(page, many=True).data)

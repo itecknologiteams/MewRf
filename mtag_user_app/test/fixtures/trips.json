@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 1,
+      "plate_number": "FIX1654",
+      "entry_plaza_name": "Fixture Main Toll Plaza",
+      "exit_plaza_name": "Fixture Interchange",
+      "entry_time": "2026-08-20T21:54:24.662814+05:00",
+      "exit_time": "2026-08-20T21:54:24.662586+05:00",
+      "charge_amount": "120.00",
+      "balance_before": "1370.00",
+      "balance_after": "1250.00",
+      "status": "completed",
+      "duration_minutes": -0.0
+    }
+  ],
+  "meta": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "total_pages": 1,
+    "current_page": 1
+  }
+}

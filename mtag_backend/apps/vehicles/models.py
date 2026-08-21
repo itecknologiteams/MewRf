@@ -69,6 +69,19 @@ class TagStatus(models.TextChoices):
     DEACTIVATED = 'deactivated', 'Deactivated'
 
 
+def default_tag_expiry():
+    """Expiry for a newly issued tag: settings.TAG_VALIDITY_MONTHS from today.
+
+    A callable default (not a fixed date) so every tag row carries a real term
+    instead of the far-future placeholder issuance used to write, which made an
+    expired tag indistinguishable from a fresh one.
+    """
+    from django.conf import settings
+    from django.utils import timezone
+    from utils.dates import add_months
+    return add_months(timezone.localdate(), getattr(settings, 'TAG_VALIDITY_MONTHS', 24))
+
+
 class Vehicle(models.Model):
     owner = models.ForeignKey(
         'users.User', on_delete=models.PROTECT, related_name='vehicles'
@@ -93,7 +106,7 @@ class Tag(models.Model):
     epc = models.CharField(max_length=24, blank=True, default='')
     vehicle = models.OneToOneField(Vehicle, null=True, blank=True, on_delete=models.CASCADE, related_name='tag')
     issued_at = models.DateTimeField(auto_now_add=True)
-    expiry_date = models.DateField()
+    expiry_date = models.DateField(default=default_tag_expiry)
     status = models.CharField(max_length=20, choices=TagStatus.choices, default=TagStatus.ACTIVE)
     last_scanned_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)

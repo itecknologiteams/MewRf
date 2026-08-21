@@ -198,26 +198,26 @@ export default function Registration() {
   if (showSuccess) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] animate-fade-in-up">
-        <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-2xl shadow-xl p-8 text-center max-w-md w-full">
-          <div className="w-16 h-16 bg-[var(--accent-emerald)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-[var(--accent-emerald)]" />
+        <div className="bg-surface border border-line rounded-2xl skeu-card p-8 text-center max-w-md w-full">
+          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-success" />
           </div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Registration Complete!</h2>
-          <p className="text-sm text-[var(--text-secondary)] mb-6">
+          <h2 className="text-xl font-bold text-ink mb-2">Registration Complete!</h2>
+          <p className="text-sm text-ink-muted mb-6">
             M-Tag registered. The vehicle can now use expressway toll plazas without stopping.
           </p>
-          <div className="bg-[var(--bg-elevated)] rounded-xl p-4 mb-6 text-left space-y-1">
-            <p className="text-xs text-[var(--text-secondary)] uppercase tracking-wider mb-1">M-Tag Serial</p>
-            <p className="text-lg font-mono font-bold text-[var(--text-primary)]">{createdTagSerial}</p>
-            <p className="text-xs text-[var(--text-secondary)]">Plate: {vehicleForm.plate_number}</p>
-            <p className="text-xs text-[var(--text-secondary)]">Owner: {ownerName} · {ownerPhone}</p>
-            <p className="text-xs text-[var(--text-secondary)]">
-              Balance: <span className="font-semibold text-[var(--accent-emerald)]">PKR {vehicleForm.initial_balance ? parseFloat(vehicleForm.initial_balance).toLocaleString() : '0'}</span>
+          <div className="bg-elevated rounded-xl p-4 mb-6 text-left space-y-1">
+            <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">M-Tag Serial</p>
+            <p className="text-lg font-mono font-bold text-ink">{createdTagSerial}</p>
+            <p className="text-xs text-ink-muted">Plate: {vehicleForm.plate_number}</p>
+            <p className="text-xs text-ink-muted">Owner: {ownerName} · {ownerPhone}</p>
+            <p className="text-xs text-ink-muted">
+              Balance: <span className="font-semibold text-success">PKR {vehicleForm.initial_balance ? parseFloat(vehicleForm.initial_balance).toLocaleString() : '0'}</span>
             </p>
           </div>
           <button
             onClick={resetAll}
-            className="w-full py-3 bg-[var(--accent-blue)] text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
+            className="w-full py-3 bg-brand text-brand-on font-semibold rounded-xl hover:opacity-90 transition-opacity"
           >
             Register Another Vehicle
           </button>
@@ -229,8 +229,8 @@ export default function Registration() {
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">M-Tag Registration</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
+        <h1 className="text-2xl font-bold text-ink">M-Tag Registration</h1>
+        <p className="text-sm text-ink-muted mt-1">
           Register a new vehicle for Smart Expressway toll collection
         </p>
       </div>
@@ -243,52 +243,52 @@ export default function Registration() {
               onClick={() => { if (s < step) setStep(s); }}
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
                 step === s
-                  ? 'bg-[var(--accent-blue)] text-white'
+                  ? 'bg-brand text-brand-on'
                   : step > s
-                  ? 'bg-[var(--accent-emerald)] text-white cursor-pointer'
-                  : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-custom)]'
+                  ? 'bg-brand text-brand-on cursor-pointer'
+                  : 'bg-elevated text-ink-muted border border-line'
               }`}
             >
               {step > s ? <CheckCircle className="w-4 h-4" /> : s}
             </button>
-            <span className={`text-xs font-medium ${step === s ? 'text-[var(--accent-blue)]' : 'text-[var(--text-secondary)]'}`}>
+            <span className={`text-xs font-medium ${step === s ? 'text-brand' : 'text-ink-muted'}`}>
               {s === 1 ? 'Owner' : s === 2 ? 'Vehicle & Tag' : 'Confirm'}
             </span>
-            {s < 3 && <ArrowRight className="w-4 h-4 text-[var(--text-tertiary)]" />}
+            {s < 3 && <ArrowRight className="w-4 h-4 text-ink-subtle" />}
           </div>
         ))}
       </div>
 
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
 
         {/* ── Step 1: Owner ── */}
         {step === 1 && (
           <div className="p-6 animate-fade-in-up">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-[var(--accent-blue)]/10 rounded-lg">
-                <User className="w-5 h-5 text-[var(--accent-blue)]" />
+              <div className="p-2 bg-brand/10 rounded-lg">
+                <User className="w-5 h-5 text-brand" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Vehicle Owner</h2>
+              <h2 className="text-lg font-semibold text-ink">Vehicle Owner</h2>
             </div>
 
             {!isAdmin ? (
-              <div className="bg-[var(--bg-elevated)] rounded-xl p-5">
-                <p className="text-xs text-[var(--text-secondary)] uppercase tracking-wider mb-1">Registering for</p>
-                <p className="text-base font-semibold text-[var(--text-primary)]">{user?.full_name}</p>
-                <p className="text-sm text-[var(--text-secondary)]">{user?.phone}</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">User ID: {user?.id}</p>
+              <div className="bg-elevated rounded-xl p-5">
+                <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">Registering for</p>
+                <p className="text-base font-semibold text-ink">{user?.full_name}</p>
+                <p className="text-sm text-ink-muted">{user?.phone}</p>
+                <p className="text-xs text-ink-subtle mt-1">User ID: {user?.id}</p>
               </div>
             ) : (
               <div className="space-y-5">
                 {/* Mode toggle */}
-                <div className="flex gap-2 p-1 bg-[var(--bg-elevated)] rounded-xl w-fit">
+                <div className="flex gap-2 p-1 bg-elevated rounded-xl w-fit">
                   <button
                     type="button"
                     onClick={() => { setOwnerMode('existing'); setOwnerId(''); setFoundUser(null); }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       ownerMode === 'existing'
-                        ? 'bg-[var(--bg-surface)] text-[var(--accent-blue)] shadow-sm'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        ? 'bg-surface text-brand shadow-sm'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     <Search className="w-4 h-4" />
@@ -299,8 +299,8 @@ export default function Registration() {
                     onClick={() => { setOwnerMode('new'); setOwnerId(''); setFoundUser(null); }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       ownerMode === 'new'
-                        ? 'bg-[var(--bg-surface)] text-[var(--accent-blue)] shadow-sm'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        ? 'bg-surface text-brand shadow-sm'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     <UserPlus className="w-4 h-4" />
@@ -312,26 +312,26 @@ export default function Registration() {
                 {ownerMode === 'existing' && (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                        Phone Number <span className="text-[var(--accent-rose)]">*</span>
+                      <label className="block text-sm font-medium text-ink mb-1.5">
+                        Phone Number <span className="text-danger">*</span>
                       </label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle" />
                           <input
                             type="tel"
                             value={searchPhone}
                             onChange={(e) => setSearchPhone(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearchUser()}
                             placeholder="03001234567"
-                            className="w-full pl-10 pr-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+                            className="w-full pl-10 pr-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={handleSearchUser}
                           disabled={isSearching}
-                          className="flex items-center gap-2 px-5 py-3 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                          className="flex items-center gap-2 px-5 py-3 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
                         >
                           {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                           Find
@@ -339,11 +339,11 @@ export default function Registration() {
                       </div>
                     </div>
                     {foundUser && (
-                      <div className="bg-[var(--accent-emerald)]/5 border border-[var(--accent-emerald)]/20 rounded-xl p-4 flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-[var(--accent-emerald)] flex-shrink-0" />
+                      <div className="bg-success/5 border border-success/20 rounded-xl p-4 flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">{foundUser.full_name}</p>
-                          <p className="text-xs text-[var(--text-secondary)]">{foundUser.phone} · ID: {foundUser.id}</p>
+                          <p className="text-sm font-semibold text-ink">{foundUser.full_name}</p>
+                          <p className="text-xs text-ink-muted">{foundUser.phone} · ID: {foundUser.id}</p>
                         </div>
                       </div>
                     )}
@@ -355,39 +355,39 @@ export default function Registration() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                          Full Name <span className="text-[var(--accent-rose)]">*</span>
+                        <label className="block text-sm font-medium text-ink mb-1.5">
+                          Full Name <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
                           value={newFullName}
                           onChange={(e) => setNewFullName(e.target.value)}
                           placeholder="Muhammad Ali"
-                          className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+                          className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                          Phone <span className="text-[var(--accent-rose)]">*</span>
+                        <label className="block text-sm font-medium text-ink mb-1.5">
+                          Phone <span className="text-danger">*</span>
                         </label>
                         <input
                           type="tel"
                           value={newPhone}
                           onChange={(e) => setNewPhone(e.target.value)}
                           placeholder="03001234567"
-                          className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+                          className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                          CNIC <span className="text-[var(--accent-rose)]">*</span>
+                        <label className="block text-sm font-medium text-ink mb-1.5">
+                          CNIC <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
                           value={newCnic}
                           onChange={(e) => setNewCnic(e.target.value)}
                           placeholder="35201-1234567-8"
-                          className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+                          className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                         />
                       </div>
                     </div>
@@ -395,7 +395,7 @@ export default function Registration() {
                       type="button"
                       onClick={handleRegisterNewUser}
                       disabled={isRegistering || !!ownerId}
-                      className="flex items-center gap-2 px-5 py-3 bg-[var(--accent-emerald)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                      className="flex items-center gap-2 px-5 py-3 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
                     >
                       {isRegistering ? (
                         <><Loader2 className="w-4 h-4 animate-spin" />Creating...</>
@@ -406,11 +406,11 @@ export default function Registration() {
                       )}
                     </button>
                     {ownerId && ownerMode === 'new' && (
-                      <div className="bg-[var(--accent-emerald)]/5 border border-[var(--accent-emerald)]/20 rounded-xl p-4 flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-[var(--accent-emerald)] flex-shrink-0" />
+                      <div className="bg-success/5 border border-success/20 rounded-xl p-4 flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">{ownerName}</p>
-                          <p className="text-xs text-[var(--text-secondary)]">{ownerPhone} · ID: {ownerId}</p>
+                          <p className="text-sm font-semibold text-ink">{ownerName}</p>
+                          <p className="text-xs text-ink-muted">{ownerPhone} · ID: {ownerId}</p>
                         </div>
                       </div>
                     )}
@@ -423,7 +423,7 @@ export default function Registration() {
               <button
                 type="button"
                 onClick={handleStep1Next}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
+                className="flex items-center gap-2 px-6 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
               >
                 Next Step
                 <ArrowRight className="w-4 h-4" />
@@ -436,37 +436,37 @@ export default function Registration() {
         {step === 2 && (
           <div className="p-6 animate-fade-in-up">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-[var(--accent-cyan)]/10 rounded-lg">
-                <Car className="w-5 h-5 text-[var(--accent-cyan)]" />
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Car className="w-5 h-5 text-info" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Vehicle & Tag Details</h2>
+              <h2 className="text-lg font-semibold text-ink">Vehicle & Tag Details</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                  Plate Number <span className="text-[var(--accent-rose)]">*</span>
+                <label className="block text-sm font-medium text-ink mb-1.5">
+                  Plate Number <span className="text-danger">*</span>
                 </label>
                 <input
                   type="text"
                   value={vehicleForm.plate_number}
                   onChange={(e) => updateVehicleField('plate_number', normalizePlate(e.target.value))}
                   placeholder="LHR1234"
-                  className={`w-full px-4 py-3 bg-[var(--bg-elevated)] border rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all ${
-                    errors.plate_number ? 'border-[var(--accent-rose)]' : 'border-[var(--border-custom)]'
+                  className={`w-full px-4 py-3 bg-elevated border rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all ${
+                    errors.plate_number ? 'border-danger' : 'border-line'
                   }`}
                 />
-                {errors.plate_number && <p className="text-xs text-[var(--accent-rose)] mt-1">{errors.plate_number}</p>}
+                {errors.plate_number && <p className="text-xs text-danger mt-1">{errors.plate_number}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                  Vehicle Type <span className="text-[var(--accent-rose)]">*</span>
+                <label className="block text-sm font-medium text-ink mb-1.5">
+                  Vehicle Type <span className="text-danger">*</span>
                 </label>
                 <select
                   value={vehicleForm.vehicle_type}
                   onChange={(e) => updateVehicleField('vehicle_type', e.target.value)}
-                  className="w-full px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+                  className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                 >
                   <option value="car">Car</option>
                   <option value="truck">Truck</option>
@@ -476,11 +476,11 @@ export default function Registration() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                  M-Tag Serial <span className="text-[var(--accent-rose)]">*</span>
+                <label className="block text-sm font-medium text-ink mb-1.5">
+                  M-Tag Serial <span className="text-danger">*</span>
                 </label>
                 {loadingTags ? (
-                  <div className="flex items-center gap-2 px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-tertiary)]">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink-subtle">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Loading available tags…
                   </div>
@@ -488,8 +488,8 @@ export default function Registration() {
                   <select
                     value={vehicleForm.tag_serial}
                     onChange={(e) => updateVehicleField('tag_serial', e.target.value)}
-                    className={`w-full px-4 py-3 bg-[var(--bg-elevated)] border rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all ${
-                      errors.tag_serial ? 'border-[var(--accent-rose)]' : 'border-[var(--border-custom)]'
+                    className={`w-full px-4 py-3 bg-elevated border rounded-xl text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all ${
+                      errors.tag_serial ? 'border-danger' : 'border-line'
                     }`}
                   >
                     <option value="">— Select an unassigned tag —</option>
@@ -501,20 +501,20 @@ export default function Registration() {
                   </select>
                 )}
                 {!loadingTags && availableTags.length === 0 && (
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">No unassigned tags in inventory.</p>
+                  <p className="text-xs text-ink-subtle mt-1">No unassigned tags in inventory.</p>
                 )}
                 {!loadingTags && availableTags.length > 0 && (
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">Showing {availableTags.length} unassigned tag{availableTags.length > 1 ? 's' : ''}.</p>
+                  <p className="text-xs text-ink-subtle mt-1">Showing {availableTags.length} unassigned tag{availableTags.length > 1 ? 's' : ''}.</p>
                 )}
-                {errors.tag_serial && <p className="text-xs text-[var(--accent-rose)] mt-1">{errors.tag_serial}</p>}
+                {errors.tag_serial && <p className="text-xs text-danger mt-1">{errors.tag_serial}</p>}
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                  Initial Balance <span className="text-[var(--text-tertiary)] font-normal">(optional)</span>
+                <label className="block text-sm font-medium text-ink mb-1.5">
+                  Initial Balance <span className="text-ink-subtle font-normal">(optional)</span>
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-[var(--text-tertiary)]">PKR</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-ink-subtle">PKR</span>
                   <input
                     type="number"
                     min="0"
@@ -522,18 +522,18 @@ export default function Registration() {
                     value={vehicleForm.initial_balance}
                     onChange={(e) => updateVehicleField('initial_balance', e.target.value)}
                     placeholder="0"
-                    className="w-full pl-14 pr-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-emerald)] focus:ring-2 focus:ring-[var(--accent-emerald)]/20 transition-all"
+                    className="w-full pl-14 pr-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-success focus:ring-2 focus:ring-success/20 transition-all"
                   />
                 </div>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">Leave empty to start with Rs. 0 balance.</p>
+                <p className="text-xs text-ink-subtle mt-1">Leave empty to start with Rs. 0 balance.</p>
               </div>
             </div>
 
             <div className="flex justify-between mt-6">
-              <button type="button" onClick={() => setStep(1)} className="px-6 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors">
+              <button type="button" onClick={() => setStep(1)} className="px-6 py-2.5 bg-elevated border border-line text-ink text-sm font-medium rounded-xl hover:bg-surface transition-colors">
                 Back
               </button>
-              <button type="button" onClick={handleStep2Next} className="flex items-center gap-2 px-6 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity">
+              <button type="button" onClick={handleStep2Next} className="flex items-center gap-2 px-6 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity">
                 Next Step
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -545,49 +545,49 @@ export default function Registration() {
         {step === 3 && (
           <form onSubmit={handleSubmit} className="p-6 animate-fade-in-up">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-[var(--accent-emerald)]/10 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-[var(--accent-emerald)]" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-success" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Confirm Registration</h2>
+              <h2 className="text-lg font-semibold text-ink">Confirm Registration</h2>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-[var(--bg-elevated)] rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Owner Details</h3>
+              <div className="bg-elevated rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-ink-muted uppercase tracking-wider mb-3">Owner Details</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">Name</span>
-                    <span className="text-[var(--text-primary)] font-medium">{ownerName || '—'}</span>
+                    <span className="text-ink-muted">Name</span>
+                    <span className="text-ink font-medium">{ownerName || '—'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">Phone</span>
-                    <span className="text-[var(--text-primary)] font-medium">{ownerPhone || '—'}</span>
+                    <span className="text-ink-muted">Phone</span>
+                    <span className="text-ink font-medium">{ownerPhone || '—'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">User ID</span>
-                    <span className="text-[var(--text-primary)] font-mono">{ownerId}</span>
+                    <span className="text-ink-muted">User ID</span>
+                    <span className="text-ink font-mono">{ownerId}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-[var(--bg-elevated)] rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Vehicle & Tag Details</h3>
+              <div className="bg-elevated rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-ink-muted uppercase tracking-wider mb-3">Vehicle & Tag Details</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">Plate Number</span>
-                    <span className="text-[var(--text-primary)] font-mono font-bold">{vehicleForm.plate_number}</span>
+                    <span className="text-ink-muted">Plate Number</span>
+                    <span className="text-ink font-mono font-bold">{vehicleForm.plate_number}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">Vehicle Type</span>
-                    <span className="text-[var(--text-primary)] capitalize">{vehicleForm.vehicle_type}</span>
+                    <span className="text-ink-muted">Vehicle Type</span>
+                    <span className="text-ink capitalize">{vehicleForm.vehicle_type}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">M-Tag Serial</span>
-                    <span className="text-[var(--text-primary)] font-mono">{vehicleForm.tag_serial}</span>
+                    <span className="text-ink-muted">M-Tag Serial</span>
+                    <span className="text-ink font-mono">{vehicleForm.tag_serial}</span>
                   </div>
-                  <div className="flex justify-between text-sm pt-2 border-t border-[var(--border-custom)]">
-                    <span className="text-[var(--text-secondary)]">Initial Balance</span>
-                    <span className={`font-semibold ${vehicleForm.initial_balance ? 'text-[var(--accent-emerald)]' : 'text-[var(--text-tertiary)]'}`}>
+                  <div className="flex justify-between text-sm pt-2 border-t border-line">
+                    <span className="text-ink-muted">Initial Balance</span>
+                    <span className={`font-semibold ${vehicleForm.initial_balance ? 'text-success' : 'text-ink-subtle'}`}>
                       PKR {vehicleForm.initial_balance ? parseFloat(vehicleForm.initial_balance).toLocaleString() : '0'}
                     </span>
                   </div>
@@ -596,13 +596,13 @@ export default function Registration() {
             </div>
 
             <div className="flex justify-between mt-8">
-              <button type="button" onClick={() => setStep(2)} className="px-6 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors">
+              <button type="button" onClick={() => setStep(2)} className="px-6 py-2.5 bg-elevated border border-line text-ink text-sm font-medium rounded-xl hover:bg-surface transition-colors">
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[var(--accent-blue)] to-[#6366F1] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                className="flex items-center gap-2 px-6 py-2.5 bg-brand text-brand-on text-sm font-semibold rounded-xl hover:bg-brand-strong active:bg-brand-strong transition-colors disabled:opacity-60"
               >
                 {isSubmitting ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />Registering...</>

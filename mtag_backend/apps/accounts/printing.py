@@ -13,6 +13,7 @@ import logging
 import os
 import subprocess
 import tempfile
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 
@@ -120,6 +121,14 @@ def _logo_escpos():
         return None
 
 
+def _amount(value) -> Decimal:
+    """Receipt figures arrive as strings; a bad one must not stop the print."""
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal('0')
+
+
 def _build_receipt_bytes(data: dict) -> bytes:
     """Build the topup-receipt ESC/POS byte stream (80mm / 48 cols)."""
     p = bytearray()
@@ -147,7 +156,15 @@ def _build_receipt_bytes(data: dict) -> bytes:
         p += _lr('Vehicle Reg:', str(data.get('vehicle_reg')))
     if data.get('tid'):
         p += _lr('TID:', str(data.get('tid')))
+    if data.get('expiry_date'):
+        p += _lr('Tag Valid Till:', str(data.get('expiry_date')))
     p += _dash()
+    # Only registrations carry a charge; showing a Rs.0.00 line on every repeat
+    # topup would just invite the question of what it is.
+    charge = _amount(data.get('service_charge'))
+    if charge > 0:
+        p += _lr('Cash Received:', 'Rs.' + str(data.get('cash_received', '')))
+        p += _lr('Service Charge:', 'Rs.' + str(data.get('service_charge')))
     p += _lr('Amount Added:', 'Rs.' + str(data.get('amount', '')))
     if data.get('balance_before') is not None:
         p += _lr('Previous Balance:', 'Rs.' + str(data.get('balance_before')))
@@ -173,8 +190,9 @@ def print_topup_receipt(data: dict) -> bool:
     """Print a topup receipt on the POS80 CUPS printer. Best-effort: returns
     True if the `lp` job was submitted, False otherwise (never raises).
 
-    `data` keys: receipt_no, datetime, consumer_name, vehicle_reg, tid, amount,
-    balance_before, balance_after, payment, operator.
+    `data` keys: receipt_no, datetime, consumer_name, vehicle_reg, tid,
+    expiry_date, amount, cash_received, service_charge, balance_before,
+    balance_after, payment, operator.
     """
     if not getattr(settings, 'TOPUP_RECEIPT_PRINT_ENABLED', False):
         logger.debug("Topup receipt printing disabled (TOPUP_RECEIPT_PRINT_ENABLED=False)")

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pre-Android-12 splash.
+     Below API 31 there is no SplashScreen API and no icon slot: the OS paints
+     `windowBackground` and nothing else. So the mark is baked into the drawable as a centred
+     bitmap layer. Without this second item, every device below Android 12 launched into a
+     plain #050505 screen with no branding — which is what "splash not working" looked like on
+     older hardware.
+     Android 12+ ignores this file entirely and uses values-v31/styles.xml instead. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_mark" />
+    </item>
+</layer-list>

@@ -17,7 +17,7 @@ from django.db import transaction
 
 from apps.tolls.models import FareMatrix, Plaza, TollLane, TollRate
 from apps.tolls.plaza_registry import (
-    LEGACY_PLAZA_ID_BASE, PLAZAS, format_plaza_id,
+    LANES, LEGACY_PLAZA_ID_BASE, PLAZAS, format_plaza_id,
 )
 
 
@@ -27,9 +27,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--apply', action='store_true', default=False,
                             help='Actually write. Without it this is a dry run.')
-        parser.add_argument('--lanes', type=int, default=4,
-                            help='Lanes to ensure per plaza, numbered 1..N (default 4). '
-                                 'Existing lanes are never removed.')
+        parser.add_argument('--lanes', type=int, default=None,
+                            help='DEPRECATED and ignored. Lane numbers come from '
+                                 'LANES in plaza_registry.py — they are the real '
+                                 'installed numbers, not a count from 1.')
+        parser.add_argument('--prune-lanes', action='store_true', default=False,
+                            help='Delete lanes that are NOT in the registry (e.g. the '
+                                 'lanes 1..4 the old --lanes seeding invented). Trips '
+                                 'keep their rows; their lane reference becomes NULL.')
         parser.add_argument('--drop-legacy', action='store_true', default=False,
                             help=f'Delete plazas with plaza_id >= {LEGACY_PLAZA_ID_BASE} '
                                  '(the pre-existing rows migration 0007 renumbered) '
@@ -38,6 +43,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         apply_changes = options['apply']
         lane_count    = options['lanes']
+        prune_lanes   = options['prune_lanes']
         drop_legacy   = options['drop_legacy']
         ok, warn, err = self.style.SUCCESS, self.style.WARNING, self.style.ERROR
 
@@ -59,6 +65,13 @@ class Command(BaseCommand):
         blocked = TollTrip.objects.filter(entry_plaza__in=legacy).exists() or \
                   TollTrip.objects.filter(exit_plaza__in=legacy).exists()
 
+        if lane_count is not None:
+            self.stdout.write(warn(
+                "  --lanes is ignored: lane numbers now come from LANES in "
+                "plaza_registry.py, because the real ones are sparse (plaza 001 "
+                "is 4,5,10,11,12,13) and never a 1..N count."
+            ))
+
         for plaza_id, name in PLAZAS:
             existing = Plaza.objects.filter(plaza_id=plaza_id).first()
             if existing is None:
@@ -67,7 +80,21 @@ class Command(BaseCommand):
                 verb = f'RENAME (was "{existing.name}")'
             else:
                 verb = 'ok'
+            wanted = LANES.get(plaza_id, ())
+            lanes_txt = ','.join(str(n) for n in wanted) or '(none)'
             self.stdout.write(f"  {format_plaza_id(plaza_id)}  {name:<32} {verb}")
+            self.stdout.write(f"        lanes: {lanes_txt}")
+            if existing is not None:
+                have = set(existing.lanes.values_list('lane_number', flat=True))
+                missing = sorted(set(wanted) - have)
+                stale = sorted(have - set(wanted))
+                if missing:
+                    self.stdout.write(f"        to add:  {','.join(map(str, missing))}")
+                if stale:
+                    self.stdout.write(warn(
+                        f"        not in registry: {','.join(map(str, stale))}"
+                        f"{' — will be DELETED' if prune_lanes else ' (pass --prune-lanes to remove)'}"
+                    ))
 
         if legacy:
             self.stdout.write("")
@@ -94,7 +121,7 @@ class Command(BaseCommand):
             return
 
         with transaction.atomic():
-            created = renamed = 0
+            created = renamed = lanes_pruned = 0
             for plaza_id, name in PLAZAS:
                 plaza, was_created = Plaza.objects.update_or_create(
                     plaza_id=plaza_id,
@@ -102,8 +129,18 @@ class Command(BaseCommand):
                 )
                 created += int(was_created)
                 renamed += int(not was_created)
-                for lane_no in range(1, lane_count + 1):
+                # The operator's real lane numbers, not 1..N. A plaza absent from
+                # LANES gets no lanes rather than invented ones.
+                for lane_no in LANES.get(plaza_id, ()):
                     TollLane.objects.get_or_create(plaza=plaza, lane_number=lane_no)
+                if prune_lanes:
+                    stale = TollLane.objects.filter(plaza=plaza).exclude(
+                        lane_number__in=LANES.get(plaza_id, ())
+                    )
+                    lanes_pruned += stale.count()
+                    # Every FK to TollLane is SET_NULL, so trips and their money
+                    # survive; only the record of which lane was used is lost.
+                    stale.delete()
 
             dropped_plazas = dropped_rates = 0
             if drop_legacy:
@@ -117,8 +154,11 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write(ok(
             f"Applied — {created} created, {renamed} updated, "
-            f"{lane_count} lane(s) ensured per plaza"
+            f"{sum(len(v) for v in LANES.values())} lane(s) ensured "
+            f"across {len(LANES)} plaza(s)"
         ))
+        if prune_lanes:
+            self.stdout.write(ok(f"Pruned {lanes_pruned} lane(s) not in the registry"))
         if drop_legacy:
             self.stdout.write(ok(
                 f"Removed {dropped_plazas} legacy plaza(s) and {dropped_rates} rate row(s)"

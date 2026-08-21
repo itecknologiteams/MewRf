@@ -13,8 +13,13 @@ class TagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tag
-        fields = ['id', 'tag_serial', 'issued_at', 'expiry_date', 'status', 'last_scanned_at', 'is_valid']
-        read_only_fields = ['id', 'issued_at', 'last_scanned_at']
+        # tid and epc are read-only but MUST be exposed: the JazzCash aggregator
+        # flow is keyed on the chip TID — the customer types it into the JazzCash
+        # app to top up. Without it the consumer app cannot tell a tag holder how
+        # to add balance, which is the app's primary job.
+        fields = ['id', 'tag_serial', 'tid', 'epc', 'issued_at', 'expiry_date',
+                  'status', 'last_scanned_at', 'is_valid']
+        read_only_fields = ['id', 'tid', 'epc', 'issued_at', 'last_scanned_at']
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -44,6 +49,47 @@ class VehicleSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError("Another vehicle already has this plate number.")
         return normalized
+
+
+class MyVehicleSerializer(serializers.ModelSerializer):
+    """One row of GET /vehicles/my/ — the consumer app's bootstrap call.
+
+    Carries the vehicle, its tag and the wallet in a single object. The wallet
+    belongs to the VEHICLE (Account is OneToOne on Vehicle), so a holder with
+    three vehicles has three balances and there is no such thing as a single
+    user balance — the client sums these itself and labels the total as a sum.
+
+    account_id/balance are flattened rather than nested because every later call
+    the app makes (/accounts/<id>/transactions/, /payments/topup/) needs the
+    account id, and a nested object invites the client to confuse it with the
+    vehicle id.
+    """
+    tag = TagSerializer(read_only=True)
+    account_id = serializers.SerializerMethodField()
+    balance = serializers.SerializerMethodField()
+    balance_updated_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Vehicle
+        fields = ['id', 'plate_number', 'vehicle_type', 'status', 'registered_at',
+                  'tag', 'account_id', 'balance', 'balance_updated_at']
+        read_only_fields = fields
+
+    def get_account_id(self, obj):
+        account = getattr(obj, 'account', None)
+        return account.id if account else None
+
+    def get_balance(self, obj):
+        # A vehicle can exist without an account (mid-reissue, or a row created
+        # before the account). Returning None rather than "0.00" keeps "unknown"
+        # distinguishable from "empty wallet" — the app must not show Rs. 0 for a
+        # balance it was never told.
+        account = getattr(obj, 'account', None)
+        return str(account.balance) if account else None
+
+    def get_balance_updated_at(self, obj):
+        account = getattr(obj, 'account', None)
+        return account.balance_updated_at if account else None
 
 
 class VehicleCreateSerializer(serializers.ModelSerializer):

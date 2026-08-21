@@ -25,6 +25,7 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -33,6 +34,7 @@ LOCAL_APPS = [
     'apps.tolls',
     'apps.accounts',
     'apps.payments',
+    'apps.notifications',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -184,10 +186,13 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_RATES': {
         'anon': '200/hour',
         'user': '2000/hour',
         'login': '10/minute',
+        # Codes cost money and target someone else's phone. Tighter than login.
+        'otp': '5/minute',
     },
 }
 
@@ -249,7 +254,111 @@ JAZZCASH_RETURN_URL = env('JAZZCASH_RETURN_URL', default='')
 # set True (and JAZZCASH_INTEGRITY_SALT) so the endpoints reject unsigned calls.
 JAZZCASH_VERIFY_HASH = env.bool('JAZZCASH_VERIFY_HASH', default=False)
 
+# ── Push notifications (FCM HTTP v1) ─────────────────────────────────────────
+#
+# Both must be set for push to be attempted; absent, every send is skipped with a debug log
+# and `/notifications/status/` reports push_available=False. That is the correct state for
+# the LAN deployment, which has no internet at all.
+#
+# The legacy server-key API was shut down by Google in June 2024, so v1 + a service account
+# is the only option. The credentials file is a PATH, never the key itself — a service
+# account JSON in settings or .env would end up in the repo.
+FCM_PROJECT_ID = env('FCM_PROJECT_ID', default='')
+FCM_CREDENTIALS_FILE = env('FCM_CREDENTIALS_FILE', default='')
+
+# ── SMS (phone OTP for first-time password setup) ────────────────────────────
+# 'console' logs the code instead of sending it — correct for dev and the LAN
+# deployment, and it makes the whole flow testable before any gateway account exists.
+# See apps/users/sms.py for the seam.
+SMS_BACKEND = env('SMS_BACKEND', default='console')
+TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
+TWILIO_FROM = env('TWILIO_FROM', default='')
+
+# Deliver the OTP by PUSH ONLY when the push demonstrably reached a bound device.
+#
+# Off by default, and the default is the safe one. Turning it on saves the SMS fee for a
+# holder who is already signed in on their handset, but it also means a holder whose only
+# bound device is a phone they no longer carry receives nothing — and since there is no
+# password reset in this system, an OTP nobody receives is an account nobody can recover.
+#
+# It does NOT change who can receive a code: push only ever goes to DeviceToken rows owned
+# by that user, which are created only by an authenticated request. An OTP can never be
+# pushed to a device that merely asked for one — see apps/users/otp_service.py for why that
+# distinction is an account takeover rather than a nicety.
+OTP_PUSH_SUPPRESSES_SMS = env.bool('OTP_PUSH_SUPPRESSES_SMS', default=False)
+
+# DEVELOPMENT ONLY. Push the OTP to whatever device asked for it.
+#
+# `config.settings.production` raises at import if this is on, because in production it is a
+# one-step account takeover: an OTP proves possession of a phone NUMBER, and a code sent to
+# the requester's own handset proves only that they installed the app. Anyone knowing a
+# customer's number could receive their code, set a new password and take the wallet.
+#
+# It exists because there is no SMS gateway yet. The console sender writes the code to the
+# server log, which is fine for curl and useless for exercising the real app on a real
+# phone — so this makes the whole onboarding flow testable end to end until a gateway is
+# contracted, at which point it goes back off and SMS becomes the channel of record.
+#
+# Only ever consulted when the account has NO already-bound device; a returning holder gets
+# the safe `send_to_user` path instead. Every use logs a WARNING.
+OTP_PUSH_TO_REQUESTING_DEVICE = env.bool('OTP_PUSH_TO_REQUESTING_DEVICE', default=False)
+
+# ── API documentation (drf-spectacular) ──────────────────────────────────────
+#
+# Served at /api/docs/ (Swagger UI), /api/redoc/ and /api/schema/.
+#
+# GATED BY DEFAULT. This is an internet-facing payment API: a public schema hands an
+# attacker the full surface — every path, every field, every enum — including the operator
+# and admin endpoints a consumer must never reach. Set API_DOCS_PUBLIC=true only on a
+# deployment you are happy to have indexed.
+API_DOCS_ENABLED = env.bool('API_DOCS_ENABLED', default=True)
+API_DOCS_PUBLIC = env.bool('API_DOCS_PUBLIC', default=False)
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'M-Tag API',
+    'DESCRIPTION': (
+        'Electronic toll collection for the Malir Expressway (Shahra-e-Bhutto), Karachi.\n\n'
+        '**Every response is wrapped in an envelope** that the generated schemas below do '
+        'NOT show:\n\n'
+        '```json\n'
+        '{"success": true,  "message": "Success", "data": <the documented shape>}\n'
+        '{"success": false, "message": "...",     "errors": {"field": ["..."]}}\n'
+        '```\n\n'
+        'Paginated endpoints add a sibling `meta` with `count`, `next`, `previous`, '
+        '`total_pages`, `current_page`.\n\n'
+        '**Authentication is cookie-based.** `POST /auth/login/` returns the user in `data` '
+        'and sets `access_token` / `refresh_token` as httpOnly cookies — the JWTs are NOT in '
+        'the body. Swagger UI sends cookies automatically once you have logged in, so the '
+        '"Authorize" button is not needed.\n\n'
+        'Access tokens last 6 hours, refresh 7 days, and refresh tokens ROTATE — two '
+        'concurrent refreshes will blacklist each other.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Endpoints are grouped by the first path segment after /api/v1/.
+    'TAGS': [
+        {'name': 'auth', 'description': 'Login, session, and phone-OTP password setup.'},
+        {'name': 'accounts', 'description': 'Balances and transactions. Consumer-scoped.'},
+        {'name': 'vehicles', 'description': 'Vehicles and tags.'},
+        {'name': 'tolls', 'description': 'Plazas, the fare matrix, and trip history.'},
+        {'name': 'payments', 'description': 'Top-ups. JazzCash webhooks are gateway-to-server.'},
+        {'name': 'notifications', 'description': 'FCM device registration.'},
+    ],
+    'SORT_OPERATIONS': True,
+}
+
 MINIMUM_ACCOUNT_BALANCE = 50
+
+# Allow ANONYMOUS callers to POST /api/v1/auth/register/.
+#
+# Off by default: there is no phone verification on that endpoint, so with it on
+# anyone can create `user` rows against arbitrary phone numbers, including
+# numbers belonging to real people who have not signed up. M-Tag accounts are
+# created at a booth, by an authenticated operator — that path is unaffected by
+# this setting (see apps/users/views.py RegisterView). Turn this on only once
+# phone-OTP verification exists.
+USER_SELF_REGISTRATION_ENABLED = env.bool('USER_SELF_REGISTRATION_ENABLED', default=False)
 
 # ── Topup receipt printing (POS / ESC-POS via CUPS `lp`) ──────────────────────
 # After a successful cash topup the backend prints a TOPUP receipt on the same
@@ -275,3 +384,16 @@ LOGGING = {
         'apps': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
     },
 }
+
+# ── Tag issuance ─────────────────────────────────────────────────────────────
+# A tag is valid for two years from the day it is issued. Kept here (not as a
+# literal in the topup view) so the term can be changed for a new batch without
+# touching code, and so the app and the receipt quote the same number.
+TAG_VALIDITY_MONTHS = env.int('TAG_VALIDITY_MONTHS', default=24)
+
+# One-off service charge for issuing a tag, taken out of the cash the consumer
+# hands over at registration (wallet is credited amount - charge). Only charged
+# on registration — a repeat topup on an already-issued tag pays nothing. The
+# operator can override the figure per registration; this is the default the
+# booth app prefills.
+TOPUP_SERVICE_CHARGE = env('TOPUP_SERVICE_CHARGE', default='350.00')

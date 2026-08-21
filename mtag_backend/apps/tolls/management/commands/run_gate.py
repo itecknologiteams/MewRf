@@ -13,8 +13,10 @@ Usage:
 import configparser
 import logging
 import os
+import statistics
 import threading
 import time
+from collections import deque
 from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
@@ -131,7 +133,11 @@ class Command(BaseCommand):
                 "[scanner]\n"
                 "reader_host = 192.168.78.8\n"
                 "reader_port = 9090\n"
-                "tag_cooldown = 5.0\n\n"
+                "tag_cooldown = 5.0\n"
+                "rssi_filter = 0        # min dBm to accept (0 = off)\n"
+                "rssi_filter_max = 0    # max dBm to accept (0 = off)\n"
+                "rssi_window = 5        # reads to median over\n"
+                "rssi_hysteresis = 3.0  # dB of slack before dropping a tag\n\n"
                 "[barrier]\n"
                 "port = /dev/ttyUSB0\n"
                 "baudrate = 115200\n"
@@ -154,8 +160,10 @@ class Command(BaseCommand):
         tag_cooldown    = float(cfg.get('scanner', 'tag_cooldown',    fallback='5.0'))
         antenna_power   = int(cfg.get('scanner', 'antenna_power',   fallback='33'))
         scan_interval   = float(cfg.get('scanner', 'scan_interval',  fallback='1.0'))
-        rssi_filter     = int(cfg.get('scanner', 'rssi_filter',     fallback='0'))
-        rssi_filter_max = int(cfg.get('scanner', 'rssi_filter_max', fallback='0'))
+        rssi_filter     = float(cfg.get('scanner', 'rssi_filter',     fallback='0'))
+        rssi_filter_max = float(cfg.get('scanner', 'rssi_filter_max', fallback='0'))
+        rssi_window     = int(cfg.get('scanner', 'rssi_window',      fallback='5'))
+        rssi_hysteresis = float(cfg.get('scanner', 'rssi_hysteresis', fallback='3.0'))
         serial_port = cfg.get('barrier', 'port',       fallback='/dev/ttyUSB0')
         serial_baud = int(cfg.get('barrier', 'baudrate', fallback='115200'))
         open_secs   = float(cfg.get('barrier', 'open_seconds', fallback='2.0'))
@@ -163,6 +171,16 @@ class Command(BaseCommand):
 
         if gate_mode not in ('entry', 'exit'):
             raise CommandError(f"Invalid gate mode '{gate_mode}' — must be 'entry' or 'exit'.")
+
+        if rssi_window < 1:
+            raise CommandError(f"rssi_window must be >= 1, got {rssi_window}.")
+        if rssi_hysteresis < 0:
+            raise CommandError(f"rssi_hysteresis must be >= 0, got {rssi_hysteresis}.")
+        if rssi_filter and rssi_filter_max and rssi_filter > rssi_filter_max:
+            raise CommandError(
+                f"rssi_filter ({rssi_filter:g}) is above rssi_filter_max "
+                f"({rssi_filter_max:g}) — no reading could ever pass."
+            )
 
         # This booth's mode is declared twice: `mode` here in rfid_config.ini
         # (what the gate does) and GATE_MODE in .env (which sync passes mtag-sync
@@ -207,6 +225,8 @@ class Command(BaseCommand):
             antenna_power=antenna_power,
             rssi_filter=rssi_filter,
             rssi_filter_max=rssi_filter_max,
+            rssi_window=rssi_window,
+            rssi_hysteresis=rssi_hysteresis,
             test_mode=test_mode,
             stdout=self.stdout,
         )
@@ -236,7 +256,8 @@ class GateController:
         self, *, gate_mode, plaza_id, lane_id,
         serial_port, serial_baud, open_secs,
         display_ip, tag_cooldown, stdout,
-        antenna_power=33, rssi_filter=0, rssi_filter_max=0, test_mode=False,
+        antenna_power=33, rssi_filter=0, rssi_filter_max=0,
+        rssi_window=5, rssi_hysteresis=3.0, test_mode=False,
     ):
         self.gate_mode     = gate_mode
         self.plaza_id      = plaza_id
@@ -247,8 +268,17 @@ class GateController:
         self.antenna_power = antenna_power
         self.rssi_filter     = rssi_filter
         self.rssi_filter_max = rssi_filter_max
+        self.rssi_window     = rssi_window
+        self.rssi_hysteresis = rssi_hysteresis
         self.test_mode       = test_mode
         self.stdout        = stdout
+
+        # RSSI smoothing state (see _rssi_accepts) — one short window per tag.
+        self._rssi_hist: dict    = {}   # tid → deque[float]
+        self._rssi_pass: dict    = {}   # tid → bool (last verdict, for hysteresis)
+        self._rssi_seen: dict    = {}   # tid → float (monotonic) — for pruning
+        self._rssi_lock          = threading.Lock()
+        self._rssi_pruned: float = 0.0  # monotonic time of last prune
 
         self.last_seen: dict      = {}   # (epc, tid) → datetime
         self.last_trigger: dict   = {}   # tid → float (monotonic)
@@ -351,16 +381,32 @@ class GateController:
     def _show_fare(self, fare):
         _bg_display(f"http://{self.display_ip}/?vehicle_number=Q.TAG&fare_amount={fare}")
 
-    def _show_denied(self, plate=''):
-        _bg_display(f"http://{self.display_ip}/?vehicle_number=DENIED&fare_amount=0")
+    def _show_balance(self, balance):
+        """The only thing the customer-facing display ever states: what is left.
 
-    def _show_low_balance(self, current_balance, plate=''):
-        bal = int(float(current_balance)) if current_balance else 0
-        _bg_display(f"http://{self.display_ip}/?vehicle_number=LOW.BAL&fare_amount={bal}")
-
-    def _show_entry(self, balance, plate=''):
+        Refusals are deliberately not shown. A driver at the barrier can do
+        nothing with the word DENIED, and it reads as an accusation in front of
+        whoever is behind them; the balance is the fact that actually explains
+        the barrier and tells them what to do about it. Operators still get the
+        reason — every refusal is logged as `[gate] DENIED — <reason>`.
+        """
         bal = int(float(balance)) if balance else 0
         _bg_display(f"http://{self.display_ip}/?vehicle_number=R.BAL{bal}&fare_amount=0")
+
+    def _show_denied(self, plate='', balance=None):
+        # Kept so run_anpr_gate.py's call sites keep working. When the refusal
+        # carries no balance (unregistered plate, no account, unknown tag) there
+        # is nothing truthful to show, so the display is left as it was rather
+        # than asserting a balance of 0 for an account that does not exist.
+        if balance is None:
+            return
+        self._show_balance(balance)
+
+    def _show_low_balance(self, current_balance, plate=''):
+        self._show_balance(current_balance)
+
+    def _show_entry(self, balance, plate=''):
+        self._show_balance(balance)
 
     def _show_exit(self, charge, remaining, plate=''):
         rem = int(float(remaining)) if remaining else 0
@@ -372,6 +418,81 @@ class GateController:
             if time.monotonic() - gate._last_tx >= 5.0:
                 _fire(f"http://{gate.display_ip}/?vehicle_number=WELCOME&take_slip")
         threading.Thread(target=_do, daemon=True).start()
+
+    # ── RSSI gating ───────────────────────────────────────────────────────────
+
+    def _rssi_accepts(self, tid: str, rssi: float) -> bool:
+        """Decide whether a read is close enough, tolerating normal RSSI jitter.
+
+        A parked vehicle does not give a steady RSSI: multipath (including our
+        own barrier boom swinging through the beam), the reader's frequency
+        hopping, and the SDK's coarse RSSI encoding together move a stationary
+        tag by a few dB between consecutive reads. That encoding is a 3-bit
+        mantissa + 5-bit exponent (Tag_Model.RSSI()), so around -55 dBm the
+        representable values are only 0.6-1.0 dB apart and a drifting reading
+        visibly steps between rungs.
+
+        Comparing a single raw read against a hard threshold therefore makes a
+        tag parked near the boundary flap between accepted and IGNORED on
+        consecutive reads — an intermittent gate fault that is painful to
+        reproduce. Two things prevent that:
+
+          * decide on the *median* of a short per-tag window, so one outlier
+            read cannot flip the verdict; and
+          * apply hysteresis, so a tag already passing has to fall
+            `rssi_hysteresis` dB clear of the threshold before it is dropped
+            (and vice versa).
+
+        The median is taken over whatever samples exist so far, so a tag's
+        first read still decides immediately — smoothing costs no gate latency.
+        """
+        if not self.rssi_filter and not self.rssi_filter_max:
+            return True  # filtering disabled — accept everything, as before
+
+        now = time.monotonic()
+        with self._rssi_lock:
+            self._prune_rssi(now)
+
+            hist = self._rssi_hist.get(tid)
+            if hist is None:
+                hist = self._rssi_hist[tid] = deque(maxlen=self.rssi_window)
+            hist.append(rssi)
+            self._rssi_seen[tid] = now
+
+            level = statistics.median(hist)
+            # Hysteresis only widens the band for a tag that is already in, so
+            # a newcomer must clear the configured threshold outright.
+            slack = self.rssi_hysteresis if self._rssi_pass.get(tid, False) else 0.0
+
+            reason = ''
+            if self.rssi_filter and level < self.rssi_filter - slack:
+                reason = f"{level:.1f} dBm < min {self.rssi_filter:g} dBm"
+            elif self.rssi_filter_max and level > self.rssi_filter_max + slack:
+                reason = f"{level:.1f} dBm > max {self.rssi_filter_max:g} dBm"
+
+            ok = not reason
+            changed = self._rssi_pass.get(tid) != ok
+            self._rssi_pass[tid] = ok
+            samples = len(hist)
+
+        # Log only on a verdict change, so a car sitting in the field does not
+        # flood the log with one identical IGNORED line per read.
+        if not ok and changed:
+            self.stdout.write(
+                f"[rssi] IGNORED — {reason} (median of {samples})"
+            )
+        return ok
+
+    def _prune_rssi(self, now: float):
+        """Drop windows for tags long gone. Caller must hold _rssi_lock."""
+        if now - self._rssi_pruned < 30.0:
+            return
+        self._rssi_pruned = now
+        ttl = max(60.0, self.tag_cooldown * 4)
+        for tid in [t for t, seen in self._rssi_seen.items() if now - seen > ttl]:
+            self._rssi_hist.pop(tid, None)
+            self._rssi_pass.pop(tid, None)
+            self._rssi_seen.pop(tid, None)
 
     # ── Tag processing ────────────────────────────────────────────────────────
 
@@ -428,11 +549,10 @@ class GateController:
             reason = result.get('reason', 'denied')
             self.stdout.write(f"[gate] DENIED — {reason}")
             self._last_tx = time.monotonic()
-            if 'balance' in reason.lower() or 'insufficient' in reason.lower():
-                bal = result.get('current_balance', '0')
-                self._show_low_balance(bal, plate)
-            else:
-                self._show_denied(plate)
+            # Pass the balance through when the refusal carries one, so the
+            # display can still show it. Absent (unknown tag, no account), it
+            # stays None and the display is left untouched.
+            self._show_denied(plate, result.get('current_balance'))
             return
 
         plate        = result.get('vehicle', '')
@@ -502,15 +622,7 @@ class GateController:
                         return
                     rssi = tag.RSSI()
                     gate.stdout.write(f"[rssi] {tid} → {rssi:.1f} dBm")
-                    if gate.rssi_filter != 0 and rssi < gate.rssi_filter:
-                        gate.stdout.write(
-                            f"[rssi] IGNORED — {rssi:.1f} dBm < min {gate.rssi_filter} dBm"
-                        )
-                        return
-                    if gate.rssi_filter_max != 0 and rssi > gate.rssi_filter_max:
-                        gate.stdout.write(
-                            f"[rssi] IGNORED — {rssi:.1f} dBm > max {gate.rssi_filter_max} dBm"
-                        )
+                    if not gate._rssi_accepts(tid, rssi):
                         return
                     gate.on_tag(epc, tid)
                 except Exception as exc:

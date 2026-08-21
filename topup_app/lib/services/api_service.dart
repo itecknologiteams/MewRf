@@ -134,8 +134,31 @@ class ApiService {
     throw Exception(_message(r));
   }
 
+  /// Billing classes for the registration dropdown. Falls back to the built-in
+  /// list if the call fails, so a flaky link can't stall a registration.
+  Future<List<VehicleCategory>> vehicleCategories() async {
+    try {
+      await _ensure();
+      final r = await _dio.get('/tolls/vehicle-categories/');
+      if (r.statusCode == 200 && r.data is Map && r.data['success'] == true) {
+        final rows = (r.data['data'] as List?) ?? [];
+        final cats = rows
+            .whereType<Map>()
+            .map(VehicleCategory.fromMap)
+            .where((c) => c.code.isNotEmpty)
+            .toList();
+        if (cats.isNotEmpty) return cats;
+      }
+    } catch (_) {
+      // fall through to the built-in list
+    }
+    return VehicleCategory.fallback;
+  }
+
   /// Cash topup. Existing tag → pass {tid, amount}. New tag → also pass
-  /// consumerName/cnic/phone/epc to register. Returns the result map.
+  /// consumerName/cnic/phone/epc/vehicleType to register; `serviceCharge` is
+  /// the issuance fee taken out of `amount` (leave empty for the server
+  /// default). Returns the result map.
   Future<Map<String, dynamic>> cashTopup({
     required String tid,
     required String amount,
@@ -144,6 +167,8 @@ class ApiService {
     String cnic = '',
     String phone = '',
     String vehicleReg = '',
+    String vehicleType = '',
+    String serviceCharge = '',
   }) async {
     await _ensure();
     final r = await _dio.post('/accounts/topup/cash/', data: {
@@ -154,6 +179,8 @@ class ApiService {
       'cnic': cnic,
       'phone': phone,
       'vehicle_reg': vehicleReg,
+      'vehicle_type': vehicleType,
+      'service_charge': serviceCharge,
     });
     if (r.statusCode != null && r.statusCode! < 300 && r.data is Map && r.data['success'] == true) {
       return Map<String, dynamic>.from(r.data['data'] as Map);

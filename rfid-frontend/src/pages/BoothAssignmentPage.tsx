@@ -99,56 +99,56 @@ export default function BoothAssignmentPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Booth Assignment</h1>
-          <p className="text-[var(--text-secondary)]">Assign unregistered tags to specific booths</p>
+          <h1 className="text-3xl font-bold text-ink mb-2">Booth Assignment</h1>
+          <p className="text-ink-muted">Assign unregistered tags to specific booths</p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-4">
+          <div className="bg-surface rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[var(--text-secondary)] text-sm">Total Unregistered</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{inventory.length}</p>
+                <p className="text-ink-muted text-sm">Total Unregistered</p>
+                <p className="text-2xl font-bold text-ink">{inventory.length}</p>
               </div>
-              <AlertCircle className="text-[var(--text-tertiary)]" size={24} />
+              <AlertCircle className="text-ink-subtle" size={24} />
             </div>
           </div>
 
-          <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-4">
+          <div className="bg-surface rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[var(--text-secondary)] text-sm">Selected</p>
-                <p className="text-2xl font-bold text-[var(--accent-blue)]">{selectedItems.size}</p>
+                <p className="text-ink-muted text-sm">Selected</p>
+                <p className="text-2xl font-bold text-brand">{selectedItems.size}</p>
               </div>
-              <Check className="text-[var(--accent-blue)]" size={24} />
+              <Check className="text-brand" size={24} />
             </div>
           </div>
 
-          <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-4">
+          <div className="bg-surface rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[var(--text-secondary)] text-sm">Target Booth</p>
-                <p className="text-2xl font-bold text-[var(--text-primary)]">
+                <p className="text-ink-muted text-sm">Target Booth</p>
+                <p className="text-2xl font-bold text-ink">
                   {selectedBooth ? `Booth ${selectedBooth}` : '-'}
                 </p>
               </div>
-              <CheckCircle className="text-[var(--accent-emerald)]" size={24} />
+              <CheckCircle className="text-success" size={24} />
             </div>
           </div>
         </div>
 
         {/* Action Bar */}
-        <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-surface rounded-xl p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+              <label className="block text-sm font-medium text-ink-muted mb-2">
                 Select Booth (1-7)
               </label>
               <select
                 value={selectedBooth}
                 onChange={(e) => setSelectedBooth(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--border-custom)] rounded-xl focus:ring-2 focus:ring-[var(--accent-blue)]/20 focus:border-[var(--accent-blue)]"
+                className="w-full px-3 py-2 border border-line rounded-xl focus:ring-2 focus:ring-brand/35 focus:border-brand"
               >
                 <option value="">Choose booth...</option>
                 {Array.from({ length: 7 }, (_, i) => (
@@ -163,7 +163,7 @@ export default function BoothAssignmentPage() {
               <button
                 onClick={handleAssign}
                 disabled={selectedItems.size === 0 || !selectedBooth || isAssigning}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-blue)] text-white rounded-xl hover:opacity-90 disabled:opacity-50 font-medium"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-brand text-brand-on rounded-xl hover:opacity-90 disabled:opacity-50 font-medium"
               >
                 {isAssigning && <Loader2 className="animate-spin" size={18} />}
                 Assign Selected
@@ -173,21 +173,21 @@ export default function BoothAssignmentPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-[var(--bg-surface)] rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-xl overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="animate-spin text-[var(--accent-blue)]" size={32} />
+              <Loader2 className="animate-spin text-brand" size={32} />
             </div>
           ) : inventory.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <CheckCircle className="text-[var(--accent-emerald)] mb-2" size={32} />
-              <p className="text-[var(--text-secondary)]">All tags have been assigned!</p>
+              <CheckCircle className="text-success mb-2" size={32} />
+              <p className="text-ink-muted">All tags have been assigned!</p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-[var(--bg-elevated)] border-b border-[var(--border-custom)]">
+                  <thead className="bg-elevated border-b border-line">
                     <tr>
                       <th className="px-6 py-3 text-left">
                         <input
@@ -197,19 +197,19 @@ export default function BoothAssignmentPage() {
                           className="w-4 h-4 cursor-pointer"
                         />
                       </th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Tag Serial</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">TID</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Plate</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Type</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-[var(--text-primary)]">Created</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Tag Serial</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">TID</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Plate</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Type</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-ink">Created</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inventory.map((item) => (
                       <tr
                         key={item.id}
-                        className={`border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)] ${
-                          selectedItems.has(item.id) ? 'bg-[var(--accent-blue)]/10' : ''
+                        className={`border-b border-line hover:bg-elevated ${
+                          selectedItems.has(item.id) ? 'bg-brand/10' : ''
                         }`}
                       >
                         <td className="px-6 py-4">
@@ -220,11 +220,11 @@ export default function BoothAssignmentPage() {
                             className="w-4 h-4 cursor-pointer"
                           />
                         </td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-primary)] font-mono">{item.tag_serial}</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)] font-mono">{item.tid.substring(0, 8)}...</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{item.vehicle_plate || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)] capitalize">{item.vehicle_type}</td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                        <td className="px-6 py-4 text-sm text-ink font-mono">{item.tag_serial}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted font-mono">{item.tid.substring(0, 8)}...</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{item.vehicle_plate || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted capitalize">{item.vehicle_type}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">
                           {new Date(item.created_at).toLocaleDateString()}
                         </td>
                       </tr>
@@ -234,15 +234,15 @@ export default function BoothAssignmentPage() {
               </div>
 
               {/* Pagination */}
-              <div className="flex justify-between items-center px-6 py-4 bg-[var(--bg-elevated)] border-t border-[var(--border-custom)]">
-                <div className="text-sm text-[var(--text-secondary)]">
+              <div className="flex justify-between items-center px-6 py-4 bg-elevated border-t border-line">
+                <div className="text-sm text-ink-muted">
                   Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => fetchUnregisteredInventory(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="flex items-center gap-1 px-3 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded hover:bg-[var(--bg-surface)] disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-2 bg-elevated text-ink rounded hover:bg-surface disabled:opacity-50"
                   >
                     <ChevronLeft size={18} />
                     Previous
@@ -250,7 +250,7 @@ export default function BoothAssignmentPage() {
                   <button
                     onClick={() => fetchUnregisteredInventory(currentPage + 1)}
                     disabled={currentPage >= totalPages}
-                    className="flex items-center gap-1 px-3 py-2 bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded hover:bg-[var(--bg-surface)] disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-2 bg-elevated text-ink rounded hover:bg-surface disabled:opacity-50"
                   >
                     Next
                     <ChevronRight size={18} />

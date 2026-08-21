@@ -3,6 +3,7 @@ from .views import (
     RegisterView, LoginView, LogoutView, MeView,
     AdminUserListView, AdminUserDetailView, ChangePasswordView,
     TokenRefreshCookieView,
+    OtpRequestView, OtpVerifyView, OtpSetPasswordView, PhoneStatusView,
 )
 
 urlpatterns = [
@@ -12,6 +13,13 @@ urlpatterns = [
     path('me/', MeView.as_view(), name='me'),
     path('change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('token/refresh/', TokenRefreshCookieView.as_view(), name='token-refresh'),
+
+    # First-time password setup / reset, verified by SMS code.
+    # Asked BEFORE requesting a code, so an existing password routes to login.
+    path('phone-status/', PhoneStatusView.as_view(), name='phone-status'),
+    path('otp/request/', OtpRequestView.as_view(), name='otp-request'),
+    path('otp/verify/', OtpVerifyView.as_view(), name='otp-verify'),
+    path('otp/set-password/', OtpSetPasswordView.as_view(), name='otp-set-password'),
     path('admin/users/', AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<int:pk>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
 ]

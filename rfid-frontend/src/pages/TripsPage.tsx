@@ -19,13 +19,13 @@ const STATUS_OPTIONS = ['All', 'active', 'completed', 'failed'];
 const statusBadge = (status: string) => {
   switch (status) {
     case 'active':
-      return 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border-[var(--accent-blue)]/20';
+      return 'bg-brand/10 text-brand border-brand/20';
     case 'completed':
-      return 'bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)] border-[var(--accent-emerald)]/20';
+      return 'bg-success/10 text-success border-success/20';
     case 'failed':
-      return 'bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] border-[var(--accent-rose)]/20';
+      return 'bg-danger/10 text-danger border-danger/20';
     default:
-      return 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-custom)]';
+      return 'bg-elevated text-ink-muted border-line';
   }
 };
 
@@ -147,16 +147,16 @@ export default function TripsPage() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <Route className="w-6 h-6 text-[var(--accent-blue)]" />
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Trip History</h1>
+            <Route className="w-6 h-6 text-brand" />
+            <h1 className="text-2xl font-bold text-ink">Trip History</h1>
           </div>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
+          <p className="text-sm text-ink-muted mt-1">
             {loading ? 'Loading...' : `${filtered.length} trips found`}
           </p>
         </div>
         <button
           onClick={fetchTrips}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-secondary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors self-start"
+          className="flex items-center gap-2 px-4 py-2.5 bg-elevated border border-line text-ink-muted text-sm font-medium rounded-xl hover:bg-surface transition-colors self-start"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -164,14 +164,14 @@ export default function TripsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-4 mb-6 shadow-sm">
+      <div className="bg-surface border border-line rounded-xl skeu-card p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Vehicle selector for non-admin */}
           {!isAdmin && vehicles.length > 0 && (
             <select
               value={selectedVehicle}
               onChange={(e) => setSelectedVehicle(e.target.value ? Number(e.target.value) : '')}
-              className="px-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-blue)]"
+              className="px-4 py-2.5 bg-elevated border border-line rounded-xl text-sm text-ink outline-none focus:border-brand"
             >
               {vehicles.map((v) => (
                 <option key={v.id} value={v.id}>{v.plate_number}</option>
@@ -180,21 +180,21 @@ export default function TripsPage() {
           )}
 
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by plate or plaza..."
-              className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-colors ${
               showFilters
-                ? 'bg-[var(--accent-blue)]/10 border-[var(--accent-blue)]/30 text-[var(--accent-blue)]'
-                : 'bg-[var(--bg-elevated)] border-[var(--border-custom)] text-[var(--text-secondary)]'
+                ? 'bg-brand/10 border-brand/30 text-brand'
+                : 'bg-elevated border-line text-ink-muted'
             }`}
           >
             <Filter className="w-4 h-4" />
@@ -203,13 +203,13 @@ export default function TripsPage() {
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-[var(--border-custom)] animate-fade-in-up">
+          <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-line animate-fade-in-up">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Status</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-lg text-sm text-[var(--text-primary)] outline-none"
+                className="px-3 py-2 bg-elevated border border-line rounded-lg text-sm text-ink outline-none"
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>{s === 'All' ? 'All Status' : s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -218,7 +218,7 @@ export default function TripsPage() {
             </div>
             <button
               onClick={() => { setStatusFilter('All'); setSearch(''); }}
-              className="self-end px-3 py-2 text-sm text-[var(--accent-rose)] hover:bg-[var(--accent-rose)]/10 rounded-lg transition-colors"
+              className="self-end px-3 py-2 text-sm text-danger hover:bg-danger/10 rounded-lg transition-colors"
             >
               Clear
             </button>
@@ -227,17 +227,17 @@ export default function TripsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-[var(--accent-blue)]" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand" />
             </div>
           ) : paginatedTrips.length === 0 ? (
             <div className="px-6 py-16 text-center">
-              <Calendar className="w-12 h-12 text-[var(--text-tertiary)] mx-auto mb-4" />
-              <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">No trips found</h3>
-              <p className="text-sm text-[var(--text-secondary)]">
+              <Calendar className="w-12 h-12 text-ink-subtle mx-auto mb-4" />
+              <h3 className="text-base font-semibold text-ink mb-2">No trips found</h3>
+              <p className="text-sm text-ink-muted">
                 {search || statusFilter !== 'All'
                   ? 'Try adjusting your filters.'
                   : 'No trips recorded yet.'}
@@ -246,15 +246,15 @@ export default function TripsPage() {
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="bg-[var(--bg-elevated)]">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Plate</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Entry Plaza</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Exit Plaza</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Entry Time</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Exit Time</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Duration</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Charge / Balance</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Status</th>
+                <tr className="bg-elevated">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Plate</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Entry Plaza</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Exit Plaza</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Entry Time</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Exit Time</th>
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Duration</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Charge / Balance</th>
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-ink-muted uppercase tracking-wider">Status</th>
                   {isAdmin && <th className="px-6 py-3" />}
                 </tr>
               </thead>
@@ -262,16 +262,16 @@ export default function TripsPage() {
                 {paginatedTrips.map((trip) => (
                   <tr
                     key={trip.id}
-                    className="border-b border-[var(--border-custom)] hover:bg-[var(--bg-elevated)] transition-colors"
+                    className="border-b border-line hover:bg-elevated transition-colors"
                   >
-                    <td className="px-6 py-4 text-sm font-mono font-semibold text-[var(--text-primary)]">
+                    <td className="px-6 py-4 text-sm font-mono font-semibold text-ink">
                       {trip.plate_number}
                     </td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-primary)]">{trip.entry_plaza_name}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
-                      {trip.exit_plaza_name || <span className="text-[var(--text-tertiary)]">In Transit</span>}
+                    <td className="px-6 py-4 text-sm text-ink">{trip.entry_plaza_name}</td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">
+                      {trip.exit_plaza_name || <span className="text-ink-subtle">In Transit</span>}
                     </td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                    <td className="px-6 py-4 text-sm text-ink-muted">
                       {new Date(trip.entry_time).toLocaleDateString('en-PK', {
                         day: 'numeric',
                         month: 'short',
@@ -279,7 +279,7 @@ export default function TripsPage() {
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                    <td className="px-6 py-4 text-sm text-ink-muted">
                       {trip.exit_time
                         ? new Date(trip.exit_time).toLocaleDateString('en-PK', {
                             day: 'numeric',
@@ -287,26 +287,26 @@ export default function TripsPage() {
                             hour: '2-digit',
                             minute: '2-digit',
                           })
-                        : <span className="text-[var(--text-tertiary)]">—</span>}
+                        : <span className="text-ink-subtle">—</span>}
                     </td>
-                    <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">
+                    <td className="px-6 py-4 text-sm text-ink-muted text-center">
                       {formatDuration(trip.duration_minutes)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       {trip.charge_amount
                         ? (
                           <div>
-                            <p className="text-sm font-semibold text-[var(--accent-rose)]">
+                            <p className="text-sm font-semibold text-danger">
                               − PKR {parseFloat(trip.charge_amount).toLocaleString()}
                             </p>
                             {trip.balance_after && (
-                              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                              <p className="text-xs text-ink-muted mt-0.5">
                                 bal: PKR {parseFloat(trip.balance_after).toLocaleString()}
                               </p>
                             )}
                           </div>
                         )
-                        : <span className="text-sm text-[var(--text-tertiary)]">—</span>}
+                        : <span className="text-sm text-ink-subtle">—</span>}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border capitalize ${statusBadge(trip.status)}`}>
@@ -320,7 +320,7 @@ export default function TripsPage() {
                             <button
                               onClick={() => setConfirmClose(trip)}
                               disabled={closingTripId === trip.id}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[var(--accent-rose)] border border-[var(--accent-rose)]/30 rounded-lg hover:bg-[var(--accent-rose)]/10 transition-colors disabled:opacity-50"
+                              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition-colors disabled:opacity-50"
                             >
                               {closingTripId === trip.id
                                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -330,14 +330,14 @@ export default function TripsPage() {
                           )}
                           {trip.status === 'completed' && trip.charge_amount && parseFloat(trip.charge_amount) > 0 && (
                             refundedTripIds.has(trip.id) ? (
-                              <span className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[var(--text-tertiary)] border border-[var(--border-custom)] rounded-lg">
+                              <span className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-ink-subtle border border-line rounded-lg">
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 Refunded
                               </span>
                             ) : (
                               <button
                                 onClick={() => setRefundTarget(trip)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[var(--accent-amber)] border border-[var(--accent-amber)]/30 rounded-lg hover:bg-[var(--accent-amber)]/10 transition-colors"
+                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-warning border border-warning/30 rounded-lg hover:bg-warning/10 transition-colors"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 Refund
@@ -356,22 +356,22 @@ export default function TripsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-custom)]">
-            <p className="text-sm text-[var(--text-secondary)]">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-line">
+            <p className="text-sm text-ink-muted">
               Page {currentPage} of {totalPages} ({filtered.length} trips)
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-sm text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-elevated border border-line text-sm text-ink-muted rounded-lg hover:bg-surface transition-colors disabled:opacity-50"
               >
                 Previous
               </button>
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-sm text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-elevated border border-line text-sm text-ink-muted rounded-lg hover:bg-surface transition-colors disabled:opacity-50"
               >
                 Next
               </button>
@@ -384,49 +384,49 @@ export default function TripsPage() {
       {refundTarget && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setRefundTarget(null)}>
           <div
-            className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up"
+            className="bg-surface border border-line rounded-2xl skeu-card p-6 w-full max-w-sm animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-[var(--accent-amber)]/10 rounded-full flex items-center justify-center">
-                <RotateCcw className="w-5 h-5 text-[var(--accent-amber)]" />
+              <div className="w-10 h-10 bg-warning/10 rounded-full flex items-center justify-center">
+                <RotateCcw className="w-5 h-5 text-warning" />
               </div>
               <div>
-                <p className="font-semibold text-[var(--text-primary)]">Refund Toll Charge</p>
-                <p className="text-xs text-[var(--text-secondary)]">{refundTarget.plate_number}</p>
+                <p className="font-semibold text-ink">Refund Toll Charge</p>
+                <p className="text-xs text-ink-muted">{refundTarget.plate_number}</p>
               </div>
             </div>
-            <div className="bg-[var(--bg-elevated)] rounded-xl p-3 mb-4 space-y-1.5 text-sm">
+            <div className="bg-elevated rounded-xl p-3 mb-4 space-y-1.5 text-sm">
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Entry</span>
-                <span className="text-[var(--text-primary)]">{refundTarget.entry_plaza_name}</span>
+                <span className="text-ink-muted">Entry</span>
+                <span className="text-ink">{refundTarget.entry_plaza_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Exit</span>
-                <span className="text-[var(--text-primary)]">{refundTarget.exit_plaza_name || '—'}</span>
+                <span className="text-ink-muted">Exit</span>
+                <span className="text-ink">{refundTarget.exit_plaza_name || '—'}</span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-[var(--border-custom)]">
-                <span className="font-medium text-[var(--text-primary)]">Amount to refund</span>
-                <span className="font-bold text-[var(--accent-amber)]">
+              <div className="flex justify-between pt-1 border-t border-line">
+                <span className="font-medium text-ink">Amount to refund</span>
+                <span className="font-bold text-warning">
                   PKR {parseFloat(refundTarget.charge_amount!).toLocaleString()}
                 </span>
               </div>
             </div>
-            <p className="text-sm text-[var(--text-secondary)] mb-5">
+            <p className="text-sm text-ink-muted mb-5">
               This will credit the toll charge back to the vehicle's M-Tag wallet. This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setRefundTarget(null)}
                 disabled={isRefunding}
-                className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-sm font-medium text-[var(--text-primary)] rounded-xl hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 bg-elevated border border-line text-sm font-medium text-ink rounded-xl hover:bg-surface transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleRefundTrip(refundTarget)}
                 disabled={isRefunding}
-                className="flex-1 py-2.5 bg-[var(--accent-amber)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-warning/12 text-warning border border-warning/40 text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {isRefunding ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {isRefunding ? 'Processing…' : 'Confirm Refund'}
@@ -440,31 +440,31 @@ export default function TripsPage() {
       {confirmClose && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setConfirmClose(null)}>
           <div
-            className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up"
+            className="bg-surface border border-line rounded-2xl skeu-card p-6 w-full max-w-sm animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-[var(--accent-rose)]/10 rounded-full flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-[var(--accent-rose)]" />
+              <div className="w-10 h-10 bg-danger/10 rounded-full flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-danger" />
               </div>
               <div>
-                <p className="font-semibold text-[var(--text-primary)]">Force Close Trip</p>
-                <p className="text-xs text-[var(--text-secondary)]">{confirmClose.plate_number}</p>
+                <p className="font-semibold text-ink">Force Close Trip</p>
+                <p className="text-xs text-ink-muted">{confirmClose.plate_number}</p>
               </div>
             </div>
-            <p className="text-sm text-[var(--text-secondary)] mb-5">
+            <p className="text-sm text-ink-muted mb-5">
               This will mark the trip as <strong>Failed</strong> without charging the vehicle. The gate may not have recorded an exit. Continue?
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmClose(null)}
-                className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-sm font-medium text-[var(--text-primary)] rounded-xl hover:bg-[var(--bg-surface)] transition-colors"
+                className="flex-1 py-2.5 bg-elevated border border-line text-sm font-medium text-ink rounded-xl hover:bg-surface transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleCloseTrip(confirmClose)}
-                className="flex-1 py-2.5 bg-[var(--accent-rose)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity"
+                className="flex-1 py-2.5 bg-danger-solid text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity"
               >
                 Force Close
               </button>

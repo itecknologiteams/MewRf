@@ -4,15 +4,19 @@
 # Not meant to be run by hand normally — deploy_booth.sh (run from the dev
 # machine) invokes this over SSH with all the values below set as env vars.
 #
-# Required env vars: PLAZA_ID, DB_PASSWORD, MASTER_IP, MASTER_DB_NAME
+# Required env vars: PLAZA_ID, MASTER_IP, MASTER_DB_NAME, MASTER_DB_USER,
+#                    MASTER_DB_PASSWORD
+#
+# STRICT ONLINE-ONLY: the booth has no local Postgres. There is no local
+# DB_PASSWORD any more — the booth's DB_* are set from the MASTER_DB_* values.
 #   PLAZA_ID is the operator-assigned plaza number (Plaza.plaza_id) — it
 #   replaced the old PLAZA_CODE, which no longer exists on the model.
 # Optional (sensible defaults below): BOOTH_NUMBER, LANE_NUMBER, READER_IP
 #   (warns if blank — fine if the reader isn't installed yet), DISPLAY_IP,
-#   BARRIER_PORT, DB_NAME, DB_USER, ALLOWED_HOST, GATE_MODE,
-#   MASTER_DB_USER, MASTER_DB_PASSWORD
+#   BARRIER_PORT, ALLOWED_HOST, GATE_MODE
 #
-# Safe to re-run — venv/DB/pm2 steps are idempotent.
+# Safe to re-run — venv/config/pm2 steps are idempotent. Nothing is migrated
+# or seeded here; master owns the schema and the data.
 
 set -euo pipefail
 
@@ -24,12 +28,9 @@ req() {
   fi
 }
 req PLAZA_ID
-req DB_PASSWORD
-# Without this the booth cannot authenticate to master and mtag-sync dies on
-# every cycle — an exit lane then never learns about trips opened elsewhere.
-# It used to be allowed to be blank, on the belief that base.py carried a usable
-# hardcoded default; base.py now falls back to the BOOTH'S OWN local password,
-# which master will always reject. Fail here instead of at 2am on a lane.
+# Booths are online-only: this password IS the booth's database access. There is
+# no local Postgres to fall back on, so a blank or wrong value here means the
+# gate cannot read a tag or open a barrier at all. Fail now, not at 2am on a lane.
 req MASTER_DB_PASSWORD
 
 # Catch a stale caller still passing the pre-plaza_id contract, rather than
@@ -59,8 +60,13 @@ BOOTH_NUMBER="${BOOTH_NUMBER:-unnamed}"
 LANE_NUMBER="${LANE_NUMBER:-1}"
 DISPLAY_IP="${DISPLAY_IP:-192.168.78.72}"
 BARRIER_PORT="${BARRIER_PORT:-/dev/ttyUSB0}"
-DB_NAME="${DB_NAME:-tag_db}"
-DB_USER="${DB_USER:-postgres}"
+# No local database — the booth connects to master's. These mirror MASTER_DB_*
+# so .env's DB_* block (written below) and the explicit 'master_pg' connection
+# both point at the same server.
+MASTER_DB_USER="${MASTER_DB_USER:-rfid}"
+DB_NAME="${MASTER_DB_NAME}"
+DB_USER="${MASTER_DB_USER}"
+DB_PASSWORD="${MASTER_DB_PASSWORD}"
 ALLOWED_HOST="${ALLOWED_HOST:-localhost}"
 GATE_MODE="${GATE_MODE:-entry}"
 if [ "$GATE_MODE" != "entry" ] && [ "$GATE_MODE" != "exit" ]; then
@@ -70,7 +76,6 @@ if [ "$GATE_MODE" != "entry" ] && [ "$GATE_MODE" != "exit" ]; then
   echo "  would turn every exiting vehicle away." >&2
   exit 1
 fi
-MASTER_DB_USER="${MASTER_DB_USER:-$DB_USER}"
 
 echo "=== Booth $BOOTH_NUMBER bootstrap — plaza_id=$PLAZA_ID lane=$LANE_NUMBER ==="
 
@@ -137,9 +142,14 @@ sed -i "s/^ALLOWED_HOSTS=.*/ALLOWED_HOSTS=localhost,127.0.0.1,${ALLOWED_HOST}/" 
 # GATE_MODE drives which sync passes mtag-sync runs (entry=push+ref/closed,
 # exit=+open trips). Validated as entry|exit at the top of this script.
 sed -i "s/^GATE_MODE=.*/GATE_MODE=${GATE_MODE}/" .env
-sed -i "s/^DB_NAME=.*/DB_NAME=${DB_NAME}/" .env
-sed -i "s/^DB_USER=.*/DB_USER=${DB_USER}/" .env
-sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD}/" .env
+# STRICT ONLINE-ONLY: this booth has no database of its own. DB_* and MASTER_DB_*
+# both point at master, as the same role (RFID) on the same server, so `default`
+# and the explicit 'master_pg' connection in services.py resolve identically.
+sed -i "s/^DB_NAME=.*/DB_NAME=${MASTER_DB_NAME}/" .env
+sed -i "s/^DB_USER=.*/DB_USER=${MASTER_DB_USER}/" .env
+sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${MASTER_DB_PASSWORD}/" .env
+sed -i "s/^DB_HOST=.*/DB_HOST=${MASTER_IP}/" .env
+sed -i "s/^DB_FALLBACK_HOST=.*/DB_FALLBACK_HOST=/" .env
 sed -i "s/^MASTER_DB_HOST=.*/MASTER_DB_HOST=${MASTER_IP}/" .env
 sed -i "s/^MASTER_DB_NAME=.*/MASTER_DB_NAME=${MASTER_DB_NAME}/" .env
 sed -i "s/^MASTER_DB_USER=.*/MASTER_DB_USER=${MASTER_DB_USER}/" .env
@@ -155,40 +165,36 @@ sed -i "s/^reader_host = .*/reader_host = ${READER_IP:-READER-NOT-CONFIGURED}/" 
 sed -i "s|^port = .*|port = ${BARRIER_PORT}|" rfid_config.ini
 sed -i "s/^display_ip = .*/display_ip = ${DISPLAY_IP}/" rfid_config.ini
 
-# ── 4. Local Postgres ─────────────────────────────────────────────────────
-echo "--- configuring local Postgres ---"
-if [ "$DB_USER" = "postgres" ]; then
-  sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
-else
-  sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
-    sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
-fi
-sudo -u postgres psql -lqt | cut -d '|' -f1 | grep -qw "${DB_NAME}" || \
-  sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
-
-# ── 5. Migrate ────────────────────────────────────────────────────────────
-echo "--- running migrations ---"
-python manage.py migrate
-
-# ── 5b. Clear stale pre-seeded data (cloned disk image artifact) ──────────
-# Some booth machines are provisioned from a shared disk image whose local
-# DB already has plazas/lanes/rates/tags seeded with different UUIDs than
-# master's canonical rows (same root cause hit on two separate booths so
-# far) — causes the sync agent's very first pull to fail permanently with
-# "duplicate key ... plazas_code_key". These tables are master-owned/
-# full-refresh per pull_service.py, so it's always correct for them to be
-# empty and let the sync agent repopulate them from master — EXCEPT once
-# real trips exist locally (toll_trips FKs to plazas, so clearing would
-# cascade-delete real activity). Only touch it when toll_trips is empty.
-# (The duplicate-key error is now on plazas_plaza_id_key rather than the old
-# plazas_code_key, since plaza_id replaced code as the unique column.)
-echo "--- checking for stale pre-seeded data (cloned-image artifact) ---"
-TRIP_COUNT="$(sudo -u postgres psql -tAc 'SELECT COUNT(*) FROM toll_trips' "${DB_NAME}" 2>/dev/null || echo 0)"
-if [ "${TRIP_COUNT:-0}" = "0" ]; then
-  echo "--- no real trips yet — clearing plazas/toll_lanes/toll_rates/tags so the sync agent pulls master's canonical rows cleanly ---"
-  sudo -u postgres psql -c "TRUNCATE plazas, toll_lanes, toll_rates, tags CASCADE;" "${DB_NAME}" >/dev/null
-else
-  echo "--- ${TRIP_COUNT} existing trip(s) found — NOT touching plaza/rate data (this booth has real activity) ---"
+# ── 4. Master database (no local Postgres) ────────────────────────────────
+# Everything that used to be here — CREATE USER, createdb, manage.py migrate and
+# the TRUNCATE of plazas/toll_lanes/toll_rates/tags — is gone. Booths are
+# online-only now: master owns the schema and the data.
+#
+# `migrate` was the dangerous one. Unlike the psql commands (which used the local
+# socket and so could never touch master), migrate reads .env — with DB_HOST now
+# pointing at master, running it here would have had every booth migrate MASTER's
+# database. master_bootstrap.sh is the only thing that migrates.
+echo "--- checking this booth can reach master's database ---"
+export DJANGO_SETTINGS_MODULE=config.settings.lan
+if ! python - <<'PYCHK'
+import sys, django
+django.setup()
+from django.db import connection
+try:
+    with connection.cursor() as c:
+        c.execute("SELECT COUNT(*) FROM plazas")
+        print(f"    reachable — {c.fetchone()[0]} plaza(s) visible")
+except Exception as exc:
+    print(f"    UNREACHABLE: {exc}", file=sys.stderr)
+    sys.exit(1)
+PYCHK
+then
+  echo "!!! Cannot reach master's database at ${MASTER_IP}." >&2
+  echo "!!!   With no local DB this booth cannot work at all." >&2
+  echo "!!!   Check: the RFID role's password, that master's postgresql.conf has" >&2
+  echo "!!!   listen_addresses='*', and that pg_hba.conf allows this booth's" >&2
+  echo "!!!   subnet to reach ${MASTER_DB_NAME} as ${MASTER_DB_USER}." >&2
+  exit 1
 fi
 
 # ── 6. PM2 ────────────────────────────────────────────────────────────────
@@ -199,18 +205,20 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 echo "--- starting PM2 ---"
-# mtag-sync included: the sync agent no longer runs inside mtag-web, it is its
-# own process now. Deleting it too means re-running this script on a booth
-# provisioned before that split cleanly replaces the old process set.
+# mtag-sync is deliberately NOT started. It replicates between a booth's local
+# database and master, and with DB_* now pointing at master both ends are the
+# same server — every pass would upsert master's rows onto themselves, advance
+# watermarks that mean nothing and re-run setval across 12 tables, from all 21
+# booths every 30s. No benefit, real load. The delete below also stops it on
+# booths provisioned before this change.
 pm2 delete mtag-web mtag-gate mtag-sync >/dev/null 2>&1 || true
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.js --only mtag-web,mtag-gate
 pm2 save
 
 echo ""
 echo "=== Bootstrap complete for booth $BOOTH_NUMBER (mode=$GATE_MODE) ==="
 echo "Verify with:"
-echo "  pm2 status                        # mtag-web, mtag-gate, mtag-sync all online"
-echo "  pm2 logs mtag-sync   # look for: [sync] Agent started — mode=${GATE_MODE}"
+echo "  pm2 status                        # mtag-web and mtag-gate online (no mtag-sync)"
 echo "  pm2 logs mtag-gate   # look for: [reader] Connected to TCP:${READER_IP}:..."
 echo "  python manage.py sync_service --once    # one cycle, verbose"
 echo "  python manage.py trip_sync             # DRIFT must be 0"

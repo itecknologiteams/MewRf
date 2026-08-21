@@ -5,6 +5,33 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // ME semantic palette. Backed by "R G B" channel vars in index.css so
+        // every one of these works with an opacity modifier (bg-brand/10).
+        canvas: "rgb(var(--canvas) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        elevated: "rgb(var(--elevated) / <alpha-value>)",
+        line: "rgb(var(--line) / <alpha-value>)",
+        divider: "rgb(var(--divider) / <alpha-value>)",
+        ink: {
+          DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+          muted: "rgb(var(--ink-muted) / <alpha-value>)",
+          subtle: "rgb(var(--ink-subtle) / <alpha-value>)",
+        },
+        brand: {
+          DEFAULT: "rgb(var(--brand) / <alpha-value>)",
+          strong: "rgb(var(--brand-strong) / <alpha-value>)",
+          ink: "rgb(var(--brand-ink) / <alpha-value>)",
+          on: "rgb(var(--on-brand) / <alpha-value>)",
+        },
+        success: "rgb(var(--success) / <alpha-value>)",
+        warning: "rgb(var(--warning) / <alpha-value>)",
+        danger: {
+          DEFAULT: "rgb(var(--danger) / <alpha-value>)",
+          solid: "rgb(var(--danger-solid) / <alpha-value>)",
+        },
+        info: "rgb(var(--info) / <alpha-value>)",
+        role: "rgb(var(--role) / <alpha-value>)",
+
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

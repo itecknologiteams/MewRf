@@ -41,13 +41,13 @@ export default function InventoryCheckWarning({
 
   return (
     <div
-      className="p-4 rounded-xl border flex gap-3 bg-[var(--bg-surface)] shadow-sm"
+      className="p-4 rounded-xl border flex gap-3 bg-surface shadow-sm"
       style={{ borderColor: warning.accent }}
     >
       <Icon className="flex-shrink-0" size={20} style={{ color: warning.accent }} />
       <div>
         <h4 className="font-semibold" style={{ color: warning.accent }}>{warning.title}</h4>
-        <p className="text-sm text-[var(--text-secondary)]">{warning.message}</p>
+        <p className="text-sm text-ink-muted">{warning.message}</p>
       </div>
     </div>
   );

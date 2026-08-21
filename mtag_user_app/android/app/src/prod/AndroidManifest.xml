@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Deliberately empty of any network relaxation.
+         prod is HTTPS and certificate-pinned (core/network/tls_pinning.dart). There is
+         no usesCleartextTraffic here, and there must never be: a merged cleartext flag
+         would silently undo the pinning story. -->
+</manifest>

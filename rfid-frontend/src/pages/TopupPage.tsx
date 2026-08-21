@@ -105,17 +105,17 @@ export default function TopupPage() {
     <div className="max-w-xl mx-auto animate-fade-in-up">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
-          <Wallet className="w-6 h-6 text-[var(--accent-emerald)]" />
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Balance Topup</h1>
+          <Wallet className="w-6 h-6 text-success" />
+          <h1 className="text-2xl font-bold text-ink">Balance Topup</h1>
         </div>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
+        <p className="text-sm text-ink-muted mt-1">
           Search a vehicle by plate number and add balance to its wallet.
         </p>
       </div>
 
       {/* Plate Search */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm mb-5">
-        <label className="block text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+      <div className="bg-surface border border-line rounded-xl skeu-card p-6 mb-5">
+        <label className="block text-xs font-medium text-ink-muted uppercase tracking-wider mb-2">
           Vehicle Plate Number
         </label>
         <div className="flex gap-2">
@@ -130,34 +130,34 @@ export default function TopupPage() {
             }}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleLookup())}
             placeholder="e.g. LHR1234"
-            className="flex-1 min-w-0 px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-emerald)] focus:ring-2 focus:ring-[var(--accent-emerald)]/20 transition-all uppercase"
+            className="flex-1 min-w-0 px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-success focus:ring-2 focus:ring-success/20 transition-all uppercase"
           />
           <button
             type="button"
             onClick={handleLookup}
             disabled={!plate.trim() || lookupLoading}
-            className="shrink-0 px-4 py-3 bg-[var(--accent-emerald)] text-white rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="shrink-0 px-4 py-3 bg-brand text-brand-on rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             {lookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           </button>
         </div>
-        {lookupError && <p className="text-xs text-[var(--accent-rose)] mt-2">{lookupError}</p>}
+        {lookupError && <p className="text-xs text-danger mt-2">{lookupError}</p>}
       </div>
 
       {/* Vehicle Card */}
       {vehicleInfo && (
-        <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl shadow-sm overflow-hidden mb-5 animate-fade-in-up">
-          <div className="flex items-center gap-4 p-5 border-b border-[var(--border-custom)]">
-            <div className="p-3 bg-[var(--accent-blue)]/10 rounded-xl">
-              <VehicleIcon className="w-6 h-6 text-[var(--accent-blue)]" />
+        <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden mb-5 animate-fade-in-up">
+          <div className="flex items-center gap-4 p-5 border-b border-line">
+            <div className="p-3 bg-brand/10 rounded-xl">
+              <VehicleIcon className="w-6 h-6 text-brand" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-lg font-bold font-mono text-[var(--text-primary)]">{vehicleInfo.plate_number}</p>
-              <p className="text-sm text-[var(--text-secondary)] capitalize">{vehicleInfo.vehicle_type}</p>
+              <p className="text-lg font-bold font-mono text-ink">{vehicleInfo.plate_number}</p>
+              <p className="text-sm text-ink-muted capitalize">{vehicleInfo.vehicle_type}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-[var(--text-secondary)] mb-0.5">Current Balance</p>
-              <p className="text-xl font-bold text-[var(--accent-emerald)]">
+              <p className="text-xs text-ink-muted mb-0.5">Current Balance</p>
+              <p className="text-xl font-bold text-success">
                 PKR {parseFloat(vehicleInfo.balance).toLocaleString()}
               </p>
             </div>
@@ -166,11 +166,11 @@ export default function TopupPage() {
           {/* Topup form */}
           <form onSubmit={handleTopup} className="p-5 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                Amount to Add <span className="text-[var(--accent-rose)]">*</span>
+              <label className="block text-sm font-medium text-ink mb-1.5">
+                Amount to Add <span className="text-danger">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-[var(--text-tertiary)]">PKR</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-ink-subtle">PKR</span>
                 <input
                   type="number"
                   min="1"
@@ -178,14 +178,14 @@ export default function TopupPage() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="500"
-                  className="w-full pl-14 pr-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-emerald)] focus:ring-2 focus:ring-[var(--accent-emerald)]/20 transition-all"
+                  className="w-full pl-14 pr-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-success focus:ring-2 focus:ring-success/20 transition-all"
                   autoFocus
                 />
               </div>
               {amount && parseFloat(amount) > 0 && (
-                <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
+                <p className="text-xs text-ink-subtle mt-1.5">
                   New balance will be:{' '}
-                  <span className="font-semibold text-[var(--accent-emerald)]">
+                  <span className="font-semibold text-success">
                     PKR {(parseFloat(vehicleInfo.balance) + parseFloat(amount)).toLocaleString()}
                   </span>
                 </p>
@@ -201,8 +201,8 @@ export default function TopupPage() {
                   onClick={() => setAmount(String(preset))}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     amount === String(preset)
-                      ? 'bg-[var(--accent-emerald)] text-white border-[var(--accent-emerald)]'
-                      : 'bg-[var(--bg-elevated)] border-[var(--border-custom)] text-[var(--text-secondary)] hover:border-[var(--accent-emerald)] hover:text-[var(--accent-emerald)]'
+                      ? 'bg-brand text-brand-on border-brand'
+                      : 'bg-elevated border-line text-ink-muted hover:border-success hover:text-success'
                   }`}
                 >
                   +{preset.toLocaleString()}
@@ -214,14 +214,14 @@ export default function TopupPage() {
               <button
                 type="button"
                 onClick={reset}
-                className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors"
+                className="flex-1 py-2.5 bg-elevated border border-line text-ink text-sm font-medium rounded-xl hover:bg-surface transition-colors"
               >
                 Clear
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !amount || parseFloat(amount) <= 0}
-                className="flex-1 py-2.5 bg-[var(--accent-emerald)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-brand text-brand-on text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting
                   ? <><Loader2 className="w-4 h-4 animate-spin" />Processing…</>
@@ -234,28 +234,28 @@ export default function TopupPage() {
 
       {/* Success receipt */}
       {result && (
-        <div className="bg-[var(--bg-surface)] border border-[var(--accent-emerald)]/30 rounded-xl p-5 shadow-sm animate-fade-in-up">
+        <div className="bg-surface border border-success/30 rounded-xl p-5 shadow-sm animate-fade-in-up">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 bg-[var(--accent-emerald)]/10 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-[var(--accent-emerald)]" />
+            <div className="w-9 h-9 bg-success/10 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-success" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Topup Successful</p>
-              <p className="text-xs text-[var(--text-secondary)]">{result.plate_number} · {result.vehicle_type}</p>
+              <p className="text-sm font-semibold text-ink">Topup Successful</p>
+              <p className="text-xs text-ink-muted">{result.plate_number} · {result.vehicle_type}</p>
             </div>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Amount Added</span>
-              <span className="font-bold text-[var(--accent-emerald)]">+ PKR {parseFloat(result.amount_added).toLocaleString()}</span>
+              <span className="text-ink-muted">Amount Added</span>
+              <span className="font-bold text-success">+ PKR {parseFloat(result.amount_added).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-secondary)]">Previous Balance</span>
-              <span className="text-[var(--text-primary)]">PKR {parseFloat(result.balance_before).toLocaleString()}</span>
+              <span className="text-ink-muted">Previous Balance</span>
+              <span className="text-ink">PKR {parseFloat(result.balance_before).toLocaleString()}</span>
             </div>
-            <div className="flex justify-between pt-2 border-t border-[var(--border-custom)]">
-              <span className="font-medium text-[var(--text-primary)]">New Balance</span>
-              <span className="font-bold text-[var(--accent-emerald)] flex items-center gap-1">
+            <div className="flex justify-between pt-2 border-t border-line">
+              <span className="font-medium text-ink">New Balance</span>
+              <span className="font-bold text-success flex items-center gap-1">
                 <ArrowRight className="w-3.5 h-3.5" />
                 PKR {parseFloat(result.new_balance).toLocaleString()}
               </span>

@@ -108,21 +108,21 @@ export default function InventoryActivationModal({
   };
 
   const inputCls =
-    'w-full px-3 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-blue)] focus:ring-2 focus:ring-[var(--accent-blue)]/20 transition-all disabled:opacity-60';
+    'w-full px-3 py-2.5 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all disabled:opacity-60';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-2xl max-w-md w-full shadow-xl">
+      <div className="bg-surface border border-line rounded-2xl skeu-card max-w-md w-full">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-[var(--border-custom)]">
+        <div className="flex justify-between items-center p-6 border-b border-line">
           <div>
-            <h2 className="text-lg font-bold text-[var(--text-primary)]">Activate Tag</h2>
-            <p className="text-sm text-[var(--text-secondary)] mt-0.5 font-mono">{tag.tag_serial}</p>
+            <h2 className="text-lg font-bold text-ink">Activate Tag</h2>
+            <p className="text-sm text-ink-muted mt-0.5 font-mono">{tag.tag_serial}</p>
           </div>
           <button
             onClick={onClose}
             disabled={submitting || !!receipt}
-            className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-lg text-ink-subtle hover:bg-elevated hover:text-ink transition-colors disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -131,20 +131,20 @@ export default function InventoryActivationModal({
         <div className="p-6">
           {looking ? (
             <div className="flex items-center justify-center py-10">
-              <Loader2 className="animate-spin text-[var(--accent-blue)]" size={28} />
+              <Loader2 className="animate-spin text-brand" size={28} />
             </div>
           ) : receipt ? (
             <div className="animate-fade-in-up">
               <div className="flex flex-col items-center text-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-[var(--accent-emerald)]/10 flex items-center justify-center mb-2">
-                  <CheckCircle className="text-[var(--accent-emerald)]" size={28} />
+                <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mb-2">
+                  <CheckCircle className="text-success" size={28} />
                 </div>
-                <p className="font-semibold text-[var(--text-primary)]">
+                <p className="font-semibold text-ink">
                   {receipt.registered ? 'Registered & Activated' : 'Topped Up'}
                 </p>
               </div>
               {receipt.receipt && (
-                <div className="space-y-2 text-sm bg-[var(--bg-elevated)] rounded-xl p-4">
+                <div className="space-y-2 text-sm bg-elevated rounded-xl p-4">
                   {([
                     ['Receipt', receipt.receipt.receipt_no],
                     ['Consumer', receipt.receipt.consumer_name],
@@ -153,8 +153,8 @@ export default function InventoryActivationModal({
                     ['New Balance', `PKR ${parseFloat(receipt.receipt.balance_after).toLocaleString()}`],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex justify-between">
-                      <span className="text-[var(--text-secondary)]">{k}</span>
-                      <span className="font-medium text-[var(--text-primary)]">{v}</span>
+                      <span className="text-ink-muted">{k}</span>
+                      <span className="font-medium text-ink">{v}</span>
                     </div>
                   ))}
                 </div>
@@ -163,14 +163,14 @@ export default function InventoryActivationModal({
           ) : (
             <div className="space-y-4">
               {found ? (
-                <div className="flex items-center justify-between bg-[var(--bg-elevated)] rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between bg-elevated rounded-xl px-4 py-3">
                   <div>
-                    <p className="font-semibold text-[var(--text-primary)]">{name}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">{phone} · {vehicleReg}</p>
+                    <p className="font-semibold text-ink">{name}</p>
+                    <p className="text-xs text-ink-muted">{phone} · {vehicleReg}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">Balance</p>
-                    <p className="font-bold text-[var(--accent-emerald)]">
+                    <p className="text-[10px] text-ink-muted uppercase tracking-wider">Balance</p>
+                    <p className="font-bold text-success">
                       PKR {parseFloat(balance ?? '0').toLocaleString()}
                     </p>
                   </div>
@@ -178,26 +178,26 @@ export default function InventoryActivationModal({
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><User size={14} className="inline mr-1.5" />Customer Name</label>
+                    <label className="block text-sm font-medium text-ink mb-1"><User size={14} className="inline mr-1.5" />Customer Name</label>
                     <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" disabled={submitting} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><Phone size={14} className="inline mr-1.5" />Phone</label>
+                    <label className="block text-sm font-medium text-ink mb-1"><Phone size={14} className="inline mr-1.5" />Phone</label>
                     <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="03001234567" disabled={submitting} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><CreditCard size={14} className="inline mr-1.5" />CNIC (optional)</label>
+                    <label className="block text-sm font-medium text-ink mb-1"><CreditCard size={14} className="inline mr-1.5" />CNIC (optional)</label>
                     <input className={inputCls} value={cnic} onChange={(e) => setCnic(formatCnic(e.target.value))} placeholder="XXXXX-XXXXXXX-X" disabled={submitting} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Vehicle Registration</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Vehicle Registration</label>
                     <input className={`${inputCls} uppercase`} value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} placeholder="LEB1234" disabled={submitting} />
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1"><Wallet size={14} className="inline mr-1.5" />Amount (Cash)</label>
+                <label className="block text-sm font-medium text-ink mb-1"><Wallet size={14} className="inline mr-1.5" />Amount (Cash)</label>
                 <input className={inputCls} type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" disabled={submitting} />
                 <div className="flex gap-2 flex-wrap mt-2">
                   {PRESETS.map((p) => (
@@ -207,8 +207,8 @@ export default function InventoryActivationModal({
                       onClick={() => setAmount(String(p))}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                         amount === String(p)
-                          ? 'bg-[var(--accent-emerald)] text-white border-[var(--accent-emerald)]'
-                          : 'bg-[var(--bg-elevated)] border-[var(--border-custom)] text-[var(--text-secondary)] hover:border-[var(--accent-emerald)] hover:text-[var(--accent-emerald)]'
+                          ? 'bg-brand text-brand-on border-brand'
+                          : 'bg-elevated border-line text-ink-muted hover:border-success hover:text-success'
                       }`}
                     >
                       +{p.toLocaleString()}
@@ -218,8 +218,8 @@ export default function InventoryActivationModal({
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button onClick={onClose} disabled={submitting} className="flex-1 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={submit} disabled={submitting} className="flex-1 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                <button onClick={onClose} disabled={submitting} className="flex-1 py-2.5 bg-elevated border border-line text-ink text-sm font-medium rounded-xl hover:bg-surface transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={submit} disabled={submitting} className="flex-1 py-2.5 bg-brand text-brand-on text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="animate-spin" size={16} />}
                   {found ? 'Top Up' : 'Register & Activate'}
                 </button>

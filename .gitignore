@@ -66,3 +66,15 @@ desktop.ini
 # ── Misc ────────────────────────────────────────────────────────────────────
 *.tar.gz
 *.zip
+
+# Deploy scripts — these hold the master DB/SSH credentials in plain text and
+# this repo is public. Kept on disk, out of git.
+deploy_booths.sh
+deploy_booth.sh
+deploy_master.sh
+
+# Bundled Python wheels for offline booth installs (rebuilt by deploy_booths.sh)
+mtag_backend/wheelhouse/
+
+# curl session jar — holds a live JWT refresh token
+cookies.txt

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Must match ClayPalette.dark.base / the icon ground. If these drift, launch flashes
+         the wrong colour for a frame or two, which reads as a stutter. -->
+    <color name="splash_background">#050505</color>
+    <color name="icon_background">#0A0A0A</color>
+    <color name="brand_primary">#FF8500</color>
+</resources>

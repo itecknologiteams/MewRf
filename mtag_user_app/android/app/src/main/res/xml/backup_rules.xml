@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto-backup rules for Android 11 and below (`android:fullBackupContent`).
+
+  Excludes the one file that CANNOT survive a restore. `flutter_secure_storage` keeps its
+  ciphertext in a SharedPreferences file and its key in the Android Keystore. Auto-backup
+  copies the prefs; it never copies the Keystore. So a restore onto a new phone — the
+  ordinary way people change handsets — reinstates ciphertext that no key on the device can
+  open, and every read throws `BadPaddingException: BAD_DECRYPT`.
+
+  The app now recovers from that at runtime, but recovering means discarding the session and
+  making the user sign in again. Not restoring the file in the first place is strictly
+  better: nothing of value is lost, because the encrypted contents were unreadable on the
+  new device anyway.
+
+  The cookie jar is excluded for the same reason plus a stronger one: it IS the session, and
+  a session silently restored onto a different phone is a credential copied to a device the
+  user may no longer own.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    <exclude domain="file" path="mtag_cookies" />
+</full-backup-content>

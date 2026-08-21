@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (`android:dataExtractionRules`). Same exclusions as backup_rules.xml, which
+  covers API 30 and below — both must be declared, because the platform picks by version and
+  a rule set that covers only one leaves the other behaving as if there were no rules at all.
+
+  `cloud-backup` is Google's backup; `device-transfer` is the direct phone-to-phone copy.
+  Both are excluded: the Keystore key travels in neither, so restored ciphertext is
+  undecryptable in both cases.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="file" path="mtag_cookies" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="file" path="mtag_cookies" />
+    </device-transfer>
+</data-extraction-rules>

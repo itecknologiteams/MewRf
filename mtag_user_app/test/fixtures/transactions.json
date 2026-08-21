@@ -1,0 +1,52 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": [
+    {
+      "id": 3,
+      "transaction_type": "refund",
+      "amount": "60.00",
+      "service_charge": "0.00",
+      "balance_before": "310.00",
+      "balance_after": "370.00",
+      "status": "success",
+      "source": null,
+      "tag_serial": "",
+      "reference_id": null,
+      "processed_at": "2026-08-20T21:54:24.660853+05:00"
+    },
+    {
+      "id": 2,
+      "transaction_type": "topup",
+      "amount": "1000.00",
+      "service_charge": "0.00",
+      "balance_before": "370.00",
+      "balance_after": "1370.00",
+      "status": "success",
+      "source": "topup_jazzcash",
+      "tag_serial": "SER165424169081",
+      "reference_id": null,
+      "processed_at": "2026-08-20T21:54:24.660392+05:00"
+    },
+    {
+      "id": 1,
+      "transaction_type": "toll_deduction",
+      "amount": "120.00",
+      "service_charge": "0.00",
+      "balance_before": "1370.00",
+      "balance_after": "1250.00",
+      "status": "success",
+      "source": "offline_exit_sync",
+      "tag_serial": "SER165424169081",
+      "reference_id": null,
+      "processed_at": "2026-08-20T21:54:24.658545+05:00"
+    }
+  ],
+  "meta": {
+    "count": 3,
+    "next": null,
+    "previous": null,
+    "total_pages": 1,
+    "current_page": 1
+  }
+}

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The status-bar mark: a toll barrier.
+
+  Monochrome and opaque-white on purpose. Android applies its own tint to a notification's
+  small icon and discards colour entirely, so the launcher icon used here renders as a solid
+  white blob — recognisable as nothing. A flat silhouette is the only thing that survives
+  that treatment, and this one still reads at 24dp in a crowded shade.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- The barrier arm. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,9 L21,9 L21,12 L3,12 Z" />
+
+    <!-- Left post, anchoring the arm. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,12 L7,12 L7,21 L4,21 Z" />
+
+    <!-- Right post. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M17,12 L20,12 L20,21 L17,21 Z" />
+
+    <!-- The lamp above the arm, which is what makes the silhouette read as a gate rather
+         than a plain bar. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,1.4 a2.6,2.6 0 1,0 0,5.2 a2.6,2.6 0 1,0 0,-5.2 Z" />
+</vector>

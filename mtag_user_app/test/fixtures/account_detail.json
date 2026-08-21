@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": 1,
+    "vehicle_id": 1,
+    "plate_number": "FIX1654",
+    "vehicle_type": "car",
+    "balance": "1250.00",
+    "balance_updated_at": "2026-08-20T21:54:24.655110+05:00",
+    "created_at": "2026-08-20T21:54:24.655117+05:00"
+  }
+}

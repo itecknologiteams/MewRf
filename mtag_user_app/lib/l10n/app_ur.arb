@@ -1,0 +1,599 @@
+{
+  "@@locale": "ur",
+  "appName": "ایم ٹیگ",
+  "appTagline": "ملیر ایکسپریس وے",
+  "actionRetry": "دوبارہ کوشش کریں",
+  "actionCancel": "منسوخ کریں",
+  "actionClose": "بند کریں",
+  "actionDone": "مکمل",
+  "actionSave": "محفوظ کریں",
+  "actionCopy": "کاپی کریں",
+  "actionCopied": "کاپی ہو گیا",
+  "actionViewAll": "سب دیکھیں",
+  "actionTopUp": "بیلنس ڈالیں",
+  "actionRefresh": "تازہ کریں",
+  "actionCallSupport": "سپورٹ کو کال کریں",
+  "actionNotNow": "ابھی نہیں",
+  "actionContinue": "جاری رکھیں",
+  "actionBack": "واپس",
+  "navHome": "ہوم",
+  "navTags": "ٹیگز",
+  "navActivity": "لین دین",
+  "navProfile": "پروفائل",
+  "loginTitle": "خوش آمدید",
+  "loginSubtitle": "اپنے ایم ٹیگ اکاؤنٹ میں سائن ان کریں",
+  "loginPhoneLabel": "موبائل نمبر",
+  "loginPhoneHint": "03XX XXX XXXX",
+  "loginPasswordLabel": "پاس ورڈ",
+  "loginPasswordHint": "اپنا پاس ورڈ درج کریں",
+  "loginSubmit": "سائن ان",
+  "loginRememberPhone": "میرا نمبر یاد رکھیں",
+  "loginPhoneRequired": "اپنا موبائل نمبر درج کریں",
+  "loginPhoneInvalid": "درست پاکستانی موبائل نمبر درج کریں، مثلاً 0300 123 4567",
+  "loginPasswordRequired": "اپنا پاس ورڈ درج کریں",
+  "loginForgotPassword": "پاس ورڈ بھول گئے؟",
+  "loginForgotPasswordBody": "ابھی خود سے پاس ورڈ تبدیل کرنے کی سہولت موجود نہیں۔ {phone} پر سپورٹ کو کال کریں، وہ آپ کو سائن ان کرا دیں گے۔",
+  "@loginForgotPasswordBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "loginBlockedTitle": "یہ اکاؤنٹ بلاک ہے",
+  "loginBlockedBody": "آپ کا ایم ٹیگ اکاؤنٹ بلاک کر دیا گیا ہے۔ {phone} پر سپورٹ کو کال کریں — جب تک اکاؤنٹ بحال نہ ہو، دوبارہ سائن ان کرنے سے فائدہ نہیں ہوگا۔",
+  "@loginBlockedBody": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "loginThrottledTitle": "بہت زیادہ کوششیں",
+  "loginThrottledBody": "آپ {seconds} سیکنڈ بعد دوبارہ کوشش کر سکتے ہیں۔",
+  "@loginThrottledBody": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "loginNoAccountTitle": "اکاؤنٹ نہیں ہے؟",
+  "loginNoAccountBody": "ایم ٹیگ اکاؤنٹ ٹول بوتھ پر ٹیگ لگواتے وقت بنایا جاتا ہے۔ اپنا شناختی کارڈ اور گاڑی کی رجسٹریشن لے کر کسی بھی پلازہ پر جائیں۔",
+  "splashChecking": "آپ کا سیشن چیک کیا جا رہا ہے",
+  "splashOfflineTitle": "ایم ٹیگ سے رابطہ نہیں ہو سکا",
+  "splashOfflineBody": "آپ اب بھی سائن ان ہیں — صرف سرور سے رابطہ نہیں ہو سکا۔ اپنا انٹرنیٹ چیک کر کے دوبارہ کوشش کریں۔",
+  "staffAccountTitle": "یہ اسٹاف اکاؤنٹ ہے",
+  "staffAccountBody": "{name} ایک {role} اکاؤنٹ ہے۔ یہ ایپ ٹیگ رکھنے والوں کے لیے ہے۔ بوتھ اور ایڈمن کام کے لیے آپریٹر پورٹل استعمال کریں۔",
+  "@staffAccountBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "staffAccountSignOut": "دوسرے اکاؤنٹ سے سائن ان کریں",
+  "dashboardGreeting": "خوش آمدید، {name}",
+  "@dashboardGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardTotalAcrossTags": "{count, plural, =0{ابھی کوئی ٹیگ نہیں} =1{1 ٹیگ کا بیلنس} other{{count} ٹیگز کا کل بیلنس}}",
+  "@dashboardTotalAcrossTags": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardTotalIsASum": "یہ آپ کے الگ الگ ٹیگ بیلنس کا مجموعہ ہے — ہر ٹیگ کا ٹول اسی کے اپنے بیلنس سے کٹتا ہے۔",
+  "dashboardTotalPartial": "نامکمل — ایک یا زیادہ بیلنس لوڈ نہیں ہو سکے۔",
+  "dashboardStatTags": "ٹیگز",
+  "dashboardStatVehicles": "گاڑیاں",
+  "dashboardStatMonthTolls": "اس مہینے کا ٹول",
+  "dashboardStatMonthTollsPartial": "کم از کم",
+  "dashboardRecentActivity": "حالیہ لین دین",
+  "dashboardYourTags": "آپ کے ٹیگز",
+  "dashboardNoTagsTitle": "ابھی کوئی ٹیگ نہیں",
+  "dashboardNoTagsBody": "جب بوتھ پر آپ کی گاڑی میں ٹیگ لگے گا تو وہ یہاں نظر آئے گا۔",
+  "lowBalanceTitle": "{plate} داخل نہیں ہو سکتی",
+  "@lowBalanceTitle": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "lowBalanceBody": "بیلنس {balance} ہے — رکاوٹ کھلنے کے لیے کم از کم {minimum} روپے ضروری ہیں۔",
+  "@lowBalanceBody": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "lowBalanceManyTitle": "{count} ٹیگز داخل نہیں ہو سکتے",
+  "@lowBalanceManyTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lowBalanceManyBody": "{plates} کا بیلنس رکاوٹ کھلنے کے لیے درکار {minimum} روپے سے کم ہے۔",
+  "@lowBalanceManyBody": {
+    "placeholders": {
+      "plates": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "lowBalanceSoonTitle": "جلد بیلنس ڈالیں",
+  "lowBalanceSoonBody": "{count, plural, =1{{plates} کا بیلنس کم ہو رہا ہے۔ داخلے کے لیے کم از کم {minimum} روپے ضروری ہیں۔} other{{plates} کا بیلنس کم ہو رہا ہے۔ داخلے کے لیے کم از کم {minimum} روپے ضروری ہیں۔}}",
+  "@lowBalanceSoonBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "plates": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "tagsTitle": "میرے ٹیگز",
+  "tagsSubtitle": "{count, plural, =1{1 ٹیگ} other{{count} ٹیگز}}",
+  "@tagsSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tagSerial": "ٹیگ سیریل",
+  "tagTid": "ٹی آئی ڈی",
+  "tagTidExplainer": "بیلنس ڈالنے کے لیے یہی نمبر جاز کیش ایپ میں درج کریں۔",
+  "tagStatus": "حالت",
+  "tagIssued": "جاری ہوا",
+  "tagExpiry": "میعاد",
+  "tagLastScanned": "آخری اسکین",
+  "tagNeverScanned": "کبھی اسکین نہیں ہوا",
+  "tagLinkedVehicle": "گاڑی",
+  "tagNoTagFitted": "کوئی ٹیگ نہیں لگا",
+  "tagNoTagFittedBody": "اس گاڑی پر ابھی کوئی ٹیگ نہیں — عام طور پر نیا ٹیگ جاری ہو رہا ہوتا ہے۔ بوتھ پر پوچھیں۔",
+  "tagExpiringSoon": "{days, plural, =0{آج میعاد ختم} =1{1 دن میں میعاد ختم} other{{days} دن میں میعاد ختم}}",
+  "@tagExpiringSoon": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "tagExpired": "میعاد ختم",
+  "tagNotUsable": "پلازہ پر قابلِ استعمال نہیں",
+  "tagUsable": "قابلِ استعمال",
+  "tagStatusActive": "فعال",
+  "tagStatusExpired": "میعاد ختم",
+  "tagStatusSuspended": "معطل",
+  "tagStatusDeactivated": "غیر فعال",
+  "tagStatusUnknown": "نامعلوم",
+  "tagsEmptyTitle": "ابھی کوئی ٹیگ نہیں",
+  "tagsEmptyBody": "ٹیگ ٹول بوتھ پر لگایا جاتا ہے۔ لگنے کے بعد وہ اپنے بیلنس کے ساتھ یہاں نظر آئے گا۔",
+  "vehiclesTitle": "میری گاڑیاں",
+  "vehicleFareClass": "ٹول کیٹیگری",
+  "vehicleStatus": "حالت",
+  "vehicleRegistered": "رجسٹریشن",
+  "vehicleBalance": "بیلنس",
+  "vehicleTrips": "سفر",
+  "vehicleStatusActive": "فعال",
+  "vehicleStatusInactive": "غیر فعال",
+  "vehicleStatusSuspended": "معطل",
+  "vehicleStatusUnknown": "نامعلوم",
+  "vehiclesEmptyTitle": "کوئی گاڑی نہیں",
+  "vehiclesEmptyBody": "ٹیگ لگواتے وقت گاڑیاں ٹول بوتھ پر رجسٹر کی جاتی ہیں۔",
+  "vehiclesUnavailableTitle": "آپ کی گاڑیوں کی فہرست نہیں مل سکی",
+  "vehiclesUnavailableBody": "یہ سرور ابھی آپ کی اپنی گاڑیوں کی فہرست دینے کی سہولت نہیں رکھتا۔ بوتھ پر پوچھیں، یا ایم ٹیگ سرور اپ ڈیٹ کروائیں۔",
+  "vehicleTypeCar": "کار / جیپ / ٹیکسی / پک اپ",
+  "vehicleTypeWagon": "ویگن / ہائی ایس",
+  "vehicleTypeCoach": "کوچ / کوسٹر / منی بس",
+  "vehicleTypeLargeBus": "بڑی بس",
+  "vehicleTypeTruck2Axle": "2 ایکسل ٹرک",
+  "vehicleTypeTruck3Axle": "3 ایکسل ٹرک",
+  "vehicleTypeTruck4Axle": "4 یا زیادہ ایکسل ٹرک",
+  "vehicleTypeMotorcycle": "موٹر سائیکل",
+  "vehicleTypeMotorcycleNotPermitted": "موٹر سائیکل ایکسپریس وے پر ممنوع ہے۔",
+  "vehicleTypeUnknown": "نامعلوم کیٹیگری",
+  "transactionsTitle": "لین دین",
+  "transactionsFilterAll": "سب",
+  "transactionsFilterTolls": "ٹول",
+  "transactionsFilterTopups": "بیلنس",
+  "transactionsFilterRefunds": "واپسی",
+  "transactionTypeToll": "ٹول",
+  "transactionTypeTopup": "بیلنس",
+  "transactionTypeRefund": "رقم واپسی",
+  "transactionTypeTransferIn": "منتقلی (آمد)",
+  "transactionTypeTransferOut": "منتقلی (روانگی)",
+  "transactionTypeUnknown": "لین دین",
+  "transactionStatusFailed": "ناکام",
+  "transactionStatusPending": "زیرِ التوا",
+  "transactionSyncedFromBooth": "بوتھ سے موصول",
+  "transactionSyncedFromBoothExplainer": "یہ ٹول اُس بوتھ پر کٹا جو آف لائن تھا، اور ہمیں بعد میں موصول ہوا۔",
+  "transactionBalanceAfter": "بیلنس {balance}",
+  "@transactionBalanceAfter": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "transactionsNotRealtime": "ٹول سفر کے کچھ منٹ بعد بھی نظر آ سکتا ہے — بوتھ ہر 30 سیکنڈ میں ڈیٹا بھیجتے ہیں۔",
+  "transactionsEmptyTitle": "ابھی کوئی لین دین نہیں",
+  "transactionsEmptyBody": "ٹیگ استعمال کرنے کے بعد سفر اور بیلنس یہاں نظر آئیں گے۔",
+  "transactionsEmptyFilteredTitle": "اس فلٹر میں کچھ نہیں",
+  "transactionsEmptyFilteredBody": "کوئی دوسرا فلٹر منتخب کریں۔",
+  "tripsTitle": "سفر",
+  "tripEntry": "داخلہ",
+  "tripExit": "اخراج",
+  "tripDuration": "دورانیہ",
+  "tripFare": "ٹول",
+  "tripLiveTitle": "اس وقت ایکسپریس وے پر",
+  "tripLiveBody": "{plaza} سے {time} پر داخل ہوئے۔ ٹول اخراج کے وقت کٹے گا۔",
+  "@tripLiveBody": {
+    "placeholders": {
+      "plaza": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "tripLiveElapsed": "اب تک {duration}",
+  "@tripLiveElapsed": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "tripStatusFailed": "ناکام",
+  "tripsEmptyTitle": "ابھی کوئی سفر نہیں",
+  "tripsEmptyBody": "ایکسپریس وے پر آپ کے سفر یہاں نظر آئیں گے۔",
+  "faresTitle": "ٹول ریٹ",
+  "faresSubtitle": "دو پلازوں کے درمیان ٹول دیکھیں",
+  "faresFrom": "سے",
+  "faresTo": "تک",
+  "faresSwap": "سمت بدلیں",
+  "faresDirectionNote": "ٹول ہر سمت کے لیے الگ مقرر ہوتا ہے، اس لیے {from} سے {to} کا ٹول واپسی سے مختلف ہو سکتا ہے۔",
+  "@faresDirectionNote": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "faresVehicleClass": "ٹول کیٹیگری",
+  "faresYourVehicle": "آپ کی {plate}",
+  "@faresYourVehicle": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "faresResult": "ٹول",
+  "faresNotSetTitle": "ٹول مقرر نہیں",
+  "faresNotSetBody": "آپریٹر نے اس سمت اور کیٹیگری کے لیے ابھی ٹول جاری نہیں کیا۔",
+  "faresPickPlazas": "ابتدائی اور آخری پلازہ منتخب کریں۔",
+  "faresMotorcycleTitle": "ممنوع",
+  "faresMotorcycleBody": "موٹر سائیکل ایکسپریس وے پر ممنوع ہے، اس لیے کوئی ٹول لاگو نہیں۔",
+  "faresEmptyTitle": "کوئی ٹول جاری نہیں",
+  "faresEmptyBody": "اس سرور پر ٹول کی فہرست خالی ہے۔",
+  "topupTitle": "بیلنس ڈالیں",
+  "topupChooseMethod": "آپ کس طریقے سے ادائیگی کریں گے؟",
+  "topupForVehicle": "{plate} میں بیلنس",
+  "@topupForVehicle": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "topupCurrentBalance": "موجودہ بیلنس",
+  "topupAmount": "رقم",
+  "topupAmountCustom": "دوسری رقم",
+  "topupMinimum": "کم از کم رقم {minimum} روپے ہے",
+  "@topupMinimum": {
+    "placeholders": {
+      "minimum": {
+        "type": "int"
+      }
+    }
+  },
+  "topupBalanceAfter": "بیلنس ڈالنے کے بعد: {balance}",
+  "@topupBalanceAfter": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "topupMethodJazzCashApp": "جاز کیش ایپ",
+  "topupMethodJazzCashAppSubtitle": "اپنے ٹیگ کی ٹی آئی ڈی کے ذریعے جاز کیش والٹ سے ادائیگی۔ ابھی دستیاب ہے۔",
+  "topupMethodJazzCashCheckout": "اسی ایپ میں ادائیگی",
+  "topupMethodJazzCashCheckoutSubtitle": "ایم ٹیگ سے باہر جائے بغیر کارڈ یا والٹ سے ادائیگی۔",
+  "topupMethodEasypaisa": "ایزی پیسہ",
+  "topupMethodEasypaisaSubtitle": "ابھی دستیاب نہیں۔",
+  "topupMethodCard": "ڈیبٹ یا کریڈٹ کارڈ",
+  "topupMethodCardSubtitle": "ابھی دستیاب نہیں۔",
+  "topupMethodCash": "بوتھ پر نقد",
+  "topupMethodCashSubtitle": "کسی بھی پلازہ پر آپریٹر کو نقد دیں اور رسید لیں۔",
+  "topupBadgeWorksNow": "ابھی دستیاب",
+  "topupBadgeComingSoon": "جلد آ رہا ہے",
+  "topupBadgeUnavailable": "سیٹ اپ نہیں",
+  "topupJazzCashStepsTitle": "جاز کیش ایپ سے بیلنس ڈالیں",
+  "topupJazzCashStep1": "اپنے فون پر جاز کیش ایپ کھولیں۔",
+  "topupJazzCashStep2": "Bill Payments میں جا کر M-Tag منتخب کریں۔",
+  "topupJazzCashStep3": "نیچے دی گئی ٹی آئی ڈی بالکل ویسے ہی درج کریں۔",
+  "topupJazzCashStep4": "اپنا نام اور نمبر پلیٹ دیکھ کر رقم درج کریں اور ادائیگی کریں۔",
+  "topupJazzCashStep5": "واپس یہاں آ جائیں — جاز کیش کی تصدیق کے بعد بیلنس خود اپ ڈیٹ ہو جائے گا۔",
+  "topupJazzCashOpenApp": "جاز کیش کھولیں",
+  "topupJazzCashOpenAppFailed": "جاز کیش ایپ نہیں کھل سکی۔ اسے اپنی ہوم اسکرین سے کھولیں۔",
+  "topupJazzCashNoTidTitle": "ٹی آئی ڈی دستیاب نہیں",
+  "topupJazzCashNoTidBody": "یہ سرور آپ کے ٹیگ کی ٹی آئی ڈی نہیں بتاتا، اس لیے ہم نہیں دکھا سکتے کہ جاز کیش میں کیا درج کرنا ہے۔ بوتھ سے اپنی ٹی آئی ڈی پوچھیں، یا وہیں نقد ادائیگی کریں۔",
+  "topupJazzCashAmountNote": "رقم آپ جاز کیش ایپ میں درج کریں گے، یہاں نہیں۔",
+  "topupCheckoutUnavailableTitle": "ایپ میں ادائیگی سیٹ اپ نہیں",
+  "topupCheckoutUnavailableBody": "اس ورژن میں کوئی پیمنٹ چیک آؤٹ سیٹ اپ نہیں، اس لیے ہم یہاں کارڈ سے ادائیگی نہیں لے سکتے۔ جاز کیش ایپ استعمال کریں یا بوتھ پر نقد ادائیگی کریں۔",
+  "topupCheckoutOpening": "محفوظ ادائیگی کھولی جا رہی ہے",
+  "topupCheckoutCancelled": "ادائیگی منسوخ ہو گئی۔ کوئی رقم نہیں کٹی۔",
+  "topupCashTitle": "بوتھ پر نقد ادائیگی",
+  "topupCashBody": "کوئی بھی پلازہ آپریٹر آپ کے ٹیگ میں بیلنس ڈال سکتا ہے۔ اپنا ٹیگ یا ٹی آئی ڈی اور نقد رقم لے جائیں — وہ آپ کو رسید پرنٹ کر کے دیں گے۔",
+  "topupCashWhatToBring": "کیا لے جانا ہے",
+  "topupCashBringTag": "اپنا ٹیگ، یا اس کی ٹی آئی ڈی لکھی ہوئی",
+  "topupCashBringPlate": "آپ کا رجسٹریشن نمبر ({plate})",
+  "@topupCashBringPlate": {
+    "placeholders": {
+      "plate": {
+        "type": "String"
+      }
+    }
+  },
+  "topupCashBringCash": "نقد رقم — آپریٹر پرنٹ شدہ رسید جاری کرتا ہے",
+  "topupCashPlazas": "ٹول پلازے",
+  "topupEasypaisaComingSoonTitle": "ایزی پیسہ ابھی دستیاب نہیں",
+  "topupEasypaisaComingSoonBody": "ایم ٹیگ ابھی ایزی پیسہ قبول نہیں کرتا۔ آپ جاز کیش ایپ سے بیلنس ڈال سکتے ہیں، یا کسی بھی پلازہ پر نقد ادائیگی کریں۔",
+  "topupCardComingSoonTitle": "کارڈ سے ادائیگی ابھی دستیاب نہیں",
+  "topupCardComingSoonBody": "ہم ابھی کارڈ سے ادائیگی نہیں لے سکتے۔ جاز کیش ایپ استعمال کریں، یا کسی بھی پلازہ پر نقد ادائیگی کریں۔",
+  "topupSubmitting": "آپ کی درخواست بنائی جا رہی ہے",
+  "topupWaitingTitle": "ادائیگی کی تصدیق کا انتظار",
+  "topupWaitingBody": "ہم نے {amount} کی درخواست درج کر لی ہے۔ ادائیگی کی تصدیق ہوتے ہی بیلنس اپ ڈیٹ ہو جائے گا — اس میں ایک منٹ لگ سکتا ہے۔",
+  "@topupWaitingBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topupConfirmedTitle": "بیلنس ڈال دیا گیا",
+  "topupConfirmedBody": "{amount} شامل ہو گئے۔",
+  "@topupConfirmedBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topupFailedTitle": "بیلنس نہیں ڈل سکا",
+  "topupTimedOutTitle": "ابھی انتظار جاری ہے",
+  "topupTimedOutBody": "ہمیں ابھی تصدیق نہیں ملی۔ اگر ادائیگی ہو گئی ہے تو بیلنس خود اپ ڈیٹ ہو جائے گا — دوبارہ ادائیگی کی ضرورت نہیں۔",
+  "topupPendingListTitle": "زیرِ التوا درخواستیں",
+  "topupPendingRow": "{amount} — تصدیق کا انتظار",
+  "@topupPendingRow": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "topupNeverCreditedLocally": "بیلنس ہمیشہ سرور سے پڑھا جاتا ہے، یہاں اندازہ نہیں لگایا جاتا۔",
+  "profileTitle": "پروفائل",
+  "profileName": "نام",
+  "profilePhone": "موبائل نمبر",
+  "profileCnic": "شناختی کارڈ",
+  "profileNotProvided": "درج نہیں",
+  "profilePhoneChangeNote": "ریکارڈ میں موبائل نمبر یا شناختی کارڈ تبدیل کرانے کے لیے بوتھ پر جائیں۔",
+  "profileEditName": "نام تبدیل کریں",
+  "profileChangePassword": "پاس ورڈ تبدیل کریں",
+  "profileCurrentPassword": "موجودہ پاس ورڈ",
+  "profileNewPassword": "نیا پاس ورڈ",
+  "profileConfirmPassword": "نیا پاس ورڈ دوبارہ",
+  "profilePasswordTooShort": "کم از کم 8 حروف استعمال کریں",
+  "profilePasswordMismatch": "دونوں پاس ورڈ مختلف ہیں",
+  "profilePasswordChanged": "پاس ورڈ تبدیل ہو گیا",
+  "profileAppearance": "ظاہری شکل",
+  "profileThemeSystem": "سسٹم کے مطابق",
+  "profileThemeLight": "روشن",
+  "profileThemeDark": "تاریک",
+  "profileLanguage": "زبان",
+  "profileLanguageEnglish": "English",
+  "profileLanguageUrdu": "اردو",
+  "profileSecurity": "سیکیورٹی",
+  "profileBiometricLock": "بایومیٹرک سے کھولیں",
+  "profileBiometricLockSubtitle": "ایم ٹیگ کھولتے وقت فنگر پرنٹ یا چہرہ مانگا جائے۔",
+  "profileBiometricUnavailable": "اس ڈیوائس پر بایومیٹرک سیٹ اپ نہیں ہے۔",
+  "profileBiometricPrompt": "ایم ٹیگ کھولیں",
+  "profileSupport": "سپورٹ",
+  "profileSupportPhone": "{phone} پر کال کریں",
+  "@profileSupportPhone": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAppVersion": "ورژن {version}",
+  "@profileAppVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "profileSignOut": "لاگ آؤٹ",
+  "profileSignOutConfirmTitle": "ایم ٹیگ سے لاگ آؤٹ کریں؟",
+  "profileSignOutConfirmBody": "دوبارہ سائن ان کے لیے آپ کو موبائل نمبر اور پاس ورڈ درکار ہوگا۔",
+  "profileNameUpdated": "نام اپ ڈیٹ ہو گیا",
+  "errorNetwork": "انٹرنیٹ نہیں ہے۔ اپنا موبائل ڈیٹا یا وائی فائی چیک کر کے دوبارہ کوشش کریں۔",
+  "errorTimeout": "سرور نے جواب دینے میں بہت وقت لیا۔ دوبارہ کوشش کریں۔",
+  "errorUnauthorised": "آپ کا سیشن ختم ہو گیا۔ دوبارہ سائن ان کریں۔",
+  "errorForbidden": "آپ کو اس کی اجازت نہیں ہے۔",
+  "errorNotFound": "یہ نہیں مل سکا۔",
+  "errorThrottled": "بہت زیادہ درخواستیں۔ کچھ دیر بعد دوبارہ کوشش کریں۔",
+  "errorValidation": "براہ کرم درج کی گئی معلومات دیکھ لیں۔",
+  "errorServer": "ہماری طرف کچھ خرابی ہو گئی۔ کچھ دیر بعد کوشش کریں۔",
+  "errorMalformed": "سرور سے غیر متوقع جواب ملا۔ اگر آپ پبلک وائی فائی پر ہیں تو موبائل ڈیٹا استعمال کریں۔",
+  "errorUnknown": "کچھ خرابی ہو گئی۔ دوبارہ کوشش کریں۔",
+  "offlineShowingSaved": "{time} کا محفوظ ڈیٹا دکھایا جا رہا ہے",
+  "@offlineShowingSaved": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "offlineBalanceAge": "{time} تک کا بیلنس",
+  "@offlineBalanceAge": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "loading": "لوڈ ہو رہا ہے",
+  "unknownValue": "—",
+  "navPlazas": "پلازہ",
+  "plazasTitle": "ٹول پلازے",
+  "plazasSubtitle": "ایکسپریس وے کے تمام پلازے، اور آپ کی گاڑی کے لیے وہاں تک کا کرایہ۔",
+  "plazasFromLabel": "سفر کہاں سے",
+  "plazasAllPlazas": "تمام پلازے",
+  "plazasFaresFrom": "{plaza} سے کرائے",
+  "@plazasFaresFrom": {
+    "placeholders": {
+      "plaza": {
+        "type": "String"
+      }
+    }
+  },
+  "plazasIsOrigin": "آپ کا مقامِ آغاز",
+  "plazasNoLanes": "کوئی لین درج نہیں",
+  "plazasLaneCount": "{count, plural, =1{1 لین} other{{count} لینیں}}",
+  "@plazasLaneCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "plazasOpenFareTable": "مکمل کرایہ نامہ",
+  "privacyPolicy": "پرائیویسی پالیسی",
+  "privacyPolicyUnavailable": "پرائیویسی پالیسی ابھی شائع نہیں ہوئی۔ {phone} پر سپورٹ کو کال کریں، وہ آپ کو بھیج دیں گے۔",
+  "@privacyPolicyUnavailable": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "tagPassLabel": "ایم ٹیگ پاس",
+  "unlockTitle": "خوش آمدید",
+  "unlockFingerprint": "فنگر پرنٹ سے کھولیں",
+  "unlockFace": "فیس آئی ڈی سے کھولیں",
+  "unlockGeneric": "بایومیٹرک سے کھولیں",
+  "unlockReason": "اپنا ایم ٹیگ والٹ کھولیں",
+  "unlockUsePassword": "پاس ورڈ استعمال کریں",
+  "unlockFailed": "شناخت نہیں ہوئی۔ دوبارہ کوشش کریں یا پاس ورڈ استعمال کریں۔",
+  "unlockLockedOut": "بہت زیادہ کوششیں۔ بایومیٹرک عارضی طور پر بند ہے — پاس ورڈ استعمال کریں۔",
+  "unlockSubtitle": "آپ کا سیشن ابھی فعال ہے۔ تصدیق کریں کہ یہ آپ ہیں۔",
+  "onboardingTitle1": "بغیر رکے سفر کریں",
+  "onboardingBody1": "آپ کا ٹیگ گینٹری پر پڑھا جاتا ہے۔ نہ رکنا، نہ نقدی، نہ قطار۔",
+  "onboardingTitle2": "بیلنس ہمیشہ معلوم",
+  "onboardingBody2": "ہر ٹول اور ہر ٹاپ اپ، ہر گاڑی کے لیے، فوراً۔",
+  "onboardingTitle3": "کہیں سے بیلنس ڈالیں",
+  "onboardingBody3": "اپنے فون سے بیلنس ڈالیں، یا کسی بھی بوتھ پر نقد۔",
+  "onboardingGetStarted": "میرا اکاؤنٹ سیٹ کریں",
+  "onboardingHaveAccount": "میرے پاس پہلے سے پاس ورڈ ہے",
+  "onboardingSkip": "چھوڑ دیں",
+  "onboardingNext": "آگے",
+  "helpTitle": "یہاں کیا کیا جا سکتا ہے؟",
+  "helpBody": "آپ کا ایم ٹیگ اکاؤنٹ ٹول بوتھ پر ٹیگ لگواتے وقت بنایا جاتا ہے — اسی موبائل نمبر سے جو آپ نے آپریٹر کو دیا تھا۔\n\n• میرا اکاؤنٹ سیٹ کریں — اگر ٹیگ موجود ہے مگر پاس ورڈ نہیں۔ ہم اس نمبر پر کوڈ بھیجیں گے اور آپ پاس ورڈ منتخب کریں گے۔\n\n• میرے پاس پہلے سے پاس ورڈ ہے — عام طریقے سے سائن ان کریں۔\n\nابھی ٹیگ نہیں؟ شناختی کارڈ اور گاڑی کی رجسٹریشن لے کر کسی بھی پلازہ پر جائیں۔",
+  "phoneEntryTitle": "آپ کا نمبر کیا ہے؟",
+  "phoneEntryBody": "وہی موبائل نمبر درج کریں جو ٹیگ لگواتے وقت بوتھ کو دیا تھا۔ تصدیق کے لیے ہم 4 ہندسوں کا کوڈ بھیجیں گے۔",
+  "phoneEntryContinue": "کوڈ بھیجیں",
+  "otpTitle": "آئیے آپ کا نمبر تصدیق کریں",
+  "otpBody": "ہم نے آپ کے فون پر 4 ہندسوں کا کوڈ بھیجا ہے۔\nمکمل درج ہونے پر خود تصدیق ہو جائے گی۔",
+  "otpBodyConsole": "اس سرور پر ایس ایم ایس گیٹ وے نہیں، اس لیے کوڈ سرور لاگ میں لکھا گیا ہے۔",
+  "otpNotReceived": "کوڈ موصول نہیں ہوا؟",
+  "otpResend": "دوبارہ بھیجیں",
+  "otpResendIn": "{seconds} سیکنڈ بعد دوبارہ",
+  "@otpResendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "otpVerifying": "تصدیق ہو رہی ہے",
+  "otpVerified": "کامیابی سے تصدیق ہوئی",
+  "otpVerifiedBody": "آپ کا نمبر تصدیق شدہ ہے۔",
+  "otpVerifiedSecure": "تصدیق شدہ اور محفوظ",
+  "otpAttemptsLeft": "{count, plural, =1{1 کوشش باقی} other{{count} کوششیں باقی}}",
+  "@otpAttemptsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "setPasswordTitle": "پاس ورڈ منتخب کریں",
+  "setPasswordBody": "اب سے سائن ان کے لیے یہی استعمال ہوگا۔ کم از کم 8 حروف۔",
+  "setPasswordLabel": "نیا پاس ورڈ",
+  "setPasswordConfirmLabel": "پاس ورڈ کی تصدیق",
+  "setPasswordSubmit": "محفوظ کریں اور آگے بڑھیں",
+  "setPasswordTooShort": "کم از کم 8 حروف استعمال کریں",
+  "setPasswordMismatch": "دونوں مماثل نہیں",
+  "phoneAlreadySetUpTitle": "آپ کے پاس پہلے سے پاس ورڈ ہے",
+  "phoneAlreadySetUpBody": "یہ نمبر پہلے سے سیٹ ہے، دوبارہ تصدیق کی ضرورت نہیں۔ اپنے منتخب کردہ پاس ورڈ سے سائن ان کریں۔\n\nبھول گئے؟ سپورٹ کو کال کریں، وہ ری سیٹ میں مدد کریں گے۔",
+  "phoneAlreadySetUpSignIn": "سائن ان پر جائیں",
+  "activitySegmentPayments": "ادائیگیاں",
+  "activitySegmentTrips": "سفر",
+  "tripsFilterAll": "تمام",
+  "tripsFilterLive": "سفر جاری",
+  "tripsFilterCompleted": "مکمل",
+  "tripsLiveBannerTitle": "اس وقت ایکسپریس وے پر",
+  "tripsCountLabel": "{count, plural, =0{کوئی سفر نہیں} =1{1 سفر} other{{count} سفر}}",
+  "tripsStaleNotice": "آخری محفوظ شدہ سفر دکھائے جا رہے ہیں — سرور سے رابطہ نہیں ہو سکا۔",
+  "pushBalanceUpdated": "آپ کا بیلنس اپ ڈیٹ ہو گیا۔",
+  "actionView": "دیکھیں",
+  "otpBodyPush": "ہم نے 4 ہندسوں کا کوڈ آپ کے فون پر بھیجا ہے، اور آپ کے سائن ان شدہ دوسرے ڈیوائس پر M-Tag ایپ میں نوٹیفکیشن کے طور پر بھی۔",
+  "resetPhoneTitle": "پاس ورڈ دوبارہ ترتیب دیں",
+  "resetPhoneBody": "اپنا رجسٹرڈ موبائل نمبر درج کریں، ہم تصدیق کے لیے 4 ہندسوں کا کوڈ بھیجیں گے۔",
+  "resetSignedOutElsewhere": "آپ کے دیگر ڈیوائسز سے سائن آؤٹ کر دیا گیا ہے۔",
+  "loginForgotPasswordReset": "کوڈ سے دوبارہ ترتیب دیں"
+}

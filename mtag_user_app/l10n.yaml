@@ -1,0 +1,10 @@
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppL10n
+output-dir: lib/l10n/generated
+nullable-getter: false
+# A key present in app_en.arb but missing from app_ur.arb would otherwise ship an
+# English string inside an Urdu build, silently. This turns that into a build
+# failure.
+untranslated-messages-file: l10n_untranslated.json

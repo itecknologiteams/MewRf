@@ -50,6 +50,11 @@ class Transaction(models.Model):
     tag_serial = models.CharField(max_length=24, blank=True)
     transaction_type = models.CharField(max_length=30, choices=TransactionType.choices)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # Fee withheld from the cash handed over, kept out of `amount` so
+    # `amount` always equals what the wallet actually moved. Cash collected
+    # at the booth is amount + service_charge — the figure the till is
+    # reconciled against. Non-zero only on tag-issuance topups today.
+    service_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     balance_before = models.DecimalField(max_digits=12, decimal_places=2)
     balance_after = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=TransactionStatus.choices, default=TransactionStatus.SUCCESS)

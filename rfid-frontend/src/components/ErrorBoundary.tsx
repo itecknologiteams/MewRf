@@ -30,23 +30,23 @@ export default class ErrorBoundary extends Component<Props, State> {
     }
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-[var(--bg-base)]">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-canvas">
         <div className="max-w-md w-full text-center space-y-5">
-          <div className="w-16 h-16 bg-[var(--accent-rose)]/10 rounded-full flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-8 h-8 text-[var(--accent-rose)]" />
+          <div className="w-16 h-16 bg-danger/10 rounded-full flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-8 h-8 text-danger" />
           </div>
 
           <div>
-            <h1 className="text-xl font-bold text-[var(--text-primary)] mb-2">
+            <h1 className="text-xl font-bold text-ink mb-2">
               Something went wrong
             </h1>
-            <p className="text-sm text-[var(--text-secondary)]">
+            <p className="text-sm text-ink-muted">
               An unexpected error occurred. Reload the page or try again — your data is safe.
             </p>
           </div>
 
           {this.state.error && (
-            <pre className="text-xs font-mono text-left text-[var(--text-tertiary)] bg-[var(--bg-elevated)] border border-[var(--border-custom)] px-4 py-3 rounded-xl overflow-auto max-h-32 whitespace-pre-wrap break-all">
+            <pre className="text-xs font-mono text-left text-ink-subtle bg-elevated border border-line px-4 py-3 rounded-xl overflow-auto max-h-32 whitespace-pre-wrap break-all">
               {this.state.error.message}
             </pre>
           )}
@@ -54,14 +54,14 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => window.location.reload()}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity"
             >
               <RefreshCw className="w-4 h-4" />
               Reload Page
             </button>
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--bg-elevated)] border border-[var(--border-custom)] text-[var(--text-primary)] text-sm font-medium rounded-xl hover:bg-[var(--bg-surface)] transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 bg-elevated border border-line text-ink text-sm font-medium rounded-xl hover:bg-surface transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
               Try Again

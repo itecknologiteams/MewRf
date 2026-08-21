@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    VehicleEntryView, VehicleExitView, TripHistoryView,
+    VehicleEntryView, VehicleExitView, TripHistoryView, MyTripListView,
     PlazaListView, TollRateListView, VehicleCategoryListView, AdminTripListView,
     AdminPlazaView, AdminPlazaDetailView, AdminLaneView,
     AdminTollRateView, AdminRateDetailView, AdminStatsView,
@@ -14,6 +14,10 @@ urlpatterns = [
     path('plazas/', PlazaListView.as_view(), name='plaza-list'),
     path('rates/', TollRateListView.as_view(), name='rate-list'),
     path('vehicle-categories/', VehicleCategoryListView.as_view(), name='vehicle-category-list'),
+    # BEFORE the <int:vehicle_id> route. 'my' would never match the int converter so
+    # either order resolves correctly, but declaring the literal first is what keeps it
+    # that way if the converter is ever widened to <str:>.
+    path('trips/my/', MyTripListView.as_view(), name='my-trips'),
     path('trips/<int:vehicle_id>/', TripHistoryView.as_view(), name='trip-history'),
     path('admin/trips/', AdminTripListView.as_view(), name='admin-trips'),
     path('admin/trips/<int:trip_id>/close/', AdminTripCloseView.as_view(), name='admin-trip-close'),

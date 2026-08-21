@@ -13,7 +13,41 @@ import { tollsApi } from '@/services/api';
 import { formatPlazaId } from '@/lib/utils';
 import type { StatsData, DailyReport, PlazaReport, LaneReport } from '@/services/api';
 
-const COLORS = ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6'];
+// Categorical ramp, assigned in fixed order. The vars re-step per theme (see
+// index.css) so the marks stay legible on both the light and dark surface.
+const COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+];
+
+/**
+ * Vertical gloss ramps for bar fills — the skeuomorphic half of the design
+ * lives on cards and graphs, so bars get a domed, top-lit body instead of a
+ * flat slab. Each id maps to one --chart-N slot and keeps that slot's hue.
+ */
+function ChartGloss({ ids, slots }: { ids: string[]; slots: number[] }) {
+  return (
+    <defs>
+      {ids.map((id, i) => {
+        const hue = `var(--chart-${slots[i]})`;
+        // Mix toward white/black rather than fading opacity: an opacity ramp
+        // lightens on a light surface and darkens on a dark one, so the dome
+        // would light from below in one of the two themes.
+        return (
+          <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`color-mix(in srgb, ${hue} 80%, white)`} />
+            <stop offset="50%" stopColor={hue} />
+            <stop offset="100%" stopColor={`color-mix(in srgb, ${hue} 84%, black)`} />
+          </linearGradient>
+        );
+      })}
+    </defs>
+  );
+}
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -40,7 +74,7 @@ function AnalyticsTab({ stats, onDownload }: { stats: StatsData; onDownload: () 
   return (
     <>
       <div className="flex justify-end mb-4">
-        <button onClick={onDownload} className="flex items-center gap-2 px-4 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity">
+        <button onClick={onDownload} className="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity">
           <Download className="w-4 h-4" />
           Download CSV
         </button>
@@ -50,63 +84,64 @@ function AnalyticsTab({ stats, onDownload }: { stats: StatsData; onDownload: () 
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.title} className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-5 shadow-sm">
+            <div key={card.title} className="bg-surface border border-line rounded-xl skeu-card p-5">
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${card.color}15` }}>
+                <div className="p-2 rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${card.color} 12%, transparent)` }}>
                   <Icon className="w-5 h-5" style={{ color: card.color }} />
                 </div>
-                <span className="text-xs text-[var(--text-secondary)]">{card.sub}</span>
+                <span className="text-xs text-ink-muted">{card.sub}</span>
               </div>
-              <p className="text-2xl font-bold text-[var(--text-primary)]">{card.value}</p>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">{card.title}</p>
+              <p className="text-2xl font-bold text-ink">{card.value}</p>
+              <p className="text-sm text-ink-muted mt-1">{card.title}</p>
             </div>
           );
         })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
+        <div className="bg-surface border border-line rounded-xl skeu-card p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-base font-semibold text-[var(--text-primary)]">Monthly Toll Revenue</h3>
-            <span className="text-xs text-[var(--accent-emerald)] bg-[var(--accent-emerald)]/10 px-2 py-1 rounded-full">Live</span>
+            <h3 className="text-base font-semibold text-ink">Monthly Toll Revenue</h3>
+            <span className="text-xs text-success bg-success/10 px-2 py-1 rounded-full">Live</span>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={stats.monthly}>
+              <ChartGloss ids={['g1', 'g2']} slots={[1, 2]} />
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-custom)" vertical={false} />
               <XAxis dataKey="month" stroke="var(--text-tertiary)" fontSize={12} />
               <YAxis stroke="var(--text-tertiary)" fontSize={12} />
-              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-custom)', borderRadius: '12px', fontSize: '12px' }} />
+              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-custom)', borderRadius: '12px', fontSize: '12px', color: 'var(--text-primary)' }} itemStyle={{ color: 'var(--text-primary)' }} labelStyle={{ color: 'var(--text-secondary)' }} />
               <Legend />
-              <Bar dataKey="toll" name="Revenue (PKR)" fill="var(--accent-blue)" radius={[8, 8, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="transactions" name="Trips" fill="var(--accent-cyan)" radius={[8, 8, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="toll" name="Revenue (PKR)" fill="url(#g1)" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="transactions" name="Trips" fill="url(#g2)" radius={[4, 4, 0, 0]} maxBarSize={50} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
+        <div className="bg-surface border border-line rounded-xl skeu-card p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-base font-semibold text-[var(--text-primary)]">Daily Transactions (Last 7 Days)</h3>
-            <span className="text-xs text-[var(--accent-emerald)] bg-[var(--accent-emerald)]/10 px-2 py-1 rounded-full">Live</span>
+            <h3 className="text-base font-semibold text-ink">Daily Transactions (Last 7 Days)</h3>
+            <span className="text-xs text-success bg-success/10 px-2 py-1 rounded-full">Live</span>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={stats.daily}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-custom)" />
               <XAxis dataKey="day" stroke="var(--text-tertiary)" fontSize={12} />
               <YAxis stroke="var(--text-tertiary)" fontSize={12} />
-              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-custom)', borderRadius: '12px', fontSize: '12px' }} />
+              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-custom)', borderRadius: '12px', fontSize: '12px', color: 'var(--text-primary)' }} itemStyle={{ color: 'var(--text-primary)' }} labelStyle={{ color: 'var(--text-secondary)' }} />
               <Legend />
-              <Line type="monotone" dataKey="amount" name="Revenue (PKR)" stroke="var(--accent-emerald)" strokeWidth={3} dot={{ fill: 'var(--accent-emerald)', strokeWidth: 2, r: 5, stroke: 'var(--bg-surface)' }} activeDot={{ r: 7, fill: 'var(--accent-emerald)', stroke: 'var(--bg-surface)', strokeWidth: 3 }} />
-              <Line type="monotone" dataKey="count" name="Trip Count" stroke="var(--accent-amber)" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'var(--accent-amber)', strokeWidth: 2, r: 4, stroke: 'var(--bg-surface)' }} />
+              <Line type="monotone" dataKey="amount" name="Revenue (PKR)" stroke="var(--chart-1)" strokeWidth={2} dot={{ fill: 'var(--chart-1)', strokeWidth: 2, r: 4, stroke: 'var(--bg-surface)' }} activeDot={{ r: 6, fill: 'var(--chart-1)', stroke: 'var(--bg-surface)', strokeWidth: 2 }} />
+              <Line type="monotone" dataKey="count" name="Trip Count" stroke="var(--chart-2)" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'var(--chart-2)', strokeWidth: 2, r: 4, stroke: 'var(--bg-surface)' }} activeDot={{ r: 6, fill: 'var(--chart-2)', stroke: 'var(--bg-surface)', strokeWidth: 2 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
-          <h3 className="text-base font-semibold text-[var(--text-primary)] mb-6">Plaza Revenue</h3>
+        <div className="lg:col-span-2 bg-surface border border-line rounded-xl skeu-card p-6">
+          <h3 className="text-base font-semibold text-ink mb-6">Plaza Revenue</h3>
           {stats.plaza_stats.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-sm text-[var(--text-secondary)]">No plaza data yet</div>
+            <div className="flex items-center justify-center h-40 text-sm text-ink-muted">No plaza data yet</div>
           ) : (
             <div className="space-y-5">
               {stats.plaza_stats.sort((a, b) => b.revenue - a.revenue).map((plaza) => {
@@ -115,18 +150,21 @@ function AnalyticsTab({ stats, onDownload }: { stats: StatsData; onDownload: () 
                   <div key={plaza.name}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-[var(--text-primary)]">{plaza.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${plaza.is_active ? 'bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)]' : 'bg-[var(--accent-rose)]/10 text-[var(--accent-rose)]'}`}>
+                        <span className="text-sm font-medium text-ink">{plaza.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${plaza.is_active ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
                           {plaza.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-semibold text-[var(--text-primary)]">PKR {plaza.revenue.toLocaleString()}</span>
-                        <span className="text-xs text-[var(--text-secondary)] ml-2">{plaza.trips} trips</span>
+                        <span className="text-sm font-semibold text-ink">PKR {plaza.revenue.toLocaleString()}</span>
+                        <span className="text-xs text-ink-muted ml-2">{plaza.trips} trips</span>
                       </div>
                     </div>
-                    <div className="h-2.5 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: 'var(--accent-blue)' }} />
+                    <div className="h-2.5 bg-elevated rounded-full overflow-hidden skeu-track">
+                      <div
+                        className="h-full rounded-full bg-brand skeu-meter transition-all duration-700"
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -135,21 +173,26 @@ function AnalyticsTab({ stats, onDownload }: { stats: StatsData; onDownload: () 
           )}
         </div>
 
-        <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-6 shadow-sm">
-          <h3 className="text-base font-semibold text-[var(--text-primary)] mb-6">Vehicle Distribution</h3>
+        <div className="bg-surface border border-line rounded-xl skeu-card p-6">
+          <h3 className="text-base font-semibold text-ink mb-6">Vehicle Distribution</h3>
           {stats.vehicle_type_breakdown.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-sm text-[var(--text-secondary)]">No vehicles registered</div>
+            <div className="flex items-center justify-center h-40 text-sm text-ink-muted">No vehicles registered</div>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={stats.vehicle_type_breakdown} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
                     {stats.vehicle_type_breakdown.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                        stroke="var(--bg-surface)"
+                        strokeWidth={2}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-custom)', borderRadius: '12px', fontSize: '12px' }}
+                    contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-custom)', borderRadius: '12px', fontSize: '12px', color: 'var(--text-primary)' }} itemStyle={{ color: 'var(--text-primary)' }} labelStyle={{ color: 'var(--text-secondary)' }}
                     formatter={(value, _name, props) => [`${props.payload.count} (${value}%)`, props.payload.name]}
                   />
                 </PieChart>
@@ -159,9 +202,9 @@ function AnalyticsTab({ stats, onDownload }: { stats: StatsData; onDownload: () 
                   <div key={item.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                      <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
+                      <span className="text-sm text-ink-muted">{item.name}</span>
                     </div>
-                    <span className="text-sm font-medium text-[var(--text-primary)]">{item.value}%</span>
+                    <span className="text-sm font-medium text-ink">{item.value}%</span>
                   </div>
                 ))}
               </div>
@@ -180,22 +223,22 @@ function LaneRow({ lane, index }: { lane: LaneReport; index: number }) {
   const typeEntries = Object.entries(lane.vehicle_types);
 
   return (
-    <div className="px-4 py-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-custom)]">
+    <div className="px-4 py-3 rounded-xl bg-elevated border border-line">
       <div className="flex items-center gap-4">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: color }}>
           {lane.lane_number ?? '?'}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[var(--text-primary)]">
+          <p className="text-sm font-medium text-ink">
             {lane.lane_number ? `Booth ${lane.lane_number}` : 'Unassigned'}
             {!lane.is_active && (
-              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] font-medium">Inactive</span>
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-danger/10 text-danger font-medium">Inactive</span>
             )}
           </p>
           {typeEntries.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-1">
               {typeEntries.map(([type, count]) => (
-                <span key={type} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-custom)] text-[var(--text-secondary)]">
+                <span key={type} className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface border border-line text-ink-muted">
                   {type}: {count}
                 </span>
               ))}
@@ -204,16 +247,16 @@ function LaneRow({ lane, index }: { lane: LaneReport; index: number }) {
         </div>
         <div className="flex gap-4 flex-shrink-0 text-right">
           <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{lane.entries.toLocaleString()}</p>
-            <p className="text-[10px] text-[var(--text-secondary)]">entries</p>
+            <p className="text-sm font-semibold text-ink">{lane.entries.toLocaleString()}</p>
+            <p className="text-[10px] text-ink-muted">entries</p>
           </div>
           <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{lane.exits.toLocaleString()}</p>
-            <p className="text-[10px] text-[var(--text-secondary)]">exits</p>
+            <p className="text-sm font-semibold text-ink">{lane.exits.toLocaleString()}</p>
+            <p className="text-[10px] text-ink-muted">exits</p>
           </div>
           <div>
             <p className="text-sm font-bold" style={{ color: 'var(--accent-emerald)' }}>{fmtPKR(lane.revenue)}</p>
-            <p className="text-[10px] text-[var(--text-secondary)]">collected</p>
+            <p className="text-[10px] text-ink-muted">collected</p>
           </div>
         </div>
       </div>
@@ -229,47 +272,47 @@ function PlazaCard({ plaza, colorIndex, forceOpen }: { plaza: PlazaReport; color
   const isOpen = forceOpen !== undefined ? forceOpen : open;
 
   return (
-    <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-surface border border-line rounded-xl skeu-card overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-[var(--bg-elevated)] transition-colors"
+        className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-elevated transition-colors"
       >
-        <div className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0" style={{ backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)` }}>
           <Building2 className="w-5 h-5" style={{ color }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{plaza.name}</p>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-custom)]">ID {formatPlazaId(plaza.plaza_id)}</span>
+            <p className="text-sm font-semibold text-ink">{plaza.name}</p>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-elevated text-ink-muted border border-line">ID {formatPlazaId(plaza.plaza_id)}</span>
             {!plaza.is_active && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-rose)]/10 text-[var(--accent-rose)] font-medium">Inactive</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-danger/10 text-danger font-medium">Inactive</span>
             )}
           </div>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">{plaza.lanes.length} booth{plaza.lanes.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-ink-muted mt-0.5">{plaza.lanes.length} booth{plaza.lanes.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex gap-4 flex-shrink-0 mr-2 text-right">
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{plaza.entries.toLocaleString()}</p>
-            <p className="text-[10px] text-[var(--text-secondary)]">entries</p>
+            <p className="text-sm font-semibold text-ink">{plaza.entries.toLocaleString()}</p>
+            <p className="text-[10px] text-ink-muted">entries</p>
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{plaza.exits.toLocaleString()}</p>
-            <p className="text-[10px] text-[var(--text-secondary)]">exits</p>
+            <p className="text-sm font-semibold text-ink">{plaza.exits.toLocaleString()}</p>
+            <p className="text-[10px] text-ink-muted">exits</p>
           </div>
           <div>
             <p className="text-sm font-bold" style={{ color: 'var(--accent-emerald)' }}>{fmtPKR(plaza.revenue)}</p>
-            <p className="text-[10px] text-[var(--text-secondary)]">collected</p>
+            <p className="text-[10px] text-ink-muted">collected</p>
           </div>
         </div>
         {isOpen
-          ? <ChevronDown className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
-          : <ChevronRight className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />}
+          ? <ChevronDown className="w-4 h-4 text-ink-muted flex-shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-ink-muted flex-shrink-0" />}
       </button>
 
       {isOpen && (
-        <div className="px-5 pb-4 border-t border-[var(--border-custom)]">
+        <div className="px-5 pb-4 border-t border-line">
           {plaza.lanes.length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)] py-4 text-center">No booth activity</p>
+            <p className="text-sm text-ink-muted py-4 text-center">No booth activity</p>
           ) : (
             <div className="pt-3 space-y-2">
               {plaza.lanes.map((lane, i) => (
@@ -336,19 +379,19 @@ function DailyReportTab() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <CalendarDays className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none" />
+            <CalendarDays className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
             <input
               type="date"
               value={date}
               max={todayStr()}
               onChange={(e) => setDate(e.target.value)}
-              className="pl-9 pr-3 py-2 text-sm rounded-xl bg-[var(--bg-surface)] border border-[var(--border-custom)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]/40"
+              className="pl-9 pr-3 py-2 text-sm rounded-xl bg-surface border border-line text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
           </div>
           {report && (
             <button
               onClick={() => setAllExpanded((v) => !v)}
-              className="text-xs px-3 py-2 rounded-xl border border-[var(--border-custom)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              className="text-xs px-3 py-2 rounded-xl border border-line bg-surface text-ink-muted hover:text-ink transition-colors"
             >
               {allExpanded ? 'Collapse all' : 'Expand all'}
             </button>
@@ -357,7 +400,7 @@ function DailyReportTab() {
         <button
           onClick={downloadCSV}
           disabled={!report}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[var(--accent-blue)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40"
+          className="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40"
         >
           <Download className="w-4 h-4" />
           Download CSV
@@ -366,36 +409,36 @@ function DailyReportTab() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--accent-blue)]" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand" />
         </div>
       ) : report ? (
         <>
           <div className="grid grid-cols-3 gap-4 mb-5">
-            <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-4 shadow-sm flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[var(--accent-blue)]/10">
-                <Car className="w-5 h-5 text-[var(--accent-blue)]" />
+            <div className="bg-surface border border-line rounded-xl skeu-card p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-brand/10">
+                <Car className="w-5 h-5 text-brand" />
               </div>
               <div>
-                <p className="text-xl font-bold text-[var(--text-primary)]">{report.totals.entries.toLocaleString()}</p>
-                <p className="text-xs text-[var(--text-secondary)]">Total entries</p>
+                <p className="text-xl font-bold text-ink">{report.totals.entries.toLocaleString()}</p>
+                <p className="text-xs text-ink-muted">Total entries</p>
               </div>
             </div>
-            <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-4 shadow-sm flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[var(--accent-cyan)]/10">
-                <FileText className="w-5 h-5 text-[var(--accent-cyan)]" />
+            <div className="bg-surface border border-line rounded-xl skeu-card p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-info/10">
+                <FileText className="w-5 h-5 text-info" />
               </div>
               <div>
-                <p className="text-xl font-bold text-[var(--text-primary)]">{report.totals.exits.toLocaleString()}</p>
-                <p className="text-xs text-[var(--text-secondary)]">Total exits</p>
+                <p className="text-xl font-bold text-ink">{report.totals.exits.toLocaleString()}</p>
+                <p className="text-xs text-ink-muted">Total exits</p>
               </div>
             </div>
-            <div className="bg-[var(--bg-surface)] border border-[var(--border-custom)] rounded-xl p-4 shadow-sm flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-[var(--accent-emerald)]/10">
-                <TrendingUp className="w-5 h-5 text-[var(--accent-emerald)]" />
+            <div className="bg-surface border border-line rounded-xl skeu-card p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-success/10">
+                <TrendingUp className="w-5 h-5 text-success" />
               </div>
               <div>
-                <p className="text-xl font-bold text-[var(--text-primary)]">{fmtPKR(report.totals.revenue)}</p>
-                <p className="text-xs text-[var(--text-secondary)]">Total collection</p>
+                <p className="text-xl font-bold text-ink">{fmtPKR(report.totals.revenue)}</p>
+                <p className="text-xs text-ink-muted">Total collection</p>
               </div>
             </div>
           </div>
@@ -409,7 +452,7 @@ function DailyReportTab() {
           {/* PlazaReport has no `trips` field — it reports entries/exits. The old
               `p.trips === 0` compared undefined to 0, so this never rendered. */}
           {report.plazas.every((p) => p.entries === 0 && p.exits === 0) && (
-            <p className="text-center py-10 text-sm text-[var(--text-secondary)]">No trips recorded on {date}</p>
+            <p className="text-center py-10 text-sm text-ink-muted">No trips recorded on {date}</p>
           )}
         </>
       ) : null}
@@ -459,11 +502,11 @@ export default function Reports() {
   return (
     <div className="animate-fade-in-up">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Reports & Analytics</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">Toll collection data across all plazas and booths</p>
+        <h1 className="text-2xl font-bold text-ink">Reports & Analytics</h1>
+        <p className="text-sm text-ink-muted mt-1">Toll collection data across all plazas and booths</p>
       </div>
 
-      <div className="flex gap-1 p-1 bg-[var(--bg-elevated)] rounded-xl border border-[var(--border-custom)] w-fit mb-6">
+      <div className="flex gap-1 p-1 bg-elevated rounded-xl border border-line w-fit mb-6">
         {([
           { key: 'analytics' as const, label: 'Analytics' },
           { key: 'daily' as const, label: 'Daily Booth Report' },
@@ -473,8 +516,8 @@ export default function Reports() {
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
               activeTab === tab.key
-                ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm border border-[var(--border-custom)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                ? 'bg-surface text-ink shadow-sm border border-line'
+                : 'text-ink-muted hover:text-ink'
             }`}
           >
             {tab.label}
@@ -486,8 +529,8 @@ export default function Reports() {
         loading ? (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="flex flex-col items-center gap-4">
-              <Loader2 className="w-10 h-10 animate-spin text-[var(--accent-blue)]" />
-              <p className="text-sm text-[var(--text-secondary)]">Loading analytics...</p>
+              <Loader2 className="w-10 h-10 animate-spin text-brand" />
+              <p className="text-sm text-ink-muted">Loading analytics...</p>
             </div>
           </div>
         ) : stats ? (
