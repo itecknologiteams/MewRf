@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     VehicleListCreateView, MyVehicleListView, VehicleDetailView, VehicleByPlateView, TagReissueView,
     AvailableTagsView, TagInventoryUploadView, TagCreateView, TagBulkCreateView,
-    TagExistsCheckView, TagScanBufferView, ScanDebugView, VehicleSuspendView,
+    TagExistsCheckView, TagScanBufferView, VehicleSuspendView,
+    TagScanLookupView,
     InventoryUploadView, InventoryListView, BoothAssignmentView,
     TagActivationQuickCreateView, TagActivationLinkExistingView, InventoryCheckView,
 )
@@ -19,7 +20,6 @@ urlpatterns = [
     path('tags/bulk/', TagBulkCreateView.as_view(), name='tag-bulk-create'),
     path('tags/check/', TagExistsCheckView.as_view(), name='tag-exists-check'),
     path('tags/scan/', TagScanBufferView.as_view(), name='tag-scan-buffer'),
-    path('tags/scan-debug/', ScanDebugView.as_view(), name='tag-scan-debug'),
     path('tags/available/', AvailableTagsView.as_view(), name='available-tags'),
     path('tags/upload/', TagInventoryUploadView.as_view(), name='tag-upload'),
     path('tags/<int:vehicle_id>/reissue/', TagReissueView.as_view(), name='tag-reissue'),
@@ -31,4 +31,6 @@ urlpatterns = [
     path('inventory/activate/', TagActivationQuickCreateView.as_view(), name='tag-activate'),
     path('inventory/activate-existing/', TagActivationLinkExistingView.as_view(), name='tag-activate-existing'),
     path('inventory/check/<str:tag_serial>/', InventoryCheckView.as_view(), name='inventory-check'),
+    # Identify a tag from what a reader actually gives us (TID/EPC).
+    path('tags/scan-lookup/', TagScanLookupView.as_view(), name='tag-scan-lookup'),
 ]

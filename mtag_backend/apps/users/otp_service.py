@@ -91,7 +91,7 @@ def _push_code(user, code: str, purpose: str) -> int:
 
         return send_to_user(
             user.id,
-            title=f'{code} is your M-Tag code',
+            title=f'{code} is your ME-Tag code',
             body='Expires in 5 minutes. Never share this code with anyone.',
             data={'type': 'otp', 'purpose': purpose},
         )
@@ -127,7 +127,7 @@ def _push_code_to_requesting_device(
 
         sent = send_to_token(
             device_token,
-            title=f'{code} is your M-Tag code',
+            title=f'{code} is your ME-Tag code',
             body='Expires in 5 minutes. Never share this code with anyone.',
             data={
                 'type': 'otp',
@@ -230,7 +230,7 @@ def request_code(
         sender = get_sms_sender()
         if sender.send(
             phone=phone,
-            message=f'{code} is your M-Tag verification code. It expires in 5 minutes.',
+            message=f'{code} is your ME-Tag verification code. It expires in 5 minutes.',
         ):
             channels.append(sender.name)
 
@@ -259,6 +259,27 @@ def verify_code(
         .first()
     )
     if otp is None or otp.consumed_at is not None:
+        # `not_found` is the one failure that says nothing about the code the caller typed —
+        # it means no LIVE row exists for this (phone, purpose) pair at all. That is almost
+        # always a client/server disagreement rather than user error, and without these
+        # details it is indistinguishable from a wrong code in the logs.
+        #
+        # Written when it happens because the alternative is guessing: a 400 whose body is
+        # the same length for a purpose mismatch, an unknown phone and an already-spent code
+        # tells an operator nothing.
+        siblings = list(
+            PhoneOtp.objects.filter(phone=phone)
+            .order_by('-created_at')
+            .values_list('purpose', 'consumed_at')[:3]
+        )
+        logger.warning(
+            'OTP verify found no live code: phone=%r purpose=%r '
+            '(latest_for_this_purpose=%s, all_recent_for_phone=%s)',
+            phone,
+            purpose,
+            'consumed' if otp is not None else 'none',
+            siblings or 'NO ROWS FOR THIS PHONE AT ALL',
+        )
         return {'ok': False, 'reason': 'not_found'}
     if otp.is_expired:
         return {'ok': False, 'reason': 'expired'}

@@ -12,16 +12,12 @@ class TollsConfig(AppConfig):
         import sys
         from django.conf import settings
 
-        # The master sync agent is NO LONGER started here. It runs as its own
-        # process — `manage.py sync_service`, PM2 app `mtag-sync` — so that the
-        # web app and the gate hold no replication logic and never block on
-        # master. Starting it here also meant every `manage.py <anything>`
-        # (shell, migrate, showmigrations) silently spun up a sync thread.
+        # There is no master sync agent any more. Booths are online-only: they
+        # have no database of their own, so there is nothing to replicate and
+        # apps/tolls/sync/ has been removed along with the mtag-sync process.
         #
-        # Gates the ANPR gate auto-start ONLY. Syncing is not affected by any
-        # setting — it runs iff the mtag-sync process is running.
-        if not getattr(settings, 'ANPR_GATE_ENABLED',
-                       getattr(settings, 'SYNC_AGENT_ENABLED', True)):
+        # This flag now gates the ANPR gate auto-start and nothing else.
+        if not getattr(settings, 'ANPR_GATE_ENABLED', True):
             return
 
         # Under Django's dev-server reloader the monitor process runs first

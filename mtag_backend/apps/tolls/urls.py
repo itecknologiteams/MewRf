@@ -2,10 +2,12 @@ from django.urls import path
 from .views import (
     VehicleEntryView, VehicleExitView, TripHistoryView, MyTripListView,
     PlazaListView, TollRateListView, VehicleCategoryListView, AdminTripListView,
-    AdminPlazaView, AdminPlazaDetailView, AdminLaneView,
+    AdminPlazaView, AdminPlazaDetailView, AdminLaneView, AdminLaneDetailView,
     AdminTollRateView, AdminRateDetailView, AdminStatsView,
     AdminTripCloseView, AdminTripRefundView, AdminGateEventListView,
     AdminDailyReportView,
+    AdminBoothDeploymentView, AdminBoothMachineDetailView,
+    AdminBoothJobView, AdminBoothJobDetailView, AdminBoothJobListView,
 )
 
 urlpatterns = [
@@ -27,7 +29,13 @@ urlpatterns = [
     path('admin/daily-report/', AdminDailyReportView.as_view(), name='admin-daily-report'),
     path('admin/plazas/', AdminPlazaView.as_view(), name='admin-plaza-list'),
     path('admin/plazas/<int:pk>/', AdminPlazaDetailView.as_view(), name='admin-plaza-detail'),
-    path('admin/plazas/<int:plaza_id>/lanes/', AdminLaneView.as_view(), name='admin-lane-create'),
+    path('admin/plazas/<int:plaza_id>/lanes/', AdminLaneView.as_view(), name='admin-lane-list'),
+    path('admin/lanes/<int:pk>/', AdminLaneDetailView.as_view(), name='admin-lane-detail'),
+    path('admin/booth-deployments/', AdminBoothDeploymentView.as_view(), name='admin-booth-deployments'),
+    path('admin/booth-machines/<int:pk>/', AdminBoothMachineDetailView.as_view(), name='admin-booth-machine-detail'),
+    path('admin/booth-machines/<int:pk>/jobs/', AdminBoothJobView.as_view(), name='admin-booth-job-create'),
+    path('admin/booth-jobs/', AdminBoothJobListView.as_view(), name='admin-booth-job-list'),
+    path('admin/booth-jobs/<int:pk>/', AdminBoothJobDetailView.as_view(), name='admin-booth-job-detail'),
     path('admin/rates/', AdminTollRateView.as_view(), name='admin-rate-create'),
     path('admin/rates/<int:pk>/', AdminRateDetailView.as_view(), name='admin-rate-detail'),
 ]

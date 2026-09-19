@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>M-Tag</string>
+	<string>ME-Tag</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -37,7 +37,7 @@
 	</array>
 	<!-- local_auth. Shown verbatim in the Face ID prompt. -->
 	<key>NSFaceIDUsageDescription</key>
-	<string>Unlock M-Tag to see your tag balances.</string>
+	<string>Unlock ME-Tag to see your tag balances.</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

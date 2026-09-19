@@ -149,7 +149,7 @@ class _StartupFailureApp extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      "M-Tag couldn't start",
+                      "ME-Tag couldn't start",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
@@ -229,7 +229,7 @@ class _ResetButtonState extends State<_ResetButton> {
       _busy = false;
       // The process cannot restart itself, and a half-initialised app is worse than a
       // closed one — so the honest instruction is to reopen it.
-      _message = 'Reset. Close M-Tag completely and open it again.';
+      _message = 'Reset. Close ME-Tag completely and open it again.';
     });
   }
 

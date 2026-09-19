@@ -176,6 +176,16 @@ class JazzCashService:
         if amount < Decimal('100'):
             return {'success': False, 'reason': 'Minimum top-up amount is Rs.100'}
 
+        # Without a ceiling one request can mint an arbitrary balance, which is
+        # exactly what makes an unverified callback catastrophic rather than
+        # merely wrong.
+        max_amount = Decimal(str(getattr(settings, 'MAX_TOPUP_AMOUNT', '500000')))
+        if amount > max_amount:
+            return {
+                'success': False,
+                'reason': f'Maximum top-up amount is Rs.{max_amount:,.0f}',
+            }
+
         topup = TopupRequest.objects.create(
             account_id=account_id,
             user_id=user_id,
@@ -214,8 +224,30 @@ class JazzCashService:
     @staticmethod
     @db_transaction.atomic
     def handle_callback(jazzcash_txn_id: str, pp_response_code: str, topup_id: str) -> dict:
+        """Credit a pending top-up that JazzCash reports as paid.
+
+        This method NEVER contacts JazzCash — it believes what the caller says.
+        The only thing standing between it and a stranger crediting a wallet for
+        free is the signature on the request, so it refuses to run at all unless
+        that signature is being enforced. Failing closed here is deliberate: an
+        uncredited payment is a support ticket, a forged one is stolen money.
+        """
         if not topup_id:
             return {'success': False, 'reason': 'topup_id is required'}
+
+        verifying = getattr(settings, 'JAZZCASH_VERIFY_HASH', False)
+        allowed_unverified = getattr(settings, 'JAZZCASH_ALLOW_UNVERIFIED_CALLBACK', False)
+        if not verifying and not allowed_unverified:
+            logger.error(
+                "Refusing top-up callback for %s: JAZZCASH_VERIFY_HASH is off, so "
+                "nothing proves this came from JazzCash. Confirm the hashing "
+                "formula, set JAZZCASH_INTEGRITY_SALT and enable verification.",
+                topup_id,
+            )
+            return {
+                'success': False,
+                'reason': 'Payment verification is not configured; callback refused.',
+            }
 
         try:
             topup = TopupRequest.objects.select_for_update().get(

@@ -139,8 +139,9 @@ cp .env.booth.example .env
 sed -i "s/^DJANGO_SETTINGS_MODULE=.*/DJANGO_SETTINGS_MODULE=config.settings.lan/" .env
 sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')|" .env
 sed -i "s/^ALLOWED_HOSTS=.*/ALLOWED_HOSTS=localhost,127.0.0.1,${ALLOWED_HOST}/" .env
-# GATE_MODE drives which sync passes mtag-sync runs (entry=push+ref/closed,
-# exit=+open trips). Validated as entry|exit at the top of this script.
+# GATE_MODE is written for the record and for anything that reads .env by hand;
+# the gate itself takes its mode from `mode` in rfid_config.ini, set below from
+# the same value. Validated as entry|exit at the top of this script.
 sed -i "s/^GATE_MODE=.*/GATE_MODE=${GATE_MODE}/" .env
 # STRICT ONLINE-ONLY: this booth has no database of its own. DB_* and MASTER_DB_*
 # both point at master, as the same role (RFID) on the same server, so `default`
@@ -205,23 +206,19 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 echo "--- starting PM2 ---"
-# mtag-sync is deliberately NOT started. It replicates between a booth's local
-# database and master, and with DB_* now pointing at master both ends are the
-# same server — every pass would upsert master's rows onto themselves, advance
-# watermarks that mean nothing and re-run setval across 12 tables, from all 21
-# booths every 30s. No benefit, real load. The delete below also stops it on
-# booths provisioned before this change.
+# There is no sync process any more: booths are online-only, so there is no
+# local database to replicate and apps/tolls/sync/ has been removed. mtag-sync
+# is still named in the delete below so that a booth provisioned before the
+# change has its old process torn down rather than left running forever.
 pm2 delete mtag-web mtag-gate mtag-sync >/dev/null 2>&1 || true
-pm2 start ecosystem.config.js --only mtag-web,mtag-gate
+pm2 start ecosystem.config.js
 pm2 save
 
 echo ""
 echo "=== Bootstrap complete for booth $BOOTH_NUMBER (mode=$GATE_MODE) ==="
 echo "Verify with:"
-echo "  pm2 status                        # mtag-web and mtag-gate online (no mtag-sync)"
+echo "  pm2 status                        # mtag-web and mtag-gate online"
 echo "  pm2 logs mtag-gate   # look for: [reader] Connected to TCP:${READER_IP}:..."
-echo "  python manage.py sync_service --once    # one cycle, verbose"
-echo "  python manage.py trip_sync             # DRIFT must be 0"
 echo ""
 echo "If PM2 has never run on this machine before, also run the command"
 echo "below ONCE (pm2 startup only prints it, doesn't run it) so it survives reboot:"

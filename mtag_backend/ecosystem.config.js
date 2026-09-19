@@ -1,14 +1,16 @@
 // PM2 process config for the m-tag backend.
-// Runs three services with the project's virtualenv Python:
-//   1. mtag-web   → Django server   (manage.py runserver)
-//   2. mtag-gate  → RFID gate       (manage.py run_gate)   — local DB only
-//   3. mtag-sync  → master sync     (manage.py sync_service) — the ONLY process
-//                                     that talks to master
+// Runs two services with the project's virtualenv Python:
+//   1. mtag-web   → Django app  (gunicorn, see gunicorn.conf.py)
+//   2. mtag-gate  → RFID gate   (manage.py run_gate)
 //
-// mtag-gate and mtag-sync are separate on purpose. The gate reads and writes
-// only its local database and holds no replication logic, so if master is
-// unreachable the sync process backs off and retries while the lane keeps
-// running. mtag-sync's behaviour is driven by GATE_MODE in .env (entry|exit).
+// There is no sync process. Booths are ONLINE-ONLY: booth_bootstrap.sh points
+// DB_* straight at master and installs no local Postgres, so a booth has no
+// database of its own to replicate. The old mtag-sync app (manage.py
+// sync_service, apps/tolls/sync/) has been removed — with both ends of the
+// sync being the same server it could only ever copy master onto itself.
+//
+// The consequence is worth stating plainly: master IS the database now. If
+// master is unreachable, the lane stops. There is no local fallback.
 //
 // Place this file in mtag_backend/ (next to manage.py). Then:
 //   pm2 start ecosystem.config.js
@@ -28,6 +30,15 @@ const venvPython = isWin
   ? path.join(__dirname, 'venv', 'Scripts', 'python.exe')
   : path.join(__dirname, 'venv', 'bin', 'python3');
 
+// venv's own gunicorn — its shebang already points at the venv's python, so PM2
+// needs no separate interpreter for it. Used for mtag-web below: `runserver` is
+// Django's development server, which its own docs state has not been through
+// security audits or performance testing. It was serving the booth's operator UI
+// and API on 0.0.0.0:8000.
+const venvGunicorn = isWin
+  ? path.join(__dirname, 'venv', 'Scripts', 'gunicorn.exe')
+  : path.join(__dirname, 'venv', 'bin', 'gunicorn');
+
 // Shared options for both apps.
 const common = {
   cwd: __dirname,               // always run from mtag_backend/ (where manage.py is)
@@ -36,10 +47,9 @@ const common = {
   restart_delay: 3000,          // wait 3s before restart (avoid crash loops)
   max_restarts: 20,
   env: {
-    // 'lan' — this file is for real booth deployment, where the sync agent
-    // (local <-> master Postgres) and online-only dual-write MUST be on.
-    // 'config.settings.local' disables the sync agent entirely — only use
-    // that by hand for a developer's own machine, never here.
+    // 'lan' — this file is for real booth deployment, where DB_* points at
+    // master. 'config.settings.local' is for a developer's own machine; never
+    // use it here.
     DJANGO_SETTINGS_MODULE: process.env.MTAG_SETTINGS_MODULE || 'config.settings.lan',
     PYTHONUNBUFFERED: '1',      // stream logs live to PM2
   },
@@ -50,23 +60,18 @@ module.exports = {
     {
       ...common,
       name: 'mtag-web',
-      script: 'manage.py',
-      // --noreload: Django's auto-reloader forks a child, which confuses PM2.
-      args: 'runserver 0.0.0.0:8000 --noreload',
+      script: venvGunicorn,
+      // gunicorn.conf.py carries bind/workers/threads/timeout. `interpreter`
+      // is deliberately cleared: gunicorn's shebang is already the venv python,
+      // and leaving `common`'s python3 in place would run it as a script.
+      interpreter: 'none',
+      args: '-c gunicorn.conf.py config.wsgi:application',
     },
     {
       ...common,
       name: 'mtag-gate',
       script: 'manage.py',
       args: 'run_gate',
-    },
-    {
-      ...common,
-      name: 'mtag-sync',
-      script: 'manage.py',
-      // Mode comes from GATE_MODE in .env — do NOT hardcode --mode here, or a
-      // booth's .env and its sync behaviour can silently disagree.
-      args: 'sync_service',
     },
   ],
 };

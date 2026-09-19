@@ -77,6 +77,16 @@ class JazzCashCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # The sibling JazzCash views verify the signature; this one did not, and
+        # it is the one that moves money. AllowAny is required (JazzCash has no
+        # account here), so the signature is the ONLY caller authentication.
+        if not verify_secure_hash(request.data):
+            logger.warning(
+                "Rejected top-up callback with a bad signature — topup: %s",
+                request.data.get('topup_id') or request.query_params.get('topup_id'),
+            )
+            return error_response("Invalid signature", status_code=400)
+
         txn_id = request.data.get('pp_TxnRefNo', '')
         response_code = request.data.get('pp_ResponseCode', '')
         # topup_id can come from POST body or query param (?topup_id=...)

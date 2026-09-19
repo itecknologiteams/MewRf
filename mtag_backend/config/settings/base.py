@@ -80,6 +80,27 @@ _db_fallback = env('DB_FALLBACK_HOST', default='')
 _db_port     = env('DB_PORT',          default='5432')
 _master_host = env('MASTER_DB_HOST',   default='192.168.78.200')
 
+# TCP keepalives on every connection. The gate holds a connection open per
+# thread and only uses it when a tag arrives, so on a quiet lane the socket can
+# sit idle for many minutes. Anything in the path that reaps idle connections —
+# a NAT table, a firewall, Postgres' own idle_session_timeout — drops it
+# silently, and the process finds out only when the next vehicle's query fails.
+# Keepalives make the kernel prove the link is alive every 30s, so the socket is
+# either kept open or torn down where Django's reconnect logic can see it.
+_db_keepalives = {
+    'keepalives': 1,
+    'keepalives_idle': 30,      # start probing after 30s of silence
+    'keepalives_interval': 10,  # then every 10s
+    'keepalives_count': 5,      # give up (and drop the socket) after 5 misses
+}
+
+# How long a connection may be reused before it is recycled. This only takes
+# effect where something calls close_old_connections() — the request cycle does
+# it for the web app, and the long-running gate commands now do it at the top of
+# each unit of work. Bounding a connection's life is what stops a lane
+# inheriting a socket that died during a quiet spell.
+_conn_max_age = env.int('DB_CONN_MAX_AGE', default=60)
+
 if _db_fallback and _db_fallback != _db_primary:
     # Multi-host mode: HOST/PORT must be empty so Django doesn't override OPTIONS
     _db_host_cfg  = ''
@@ -89,11 +110,12 @@ if _db_fallback and _db_fallback != _db_primary:
         'port': f'{_db_port},{_db_port}',
         'connect_timeout': 3,   # seconds to wait per host before trying next
         'target_session_attrs': 'any',
+        **_db_keepalives,
     }
 else:
     _db_host_cfg  = _db_primary
     _db_port_cfg  = _db_port
-    _db_options   = {'connect_timeout': 3}
+    _db_options   = {'connect_timeout': 3, **_db_keepalives}
 
 DATABASES = {
     'default': {
@@ -104,6 +126,7 @@ DATABASES = {
         'HOST':     _db_host_cfg,
         'PORT':     _db_port_cfg,
         'OPTIONS':  _db_options,
+        'CONN_MAX_AGE': _conn_max_age,
     },
     # Explicit single-host connections for sync agent.
     # These bypass multi-host failover — always target one server.
@@ -114,7 +137,8 @@ DATABASES = {
         'PASSWORD': env('DB_PASSWORD', default='postgres'),
         'HOST':     'localhost',
         'PORT':     _db_port,
-        'OPTIONS':  {'connect_timeout': 3},
+        'OPTIONS':  {'connect_timeout': 3, **_db_keepalives},
+        'CONN_MAX_AGE': _conn_max_age,
     },
     'master_pg': {
         'ENGINE':   'django.db.backends.postgresql',
@@ -132,7 +156,8 @@ DATABASES = {
         'PASSWORD': env('MASTER_DB_PASSWORD', default=env('DB_PASSWORD', default='postgres')),
         'HOST':     _master_host,
         'PORT':     _db_port,
-        'OPTIONS':  {'connect_timeout': 3},
+        'OPTIONS':  {'connect_timeout': 3, **_db_keepalives},
+        'CONN_MAX_AGE': _conn_max_age,
     },
 }
 
@@ -211,39 +236,46 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
-# ANPR gate auto-start (see apps/tolls/apps.py).
-#
-# Renamed from SYNC_AGENT_ENABLED, which no longer described what it does: the
-# master sync agent is its own process now (`manage.py sync_service` / PM2 app
-# `mtag-sync`) and is NOT gated by any setting — it runs because PM2 runs it.
-# Leaving the old name would invite someone to set it expecting sync to stop.
-# The old name is still honoured so existing .env files keep working.
+# ANPR gate auto-start (see apps/tolls/apps.py). This is the only thing the
+# setting controls. The old SYNC_AGENT_ENABLED name is still honoured as a
+# default so existing .env files keep working; it no longer has anything to do
+# with syncing, which has been removed outright.
 ANPR_GATE_ENABLED = env.bool(
     'ANPR_GATE_ENABLED',
     default=env.bool('SYNC_AGENT_ENABLED', default=True),
 )
-# Deprecated alias — read nowhere; kept so old code/config referencing it does
-# not silently get a different value than ANPR_GATE_ENABLED.
-SYNC_AGENT_ENABLED = ANPR_GATE_ENABLED
 
-# Booth mode — 'entry' or 'exit'. Selects which sync passes the sync service
-# runs (see apps/tolls/sync/agent.py):
-#   entry  push + pull(reference, closed trips)
-#   exit   push + pull(reference, closed trips, OPEN trips)
-# An unset or misspelled value degrades to 'exit', the superset: an exit booth
-# denied open trips turns paying vehicles away, whereas an entry booth pulling a
-# few extra rows costs nothing.
+# ── Settings kept only so a deployed .env does not break ─────────────────────
+# Both are read by nothing. They are retained because every booth's .env still
+# carries them and django-environ would not care either way, but deleting the
+# names from here would remove the only place that records what they meant.
+# Drop them once no deployed .env sets them.
+#
+# GATE_MODE selected which passes the booth<->master sync service ran. Booths
+# are online-only now — they have no database of their own — so that service
+# and its apps/tolls/sync/ package have been deleted. The gate takes its own
+# entry/exit mode from `mode` in rfid_config.ini, and always did.
 GATE_MODE = env('GATE_MODE', default='exit')
 
-# NO LONGER USED — kept only so an existing .env carrying ONLINE_ONLY_MODE does
-# not break, and to document the change.
-#
-# The gate used to write to the local DB and master synchronously, rejecting the
-# transaction outright if master was unreachable — which meant a master outage
-# closed every lane. The gate now writes only to its local database, and the
-# separate sync service (apps/tolls/sync/, PM2 app mtag-sync) replicates to
-# master. Nothing reads this setting; delete it once no deployed .env sets it.
+# ONLINE_ONLY_MODE dates from when the gate wrote to a local DB and to master in
+# the same transaction. There is no longer anything to toggle: master is the
+# only database a booth has, which is what makes the system online-only. The
+# trade-off is deliberate and worth restating — if master is unreachable, the
+# lane stops. There is no local fallback and nothing retries in the background.
 ONLINE_ONLY_MODE = env.bool('ONLINE_ONLY_MODE', default=False)
+
+# ── Booth code deployment (master only) ──────────────────────────────────────
+# Credentials for SSHing into a booth to push code, used by booth_deploy_worker
+# and the admin portal's booth-deployment view. These are the same shared values
+# deploy_booths.sh uses; they live in master's .env, never in the database.
+#
+# Leave BOOTH_SSH_PASSWORD empty to use key-based auth instead — then master
+# needs its key in each booth's authorized_keys, and sshpass is not required.
+BOOTH_SSH_USER = env('BOOTH_SSH_USER', default='iteck')
+BOOTH_SSH_PASSWORD = env('BOOTH_SSH_PASSWORD', default='')
+# An update reinstalls dependencies and restarts PM2; on a slow booth that is
+# minutes, not seconds.
+BOOTH_DEPLOY_TIMEOUT = env.int('BOOTH_DEPLOY_TIMEOUT', default=1800)
 
 JAZZCASH_MERCHANT_ID = env('JAZZCASH_MERCHANT_ID', default='')
 JAZZCASH_PASSWORD = env('JAZZCASH_PASSWORD', default='')
@@ -253,6 +285,21 @@ JAZZCASH_RETURN_URL = env('JAZZCASH_RETURN_URL', default='')
 # Keep False until the exact hashing formula is confirmed with JazzCash, then
 # set True (and JAZZCASH_INTEGRITY_SALT) so the endpoints reject unsigned calls.
 JAZZCASH_VERIFY_HASH = env.bool('JAZZCASH_VERIFY_HASH', default=False)
+
+# The payment callback credits a wallet. With JAZZCASH_VERIFY_HASH off nothing
+# proves a callback came from JazzCash, so anyone who can reach the endpoint can
+# mark a pending top-up paid — the callback never contacts JazzCash to check.
+# It therefore refuses to credit unless the signature is actually being enforced.
+#
+# Set this True ONLY for a sandbox with no real money behind it. In production
+# confirm the hashing formula with JazzCash, set JAZZCASH_INTEGRITY_SALT, and
+# turn JAZZCASH_VERIFY_HASH on instead.
+JAZZCASH_ALLOW_UNVERIFIED_CALLBACK = env.bool(
+    'JAZZCASH_ALLOW_UNVERIFIED_CALLBACK', default=False)
+
+# Upper bound on a single top-up. There was none, so one request could mint an
+# arbitrary balance. Raise it deliberately if a legitimate top-up needs more.
+MAX_TOPUP_AMOUNT = env('MAX_TOPUP_AMOUNT', default='500000')
 
 # ── Push notifications (FCM HTTP v1) ─────────────────────────────────────────
 #
@@ -397,3 +444,36 @@ TAG_VALIDITY_MONTHS = env.int('TAG_VALIDITY_MONTHS', default=24)
 # operator can override the figure per registration; this is the default the
 # booth app prefills.
 TOPUP_SERVICE_CHARGE = env('TOPUP_SERVICE_CHARGE', default='350.00')
+
+# ── Baseline browser hardening ───────────────────────────────────────────────
+# Defaults that hold everywhere, including the HTTP-only LAN deployment. The
+# TLS-dependent half (HSTS, SSL redirect, Secure cookies) stays in
+# config.settings.production, because switching it on without a certificate in
+# front produces a redirect loop that presents as the site being down.
+
+# Auth is a cookie-borne JWT (apps/users/authentication.py) and DRF only enforces
+# CSRF for SessionAuthentication, so SameSite is what actually stops cross-site
+# forgery here: 'Lax' withholds the cookie on any cross-site POST/PUT/DELETE.
+# The login view sets the same attributes on access_token/refresh_token — change
+# these two together with apps/users/views.py or the protection is uneven.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+# Nothing in the frontend reads this cookie from JavaScript (it authenticates
+# with the JWT cookie instead), so it can be closed to script — which stops an
+# XSS from reading the token and self-submitting a valid form post.
+CSRF_COOKIE_HTTPONLY = True
+
+# Hosts allowed to make cross-origin state-changing requests. Empty by default:
+# same-origin deployments need nothing here, and a wrong entry is a CSRF bypass.
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+
+# Stop the browser guessing a response is HTML when we said it was JSON — the
+# usual route from "uploaded file is echoed back" to stored XSS.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+# No page here is ever meant to be framed; denying it removes clickjacking.
+X_FRAME_OPTIONS = 'DENY'
+# Do not leak our paths (which embed IDs) in the Referer of outbound links.
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+# Sever the window handle a page we open keeps to us, and vice versa.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'

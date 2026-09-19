@@ -34,10 +34,10 @@
 │  │         Django Server               │    │
 │  │         (Gunicorn)                  │    │
 │  │                                     │    │
-│  │  ┌────────────┐  ┌───────────────┐  │    │
-│  │  │ REST API   │  │  Sync Agent   │  │    │
-│  │  │ Entry/Exit │  │  (30s loop)   │  │    │
-│  │  └────────────┘  └───────────────┘  │    │
+│  │  ┌────────────┐                     │    │
+│  │  │ REST API   │   (no sync agent)   │    │
+│  │  │ Entry/Exit │                     │    │
+│  │  └────────────┘                     │    │
 │  │                                     │    │
 │  │  ┌─────────────────────────────┐    │    │
 │  │  │     ANPR Gate Controller    │    │    │
@@ -45,15 +45,8 @@
 │  │  └─────────────────────────────┘    │    │
 │  └─────────────────────────────────────┘    │
 │                    │                         │
-│  ┌─────────────────────────────────────┐    │
-│  │      Local PostgreSQL               │    │
-│  │      (localhost)                    │    │
-│  │                                     │    │
-│  │  toll_trips    accounts             │    │
-│  │  transactions  vehicles             │    │
-│  │  tags          plazas               │    │
-│  │  toll_rates    sync_log             │    │
-│  └─────────────────────────────────────┘    │
+│         no local database — every            │
+│         query goes to MASTER below           │
 │                                              │
 │  ┌─────────────────────────────────────┐    │
 │  │    quick-toll-system (Node.js)      │    │
@@ -82,7 +75,7 @@ AnprGateController.on_plate()
     ↓
 Plate normalize (KDE-1836 → KDE1836)
     ↓
-Vehicle + Tag lookup (local DB)
+Vehicle + Tag lookup (master DB)
     ↓
 Tag status check (ACTIVE?)
     ↓
@@ -90,11 +83,9 @@ EntryService.process_entry()
     ↓
 Balance check (≥ Rs.50?)
     ↓
-TollTrip CREATE → local DB
+TollTrip CREATE → master DB
     ↓
 Barrier OPEN + Display show balance
-    ↓
-(30s baad) Sync Push → Master DB
 
 
 EXIT (Plaza B)
@@ -106,52 +97,37 @@ AnprGateController.on_plate()
 ExitService.process_exit()
     ↓
 _find_active_trip()
-  ├─ Local DB check (trip pulled from master)
-  └─ Master fallback (agar sync nahi hua abhi tak)
+  └─ Master DB (booth ka apna DB nahi hai — 'default' hi master hai)
     ↓
 TollRate lookup (A → B ka rate)
     ↓
-Balance deduct → local DB
-TollTrip UPDATE (status=completed) → local DB
-Transaction CREATE → local DB
+Balance deduct → master DB
+TollTrip UPDATE (status=completed) → master DB
+Transaction CREATE → master DB
     ↓
 Barrier OPEN + Display show fare
-    ↓
-(30s baad) Sync Push → Master DB
+
+Sab kuch ek hi transaction mein master pe commit hota hai.
+Koi sync step nahi — entry Plaza A pe hote hi Plaza B ko turant dikh jati hai.
 ```
 
 ---
 
-## Sync Agent — 30 Second Cycle
+## Sync Agent — removed
 
-```
-┌─────────────────────────────────────────────┐
-│              Every 30 Seconds                │
-│                                              │
-│  PULL (Master → Local)                       │
-│  ┌──────────────────────────────────────┐   │
-│  │ plazas      → full refresh           │   │
-│  │ toll_lanes  → full refresh           │   │
-│  │ toll_rates  → full refresh           │   │
-│  │ tags        → full refresh           │   │
-│  │ vehicles    → updated_at filter      │   │
-│  │ users       → updated_at filter      │   │
-│  │ accounts    → balance_updated_at     │   │
-│  │              (timestamp guard)       │   │
-│  │ active_trips→ full refresh           │   │
-│  │              (cross-plaza exits)     │   │
-│  └──────────────────────────────────────┘   │
-│                                              │
-│  PUSH (Local → Master)                       │
-│  ┌──────────────────────────────────────┐   │
-│  │ toll_trips  → updated_at filter      │   │
-│  │              (entries + exits both)  │   │
-│  │ transactions→ processed_at filter    │   │
-│  │ accounts    → balance_updated_at     │   │
-│  │              (timestamp guard)       │   │
-│  └──────────────────────────────────────┘   │
-└─────────────────────────────────────────────┘
-```
+Pehle har booth 30 second ke cycle par master se pull aur master ko push karta
+tha (`apps/tolls/sync/`, PM2 app `mtag-sync`). Woh poora package delete kar diya
+gaya hai.
+
+Wajah simple hai: `booth_bootstrap.sh` ab booth par koi local Postgres install
+nahi karta aur `DB_*` seedha master pe point karta hai. Matlab sync ke dono
+end ek hi server the — har pass master ki rows ko master pe hi wapas likhta,
+watermarks aage barhata jinka koi matlab nahi tha, aur 12 tables par `setval`
+dobara chalata. Ab jo gate likhta hai woh pehle se hi master par hota hai.
+
+Jo cheezein is ke saath khatam ho gayin: sync lag, watermark drift, aur do
+databases ke beech divergence. Jo cheez add hui: master ki availability ab har
+lane ki availability hai.
 
 ---
 
@@ -182,37 +158,47 @@ Barrier OPEN + Display show fare
 
 ---
 
-## Offline Scenario (Master Down)
+## Master Down — kya hota hai
+
+> **Yeh section pehle ulta likha tha.** Purana design mein booth ka apna local
+> Postgres tha aur master down hone par bhi lane chalti rehti thi. Ab aisa
+> **nahi** hai — booths online-only hain, unka koi apna database nahi.
 
 ```
 Master DOWN
     ↓
-Gate PC kaam karta raha hai (local DB)
-Entry ✅  Exit ✅  Balance deduct ✅
+Booth ka 'default' DB = master. Koi fallback nahi.
+    ↓
+Entry ❌  Exit ❌  Balance deduct ❌
+Barrier nahi khulega — gate DB error log karega
     ↓
 Master BACK UP
     ↓
-Next sync cycle (max 30s)
-Push → sab kuch master pe
-Pull → master se updates local pe
-    ↓
-Sab PCs sync ✅
+Lane turant chalne lagti hai. Reconcile karne ko kuch nahi,
+kyunki outage ke doran koi transaction hui hi nahi.
 ```
+
+Yeh trade-off jaan boojh kar liya gaya hai: ek hi database hone ka matlab hai
+koi replication lag nahi, koi divergence nahi, aur koi double-charge nahi — lekin
+master ki availability ab har lane ki availability hai. Master aur booths ke
+beech ka network us hisaab se treat karna chahiye.
 
 ---
 
 ## Cross-Plaza Exit — Timing
 
 ```
-0s  — Vehicle enters Plaza A  (local A pe save)
-30s — Plaza A push → master
-60s — Plaza B pull → local B mein active trip aa gayi
+0s  — Vehicle enters Plaza A  → master pe commit
+0s  — Plaza B ko wohi trip turant dikhti hai (same database)
       Vehicle exits B → success ✅
 
-Malir Expressway min travel time = 6-8 minutes
-Max sync delay = 60 seconds
-→ Koi issue nahi
+Max delay = 0 seconds
 ```
+
+Pehle yahan 60 second tak ka sync lag hota tha (push 30s + pull 30s), jise
+Malir Expressway ke 6-8 minute travel time se cover kiya jata tha. Online-only
+ke baad woh window bilkul khatam hai — short hop ya U-turn par bhi koi race
+nahi.
 
 ---
 
@@ -231,10 +217,10 @@ Max sync delay = 60 seconds
 
 | Cheez | Value |
 |-------|-------|
-| Primary DB per gate | Local PostgreSQL (localhost) |
-| Sync interval | 30 seconds |
-| Cross-plaza trip max delay | 60 seconds |
-| Master down tolerance | Unlimited |
+| Primary DB per gate | Master PostgreSQL (no local DB) |
+| Sync interval | — (no sync) |
+| Cross-plaza trip max delay | 0 seconds |
+| Master down tolerance | **None — lane stops** |
 | Minimum balance for entry | Rs.50 |
 | Plate cooldown (same plate) | 5 seconds |
 | Barrier open duration | 2 seconds |
@@ -245,14 +231,15 @@ Max sync delay = 60 seconds
 
 | File | Kaam |
 |------|------|
-| `apps/tolls/sync/agent.py` | Sync agent — 30s loop |
-| `apps/tolls/sync/pull_service.py` | Master → Local pull |
-| `apps/tolls/sync/push_service.py` | Local → Master push |
-| `apps/tolls/sync/connections.py` | psycopg2 connection helpers |
 | `apps/tolls/services.py` | EntryService, ExitService |
 | `apps/tolls/management/commands/run_anpr_gate.py` | ANPR WebSocket controller |
 | `apps/tolls/management/commands/run_gate.py` | RFID gate controller |
-| `apps/tolls/apps.py` | Django startup — sync + ANPR auto-start |
+| `apps/tolls/barrier.py` | Barrier backend — service or serial |
+| `apps/tolls/apps.py` | Django startup — ANPR auto-start |
+
+> The `apps/tolls/sync/` package (agent, pull, push, connections) has been
+> removed. Booths are online-only and have no database of their own, so there is
+> nothing to replicate. See the note under **Deployment** below.
 | `config/settings/lan.py` | Production settings (LAN, no SSL) |
 | `gunicorn.conf.py` | Gunicorn config (1 worker, 4 threads) |
 | `mtag.service` | systemd service file |
@@ -263,9 +250,9 @@ Max sync delay = 60 seconds
 ## Environment — .env
 
 ```ini
-DB_HOST=localhost              # Gate PC ka local PostgreSQL
-DB_FALLBACK_HOST=              # No fallback needed
-master_pg → 192.168.78.200    # Sync agent explicitly connects here
+DB_HOST=192.168.78.200         # MASTER — booth ka apna DB nahi hai
+DB_FALLBACK_HOST=              # Koi fallback nahi
+MASTER_DB_HOST=192.168.78.200  # Wohi server; 'master_pg' alias isi pe jata hai
 ```
 
 ---

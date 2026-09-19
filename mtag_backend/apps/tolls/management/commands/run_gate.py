@@ -17,11 +17,104 @@ import statistics
 import threading
 import time
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand, CommandError
+from django.core.management.color import no_style
+from django.db import InterfaceError, OperationalError, close_old_connections, connections
+
+from apps.tolls import barrier as barrier_mod
+
+# Ceiling on one continuous opening, however many vehicles keep extending it.
+# A lane that has been open this long is not a convoy any more — it is a fault,
+# and the boom coming down is what makes anyone notice.
+MAX_CONTINUOUS_OPEN = 60.0
+
+# How often one tag's balance may be re-queried and re-shown while it sits in
+# range. Every read of every tag in the field comes through the preview path, so
+# this is what keeps a queue of waiting cars off the database.
+BALANCE_REFRESH_SECONDS = 5.0
+
+# How often the idle greeting is repainted on a lane where nothing is happening.
+# Only needed so a display power-cycled on its own comes back, so it is slow.
+WELCOME_REFRESH_SECONDS = 60.0
 
 log = logging.getLogger('apps.tolls.gate')
+
+# Errors that mean "the socket is gone", as opposed to "the query was wrong".
+# Only these are worth reconnecting for; a bad query would just fail again.
+_DEAD_CONNECTION = (InterfaceError, OperationalError)
+
+
+def db_call(fn, *args, **kwargs):
+    """Run a database call on a connection that is actually alive.
+
+    Django only recycles connections at request boundaries, and the gate has no
+    requests: it is one long-lived process whose threads each hold a connection
+    for the life of the booth. Worse, the thread that matters — the SDK's
+    receive thread, where every tag scan is handled — touches the database only
+    when a vehicle turns up. On a quiet lane that connection sits idle for as
+    long as the quiet lasts, and whatever is between the gate and Postgres (a
+    NAT table, a firewall, idle_session_timeout) eventually reaps it.
+
+    Nothing notices, because nothing is looking. The next vehicle's query then
+    raises OperationalError, the listener's blanket except swallows it, and the
+    barrier stays down. And since the broken connection is never closed, every
+    vehicle after it fails the same way — the lane is dead until the process is
+    restarted, which is exactly the fault this fixes.
+
+    So: recycle anything stale before the call, and if the call still dies on a
+    connection that went away underneath it, throw that connection out and try
+    once more on a fresh one. Genuine failures (a missing tag, an insufficient
+    balance) are not retried — they never reach here as exceptions.
+    """
+    close_old_connections()
+    try:
+        return fn(*args, **kwargs)
+    except _DEAD_CONNECTION as exc:
+        log.warning("[db] connection lost (%s) — reconnecting and retrying", exc)
+        # close_all() rather than close_old_connections(): the latter keeps a
+        # connection whose error Django has not marked yet, which is precisely
+        # the one that just failed.
+        connections.close_all()
+        return fn(*args, **kwargs)
+
+
+def install_statement_timeout(timeout_ms: int, stdout=None):
+    """Cap how long any query from THIS process may run.
+
+    Booths are online-only, so every gate query goes to master — and master's
+    own statement_timeout is 15 minutes. The tag-processing thread is the single
+    thread that handles every vehicle, so one query wedged behind a lock or a
+    bad plan takes the whole lane down with it for as long as that ceiling
+    allows. Every query the gate issues is a point lookup; none has any business
+    taking seconds, let alone minutes.
+
+    Applied through connection_created rather than DATABASES['OPTIONS'] because
+    master and booths share config.settings.lan. Putting it in settings would
+    also cap `migrate`, `load_fares`, booth_deploy_worker and the portal's
+    report queries, which legitimately run long. The signal fires per new
+    connection, so it survives db_call's reconnects and covers every thread.
+
+    Deliberately installed by the management commands and NOT by
+    GateController.__init__: apps.py can start an AnprGateController inside the
+    gunicorn web process, where this cap would silently apply to admin and
+    reporting queries too.
+    """
+    from django.db.backends.signals import connection_created
+
+    def _apply(sender, connection, **kwargs):
+        if connection.alias != 'default':
+            return  # master_pg sets its own, tighter, bound in services.py
+        with connection.cursor() as cursor:
+            cursor.execute(f"SET statement_timeout = {int(timeout_ms)}")
+
+    # weak=False: the receiver is a local function and would otherwise be
+    # garbage collected the moment this returns, silently doing nothing.
+    connection_created.connect(_apply, weak=False)
+    if stdout:
+        stdout.write(f"[db] statement_timeout set to {timeout_ms}ms for this process")
+    return _apply
 
 
 def resolve_plaza_lane(plaza_id: str, plaza_row_id: str, lane_number: str, lane_id: str):
@@ -134,8 +227,9 @@ class Command(BaseCommand):
                 "reader_host = 192.168.78.8\n"
                 "reader_port = 9090\n"
                 "tag_cooldown = 5.0\n"
-                "rssi_filter = 0        # min dBm to accept (0 = off)\n"
-                "rssi_filter_max = 0    # max dBm to accept (0 = off)\n"
+                "rssi_detect = 0        # dBm to notice a tag at all (0 = off)\n"
+                "rssi_open_min = 0      # dBm band the barrier opens in (0 = off)\n"
+                "rssi_open_max = 0      #   \"                                  \n"
                 "rssi_window = 5        # reads to median over\n"
                 "rssi_hysteresis = 3.0  # dB of slack before dropping a tag\n\n"
                 "[barrier]\n"
@@ -160,14 +254,39 @@ class Command(BaseCommand):
         tag_cooldown    = float(cfg.get('scanner', 'tag_cooldown',    fallback='5.0'))
         antenna_power   = int(cfg.get('scanner', 'antenna_power',   fallback='33'))
         scan_interval   = float(cfg.get('scanner', 'scan_interval',  fallback='1.0'))
-        rssi_filter     = float(cfg.get('scanner', 'rssi_filter',     fallback='0'))
-        rssi_filter_max = float(cfg.get('scanner', 'rssi_filter_max', fallback='0'))
+        # Three thresholds, two stages. `rssi_detect` is the weakest read worth
+        # reacting to at all — a tag at or above it gets its balance shown and
+        # nothing more. The barrier only opens, and the trip is only charged,
+        # while the tag sits inside [rssi_open_min, rssi_open_max].
+        #
+        # The old single-band keys are still honoured so a tuned booth keeps
+        # working untouched: under that scheme every accepted read both showed
+        # and opened, so rssi_filter maps to both lower bounds.
+        legacy_min = cfg.get('scanner', 'rssi_filter',     fallback='0')
+        legacy_max = cfg.get('scanner', 'rssi_filter_max', fallback='0')
+        rssi_detect   = float(cfg.get('scanner', 'rssi_detect',   fallback=legacy_min))
+        rssi_open_min = float(cfg.get('scanner', 'rssi_open_min', fallback=legacy_min))
+        rssi_open_max = float(cfg.get('scanner', 'rssi_open_max', fallback=legacy_max))
         rssi_window     = int(cfg.get('scanner', 'rssi_window',      fallback='5'))
         rssi_hysteresis = float(cfg.get('scanner', 'rssi_hysteresis', fallback='3.0'))
         serial_port = cfg.get('barrier', 'port',       fallback='/dev/ttyUSB0')
         serial_baud = int(cfg.get('barrier', 'baudrate', fallback='115200'))
         open_secs   = float(cfg.get('barrier', 'open_seconds', fallback='2.0'))
+        # Booths running qtserver-v2-new let its barrierServer own the serial
+        # port; the gate asks it over HTTP instead of writing to the same tty.
+        # Detected at startup, so no booth needs its config edited for this.
+        barrier_service_url = cfg.get(
+            'barrier', 'service_url', fallback=barrier_mod.DEFAULT_SERVICE_URL)
+        barrier_service_cycle = float(
+            cfg.get('barrier', 'service_cycle_seconds', fallback='0.5'))
+        # 'serial' pins the old behaviour on a booth where the service must not
+        # be used; anything else auto-detects.
+        barrier_mode = cfg.get('barrier', 'mode', fallback='auto').strip().lower()
         display_ip  = cfg.get('display', 'display_ip', fallback='192.168.78.12')
+        # A gate query is always a point lookup. 10s is far beyond anything
+        # healthy and far below master's own 15-minute ceiling. 0 disables.
+        statement_timeout_ms = int(
+            cfg.get('gate', 'statement_timeout_ms', fallback='10000'))
 
         if gate_mode not in ('entry', 'exit'):
             raise CommandError(f"Invalid gate mode '{gate_mode}' — must be 'entry' or 'exit'.")
@@ -176,28 +295,41 @@ class Command(BaseCommand):
             raise CommandError(f"rssi_window must be >= 1, got {rssi_window}.")
         if rssi_hysteresis < 0:
             raise CommandError(f"rssi_hysteresis must be >= 0, got {rssi_hysteresis}.")
-        if rssi_filter and rssi_filter_max and rssi_filter > rssi_filter_max:
+        if rssi_open_min and rssi_open_max and rssi_open_min > rssi_open_max:
             raise CommandError(
-                f"rssi_filter ({rssi_filter:g}) is above rssi_filter_max "
-                f"({rssi_filter_max:g}) — no reading could ever pass."
+                f"rssi_open_min ({rssi_open_min:g}) is above rssi_open_max "
+                f"({rssi_open_max:g}) — the barrier could never open."
+            )
+        # A vehicle has to be noticed before it can be let through. If the detect
+        # threshold sits inside the open band, a tag reaches the barrier stage
+        # without ever having been detected — survivable, but it means the UFD
+        # never shows a balance and the operator has mistuned the lane.
+        if rssi_detect and rssi_open_min and rssi_detect > rssi_open_min:
+            raise CommandError(
+                f"rssi_detect ({rssi_detect:g}) is above rssi_open_min "
+                f"({rssi_open_min:g}) — a vehicle would reach the barrier band "
+                f"before the gate ever noticed it. Detect must be the weaker "
+                f"(more negative) threshold."
             )
 
-        # This booth's mode is declared twice: `mode` here in rfid_config.ini
-        # (what the gate does) and GATE_MODE in .env (which sync passes mtag-sync
-        # runs). booth_bootstrap.sh writes both from one value, but a hand-edit to
-        # one leaves them disagreeing — and the bad case is silent: an exit lane
-        # whose sync runs in entry mode never pulls open trips, so every exiting
-        # vehicle is turned away with "No active trip found".
+        # This booth's mode is still declared twice — `mode` here in
+        # rfid_config.ini and GATE_MODE in .env — but only the former decides
+        # anything now. GATE_MODE used to select which passes mtag-sync ran, and
+        # that process is gone, so a disagreement between the two is a tidiness
+        # problem rather than a lane that turns paying vehicles away. Said once,
+        # quietly, instead of the old three-line alarm.
         from django.conf import settings
-        sync_mode = str(getattr(settings, 'GATE_MODE', '') or '').strip().lower()
-        if sync_mode and sync_mode != gate_mode:
-            self.stdout.write(self.style.ERROR(
-                f"!!! MODE MISMATCH: rfid_config.ini mode='{gate_mode}' but "
-                f".env GATE_MODE='{sync_mode}'.\n"
-                f"!!!   The gate will run as '{gate_mode}' while mtag-sync syncs as "
-                f"'{sync_mode}'.\n"
-                f"!!!   Fix .env to GATE_MODE={gate_mode} and restart mtag-sync."
+        env_mode = str(getattr(settings, 'GATE_MODE', '') or '').strip().lower()
+        if env_mode and env_mode != gate_mode:
+            self.stdout.write(self.style.WARNING(
+                f"[gate] .env GATE_MODE='{env_mode}' disagrees with "
+                f"rfid_config.ini mode='{gate_mode}'. The gate follows "
+                f"rfid_config.ini; GATE_MODE is no longer read by anything. "
+                f"Align .env when convenient."
             ))
+
+        if statement_timeout_ms > 0:
+            install_statement_timeout(statement_timeout_ms, self.stdout)
 
         test_mode = options['test_mode']
 
@@ -220,15 +352,20 @@ class Command(BaseCommand):
             serial_port=serial_port,
             serial_baud=serial_baud,
             open_secs=open_secs,
+            barrier_service_url=barrier_service_url,
+            barrier_service_cycle=barrier_service_cycle,
+            barrier_mode=barrier_mode,
             display_ip=display_ip,
             tag_cooldown=tag_cooldown,
             antenna_power=antenna_power,
-            rssi_filter=rssi_filter,
-            rssi_filter_max=rssi_filter_max,
+            rssi_detect=rssi_detect,
+            rssi_open_min=rssi_open_min,
+            rssi_open_max=rssi_open_max,
             rssi_window=rssi_window,
             rssi_hysteresis=rssi_hysteresis,
             test_mode=test_mode,
             stdout=self.stdout,
+            style=self.style,
         )
 
         gate.run(reader_host, reader_port, scan_interval)
@@ -256,8 +393,10 @@ class GateController:
         self, *, gate_mode, plaza_id, lane_id,
         serial_port, serial_baud, open_secs,
         display_ip, tag_cooldown, stdout,
-        antenna_power=33, rssi_filter=0, rssi_filter_max=0,
+        antenna_power=33, rssi_detect=0, rssi_open_min=0, rssi_open_max=0,
         rssi_window=5, rssi_hysteresis=3.0, test_mode=False,
+        barrier_service_url=barrier_mod.DEFAULT_SERVICE_URL,
+        barrier_service_cycle=0.5, barrier_mode='auto', style=None,
     ):
         self.gate_mode     = gate_mode
         self.plaza_id      = plaza_id
@@ -266,16 +405,27 @@ class GateController:
         self.display_ip    = display_ip
         self.tag_cooldown  = tag_cooldown
         self.antenna_power = antenna_power
-        self.rssi_filter     = rssi_filter
-        self.rssi_filter_max = rssi_filter_max
+        self.rssi_detect     = rssi_detect
+        self.rssi_open_min   = rssi_open_min
+        self.rssi_open_max   = rssi_open_max
         self.rssi_window     = rssi_window
         self.rssi_hysteresis = rssi_hysteresis
         self.test_mode       = test_mode
         self.stdout        = stdout
+        # run() reports a reader that refuses extended TID reads via
+        # self.style.ERROR. GateController never had a `style`, so that branch
+        # raised AttributeError instead of printing the warning — crashing the
+        # command at the one moment it was trying to explain itself, and leaving
+        # PM2 to restart straight back into the same rejection until it gave up
+        # on the lane. no_style() returns the text unchanged, so a caller that
+        # passes no style still gets the message.
+        self.style         = style or no_style()
 
-        # RSSI smoothing state (see _rssi_accepts) — one short window per tag.
+        # RSSI smoothing state (see _rssi_stage) — one short window per tag.
         self._rssi_hist: dict    = {}   # tid → deque[float]
-        self._rssi_pass: dict    = {}   # tid → bool (last verdict, for hysteresis)
+        self._rssi_at_barrier: dict = {}  # tid → bool (in the open band, for hysteresis)
+        self._rssi_stage_last: dict = {}  # tid → str (last stage, to log only changes)
+        self._balance_shown: dict   = {}  # tid → float (monotonic) — UFD throttle
         self._rssi_seen: dict    = {}   # tid → float (monotonic) — for pruning
         self._rssi_lock          = threading.Lock()
         self._rssi_pruned: float = 0.0  # monotonic time of last prune
@@ -283,38 +433,33 @@ class GateController:
         self.last_seen: dict      = {}   # (epc, tid) → datetime
         self.last_trigger: dict   = {}   # tid → float (monotonic)
         self._recent_ok: dict     = {}   # tid → float (monotonic) — recently processed tags
+        self._tag_state_pruned: float = 0.0  # monotonic time of last prune
         self._last_tx: float      = 0.0  # monotonic time of last transaction
-        self._barrier_busy        = False
-        self._pending_queue: list = []   # approved cars waiting for barrier
+        # Which transaction the idle greeting was last sent for, and when — so
+        # a quiet lane is not repainted every scan. -1.0 so the first call sends.
+        self._welcome_tx: float   = -1.0
+        self._welcome_at: float   = 0.0
+        # The barrier is open from now until _open_until (monotonic). Every
+        # approved vehicle pushes that deadline out instead of queueing its own
+        # opening — see _hold_open_for_vehicle.
+        self._open_until: float   = 0.0
+        # When the current continuous opening began — the datum MAX_CONTINUOUS_OPEN
+        # is measured from.
+        self._open_started: float = 0.0
+        self._barrier_open        = False
         self._lock = threading.Lock()
         self._running = True
 
-        self._serial = None
-        self._setup_serial(serial_port, serial_baud)
+        self.barrier = barrier_mod.BarrierBackend(
+            serial_port=serial_port, serial_baud=serial_baud,
+            open_secs=open_secs, stdout=stdout,
+            service_url=barrier_service_url,
+            service_cycle_secs=barrier_service_cycle,
+            prefer_service=(barrier_mode != 'serial'),
+        )
 
         # Start portal-triggered gate open polling thread
         threading.Thread(target=self._poll_portal_opens, daemon=True).start()
-
-    # ── Serial ────────────────────────────────────────────────────────────────
-
-    def _setup_serial(self, port, baud):
-        try:
-            import serial
-            self._serial = serial.Serial(port=port, baudrate=baud, timeout=1)
-            self.stdout.write(f"[serial] Connected on {port} at {baud} baud")
-        except Exception as exc:
-            self.stdout.write(f"[serial] Not available ({exc}) — barrier control disabled")
-            self._serial = None
-
-    def _send_serial(self, cmd: str):
-        try:
-            if self._serial and self._serial.is_open:
-                self._serial.write(cmd.encode())
-                return True
-        except Exception as exc:
-            self.stdout.write(f"[serial] Write error: {exc}")
-            self._serial = None
-        return False
 
     # ── Portal-triggered gate opens ───────────────────────────────────────────
 
@@ -327,54 +472,112 @@ class GateController:
         from django.utils import timezone
         from apps.tolls.models import PendingGateOpen
 
+        def _claim_next():
+            cutoff = timezone.now() - timedelta(seconds=30)
+            cmd = PendingGateOpen.objects.filter(
+                plaza_id=self.plaza_id,
+                executed_at__isnull=True,
+                created_at__gte=cutoff,
+            ).first()
+            if cmd:
+                cmd.executed_at = timezone.now()
+                cmd.save(update_fields=['executed_at'])
+            return cmd
+
         while self._running:
             try:
-                cutoff = timezone.now() - timedelta(seconds=30)
-                cmd = PendingGateOpen.objects.filter(
-                    plaza_id=self.plaza_id,
-                    executed_at__isnull=True,
-                    created_at__gte=cutoff,
-                ).first()
+                cmd = db_call(_claim_next)
                 if cmd:
-                    cmd.executed_at = timezone.now()
-                    cmd.save(update_fields=['executed_at'])
                     self.stdout.write("[portal] Gate open triggered via portal")
-                    self._open_barrier()
-                    self._schedule_close()
+                    self._hold_open_for_vehicle(
+                        {'gateEventId': cmd.id}, source='manual')
             except Exception as exc:
+                # This ran every second on the same connection for the life of
+                # the process, so one dropped socket used to mean the portal
+                # button never worked again either. db_call reconnects; this
+                # catch is now only for the errors a reconnect cannot fix.
                 self.stdout.write(f"[poll] Error: {exc}")
             time.sleep(1)
 
     # ── Barrier ───────────────────────────────────────────────────────────────
 
-    def _open_barrier(self):
-        self.stdout.write("[barrier] OPENING")
-        self._send_serial('o')
+    def _hold_open_for_vehicle(self, metadata=None, source='rfid'):
+        """Keep the barrier up long enough for one more approved vehicle.
 
-    def _close_barrier(self):
-        self.stdout.write("[barrier] CLOSING")
-        self._send_serial('f')
+        A convoy is one opening, not one pulse per car. Pulsing per car is what
+        stranded the fourth vehicle: its tag was read far-field, charged, and
+        cycled on the queue's schedule while the car was still upstream, so it
+        arrived at a barrier that had already opened and closed for it.
 
-    def _schedule_close(self):
-        def _do():
-            time.sleep(self.open_secs)
-            self._close_barrier()
-            # Process next car in queue
+        So every approval pushes out a shared deadline rather than waiting for
+        its own turn. The first one raises the boom; the rest only extend it;
+        one watcher drops it once the deadline passes with nobody new arriving.
+        """
+        now = time.monotonic()
+        with self._lock:
+            first = not self._barrier_open
+            if first:
+                self._barrier_open = True
+                self._open_started = now
+            # A vehicle approved now needs open_seconds from now, but never less
+            # than what an earlier vehicle already bought.
+            deadline = max(self._open_until, now + self.open_secs)
+            # A stream of reads must not be able to pin the boom up: past this,
+            # the lane needs a human, not a longer timer.
+            #
+            # The ceiling is measured from when THIS opening began, not from
+            # now. Against `now` it could never bind — every extension moved the
+            # ceiling forward by exactly as much as it moved the deadline, so
+            # the documented 60s limit did not exist and a lane could stay open
+            # indefinitely.
+            ceiling = self._open_started + MAX_CONTINUOUS_OPEN
+            self._open_until = min(deadline, ceiling)
+            capped = deadline > ceiling
+            held = self._open_until - now
+
+        if capped:
+            self.stdout.write(self.style.WARNING(
+                f"[barrier] Open {MAX_CONTINUOUS_OPEN:.0f}s continuously — "
+                f"refusing to extend further; the boom will drop. A lane open "
+                f"this long is a fault, not a convoy."
+            ))
+
+        if not first:
+            self.stdout.write(f"[barrier] EXTENDING open window — {held:.1f}s left")
+            return True
+
+        self.stdout.write(f"[barrier] HOLDING OPEN ({self.barrier.mode}) — {held:.1f}s")
+        meta = {'lane': self.lane_id, 'mode': self.gate_mode}
+        meta.update(metadata or {})
+        ok = self.barrier.hold(meta, source=source)
+        threading.Thread(target=self._release_when_clear, daemon=True).start()
+        return ok
+
+    def _release_when_clear(self):
+        """Drop the barrier once the last approved vehicle's window expires.
+
+        Polls rather than sleeping the whole window in one go, because the
+        deadline moves: a car approved while this is waiting extends it, and the
+        boom has to stay up for it.
+        """
+        while True:
             with self._lock:
-                self._barrier_busy = False
-                next_item = self._pending_queue.pop(0) if self._pending_queue else None
-            if next_item:
-                next_tid, next_display_fn = next_item
-                self.stdout.write(
-                    f"[queue] Processing next car: {next_tid} "
-                    f"({len(self._pending_queue)} remaining)"
-                )
-                with self._lock:
-                    self._barrier_busy = True
-                next_display_fn()
-                self._open_barrier()
-                self._schedule_close()
-        threading.Thread(target=_do, daemon=True).start()
+                remaining = self._open_until - time.monotonic()
+                if remaining <= 0 or not self._running:
+                    # Deciding to drop the boom and recording that it is down
+                    # MUST happen under one acquisition of the lock. When they
+                    # were split, a vehicle approved in the gap was told its
+                    # window had been extended — and was then released anyway,
+                    # with its deadline wiped to zero. That car had already been
+                    # charged, its tag was suppressed as 'already cleared', and
+                    # nothing was left to raise the boom for it.
+                    self._barrier_open = False
+                    self._open_until = 0.0
+                    break
+            time.sleep(min(remaining, 0.2))
+
+        self.stdout.write("[barrier] RELEASING")
+        return self.barrier.release()
 
     # ── Display ───────────────────────────────────────────────────────────────
 
@@ -413,7 +616,30 @@ class GateController:
         _bg_display(f"http://{self.display_ip}/?vehicle_number=R.BAL{rem}&fare_amount={charge}")
 
     def _show_welcome(self):
+        """Put the idle greeting up — once per quiet spell, not once a second.
+
+        The scan loop asks for this on every pass where the lane has been quiet
+        longer than DISPLAY_HOLD. With scan_interval at 1s that meant a thread
+        and an HTTP request every second for as long as no vehicle came, all of
+        them painting a display that was already showing WELCOME: around 86,000
+        requests a day at a booth, aimed at a small embedded device that has
+        better things to do.
+
+        The greeting only needs sending when something else was on the display,
+        so it is sent once per transaction and then left alone. It is still
+        refreshed occasionally, because the display can be power-cycled
+        independently of the gate and would otherwise come back blank and stay
+        that way.
+        """
         gate = self
+        now_m = time.monotonic()
+        with self._lock:
+            if (self._welcome_tx == self._last_tx
+                    and now_m - self._welcome_at < WELCOME_REFRESH_SECONDS):
+                return
+            self._welcome_tx = self._last_tx
+            self._welcome_at = now_m
+
         def _do():
             if time.monotonic() - gate._last_tx >= 5.0:
                 _fire(f"http://{gate.display_ip}/?vehicle_number=WELCOME&take_slip")
@@ -421,8 +647,17 @@ class GateController:
 
     # ── RSSI gating ───────────────────────────────────────────────────────────
 
-    def _rssi_accepts(self, tid: str, rssi: float) -> bool:
-        """Decide whether a read is close enough, tolerating normal RSSI jitter.
+    def _rssi_stage(self, tid: str, rssi: float) -> str:
+        """Which stage of the lane this read puts the tag in.
+
+            'ignore'  weaker than rssi_detect — not here yet, or another lane
+            'detect'  in range: show the balance, charge nothing, stay shut
+            'open'    inside [rssi_open_min, rssi_open_max] — at the barrier
+
+        Splitting these is what stops a car being charged for a barrier cycle it
+        never got. The reader sees a tag many metres out; acting on that read
+        opened and closed the boom while the vehicle was still approaching, and
+        in a convoy it spent one car's opening on another car's tag.
 
         A parked vehicle does not give a steady RSSI: multipath (including our
         own barrier boom swinging through the beam), the reader's frequency
@@ -433,21 +668,21 @@ class GateController:
         visibly steps between rungs.
 
         Comparing a single raw read against a hard threshold therefore makes a
-        tag parked near the boundary flap between accepted and IGNORED on
-        consecutive reads — an intermittent gate fault that is painful to
-        reproduce. Two things prevent that:
+        tag parked near a boundary flap between stages on consecutive reads — an
+        intermittent gate fault that is painful to reproduce. Two things prevent
+        that:
 
           * decide on the *median* of a short per-tag window, so one outlier
-            read cannot flip the verdict; and
-          * apply hysteresis, so a tag already passing has to fall
-            `rssi_hysteresis` dB clear of the threshold before it is dropped
-            (and vice versa).
+            read cannot flip the stage; and
+          * apply hysteresis to the open band, so a tag already at the barrier
+            has to fall `rssi_hysteresis` dB clear of it before it is let go.
 
-        The median is taken over whatever samples exist so far, so a tag's
-        first read still decides immediately — smoothing costs no gate latency.
+        The median is taken over whatever samples exist so far, so a tag's first
+        read still decides immediately — smoothing costs no gate latency.
         """
-        if not self.rssi_filter and not self.rssi_filter_max:
-            return True  # filtering disabled — accept everything, as before
+        banded = bool(self.rssi_open_min or self.rssi_open_max)
+        if not self.rssi_detect and not banded:
+            return 'open'  # filtering disabled — every read opens, as before
 
         now = time.monotonic()
         with self._rssi_lock:
@@ -458,30 +693,63 @@ class GateController:
                 hist = self._rssi_hist[tid] = deque(maxlen=self.rssi_window)
             hist.append(rssi)
             self._rssi_seen[tid] = now
-
             level = statistics.median(hist)
-            # Hysteresis only widens the band for a tag that is already in, so
-            # a newcomer must clear the configured threshold outright.
-            slack = self.rssi_hysteresis if self._rssi_pass.get(tid, False) else 0.0
-
-            reason = ''
-            if self.rssi_filter and level < self.rssi_filter - slack:
-                reason = f"{level:.1f} dBm < min {self.rssi_filter:g} dBm"
-            elif self.rssi_filter_max and level > self.rssi_filter_max + slack:
-                reason = f"{level:.1f} dBm > max {self.rssi_filter_max:g} dBm"
-
-            ok = not reason
-            changed = self._rssi_pass.get(tid) != ok
-            self._rssi_pass[tid] = ok
             samples = len(hist)
 
-        # Log only on a verdict change, so a car sitting in the field does not
-        # flood the log with one identical IGNORED line per read.
-        if not ok and changed:
+            if self.rssi_detect and level < self.rssi_detect:
+                stage = 'ignore'
+            elif not banded:
+                # A detect threshold on its own means the old behaviour above it.
+                stage = 'open'
+            else:
+                # Hysteresis only widens the band for a tag already inside it, so
+                # a newcomer must clear the configured band outright.
+                slack = self.rssi_hysteresis if self._rssi_at_barrier.get(tid) else 0.0
+                below = self.rssi_open_min and level < self.rssi_open_min - slack
+                above = self.rssi_open_max and level > self.rssi_open_max + slack
+                stage = 'detect' if (below or above) else 'open'
+
+            self._rssi_at_barrier[tid] = stage == 'open'
+            changed = self._rssi_stage_last.get(tid) != stage
+            self._rssi_stage_last[tid] = stage
+
+        # Log only on a stage change, so a car sitting in the field does not
+        # flood the log with one identical line per read.
+        if changed:
             self.stdout.write(
-                f"[rssi] IGNORED — {reason} (median of {samples})"
+                f"[rssi] {tid} → {stage.upper()} at {level:.1f} dBm "
+                f"(median of {samples})"
             )
-        return ok
+        return stage
+
+    def _prune_tag_state(self, now_dt):
+        """Drop per-tag bookkeeping for vehicles long gone. Caller holds _lock.
+
+        _prune_rssi already did this for the RSSI windows, but the three dicts
+        guarded by _lock were never pruned at all: last_seen gained an entry per
+        (EPC, TID) ever seen, last_trigger and _recent_ok one per TID. On a lane
+        passing thousands of distinct vehicles a day that is a process which
+        only ever grows — the gate is meant to run for months between restarts,
+        and the one thing it must not do is slowly consume the booth.
+
+        Entries are only useful for as long as the windows that read them: the
+        1-second dedup, the per-tag cooldown, and the open_secs + 2s clearance
+        grace. Anything older than the longest of those, with margin, cannot
+        change a decision.
+        """
+        now_m = time.monotonic()
+        if now_m - self._tag_state_pruned < 60.0:
+            return
+        self._tag_state_pruned = now_m
+
+        ttl = max(60.0, self.tag_cooldown * 4, self.open_secs + 2.0)
+        for tid in [t for t, seen in self.last_trigger.items() if now_m - seen > ttl]:
+            del self.last_trigger[tid]
+        for tid in [t for t, seen in self._recent_ok.items() if now_m - seen > ttl]:
+            del self._recent_ok[tid]
+        cutoff = now_dt - timedelta(seconds=ttl)
+        for key in [k for k, seen in self.last_seen.items() if seen < cutoff]:
+            del self.last_seen[key]
 
     def _prune_rssi(self, now: float):
         """Drop windows for tags long gone. Caller must hold _rssi_lock."""
@@ -491,7 +759,9 @@ class GateController:
         ttl = max(60.0, self.tag_cooldown * 4)
         for tid in [t for t, seen in self._rssi_seen.items() if now - seen > ttl]:
             self._rssi_hist.pop(tid, None)
-            self._rssi_pass.pop(tid, None)
+            self._rssi_at_barrier.pop(tid, None)
+            self._rssi_stage_last.pop(tid, None)
+            self._balance_shown.pop(tid, None)
             self._rssi_seen.pop(tid, None)
 
     # ── Tag processing ────────────────────────────────────────────────────────
@@ -499,30 +769,95 @@ class GateController:
     def _process_tag(self, tag_serial: str) -> dict:
         from apps.tolls.services import EntryService, ExitService
         if self.gate_mode == 'entry':
-            return EntryService.process_entry(tag_serial, self.plaza_id, self.lane_id)
-        return ExitService.process_exit(tag_serial, self.plaza_id, self.lane_id)
+            return db_call(
+                EntryService.process_entry, tag_serial, self.plaza_id, self.lane_id)
+        return db_call(
+            ExitService.process_exit, tag_serial, self.plaza_id, self.lane_id)
 
-    def on_tag(self, epc: str, tid: str):
+    def on_tag(self, epc: str, tid: str, rssi: float = 0.0):
+        """Route one read to its stage. Nothing here costs the customer money.
+
+        The reader sees a tag long before the vehicle reaches the boom, so a read
+        on its own is not an arrival. Far-field reads only tell the driver what
+        their balance is; the trip is charged, and the barrier opened, in
+        _at_barrier — when the signal says the vehicle is actually there.
+        """
+        stage = self._rssi_stage(tid, rssi)
+        if stage == 'ignore':
+            return
+
         now = datetime.now()
         key = (epc, tid)
-
         with self._lock:
-            # 1-second deduplication
+            self._prune_tag_state(now)
+            # 1-second deduplication. Cheap, and applies to both stages — the
+            # reader reports the same tag several times per inventory pass.
             prev = self.last_seen.get(key)
             if prev and (now - prev).total_seconds() <= 1:
                 return
             self.last_seen[key] = now
 
+        if stage == 'detect':
+            self._approaching(tid)
+            return
+        self._at_barrier(epc, tid, now)
+
+    # ── Stage 1: in range, not yet at the barrier ────────────────────────────
+
+    def _approaching(self, tid: str):
+        """Show this tag's balance. No trip, no charge, no barrier.
+
+        Runs on every read of every tag in range, so it is throttled per tag and
+        goes through the read-only preview rather than the charging services.
+        """
+        now_m = time.monotonic()
+        with self._lock:
+            # A vehicle already cleared at the barrier is on its way through;
+            # re-announcing its pre-charge balance would contradict the figure
+            # the UFD is showing it.
+            if tid in self._recent_ok:
+                return
+            last = self._balance_shown.get(tid)
+            if last is not None and (now_m - last) < BALANCE_REFRESH_SECONDS:
+                return
+            self._balance_shown[tid] = now_m
+
+        from apps.tolls.services import preview_tag
+        preview = db_call(preview_tag, tid)
+        if not preview.get('success'):
+            # Not shown to the driver — see _show_balance on why refusals stay
+            # off the UFD. The operator still gets it, once per approach.
+            self.stdout.write(
+                f"[gate] In range, not chargeable — {preview.get('reason')} ({tid})")
+            return
+
+        balance = preview.get('current_balance', '0')
+        short = "" if preview.get('sufficient') else " [BELOW MINIMUM]"
+        self.stdout.write(
+            f"[gate] In range — {preview.get('vehicle')} "
+            f"balance: Rs.{balance}{short}"
+        )
+        self._last_tx = time.monotonic()
+        self._show_balance(balance)
+
+    # ── Stage 2: at the barrier — charge, then open ──────────────────────────
+
+    def _at_barrier(self, epc: str, tid: str, now):
+        with self._lock:
             now_m = time.monotonic()
 
-            # Recently-processed check comes BEFORE cooldown so the car arriving
-            # at the barrier after a far-field scan isn't blocked by the cooldown.
-            # One-shot: delete after use so barrier only opens once per approach.
-            # Window = open_secs + 2s grace — after that, tag must re-process via DB.
-            recent = self._recent_ok.pop(tid, None)
-            if recent and (now_m - recent) < (self.open_secs + 2.0):
-                self.stdout.write(f"[gate] Re-scan within open window — skipping re-open for {tid}")
-                return
+            # An already-cleared tag stays suppressed for as long as the barrier
+            # is actually up: during a convoy that window keeps being extended,
+            # and re-processing a car still sitting in the field would charge it
+            # a second time. Once the boom drops, the entry expires on its own
+            # grace and the tag must go through the DB again.
+            recent = self._recent_ok.get(tid)
+            if recent is not None:
+                if self._barrier_open or (now_m - recent) < (self.open_secs + 2.0):
+                    self.stdout.write(
+                        f"[gate] Already cleared this approach — skipping {tid}")
+                    return
+                del self._recent_ok[tid]
 
             # Per-tag cooldown (only for tags not yet processed)
             last_t = self.last_trigger.get(tid)
@@ -532,16 +867,17 @@ class GateController:
                 return
             self.last_trigger[tid] = now_m
 
-        self.stdout.write(f"\n>>> EPC: {epc} | TID: {tid} | {now} | mode={self.gate_mode.upper()}")
+        self.stdout.write(f"\n>>> AT BARRIER | EPC: {epc} | TID: {tid} | {now} | mode={self.gate_mode.upper()}")
 
         # Test mode: skip all DB checks, open barrier immediately
         if self.test_mode:
-            self.stdout.write(f"[TEST] Tag detected — opening barrier (DB check skipped)")
+            self.stdout.write(f"[TEST] Tag at barrier — opening (DB check skipped)")
             self._last_tx = time.monotonic()
-            self._open_barrier()
-            self._schedule_close()
+            self._hold_open_for_vehicle({'tagId': tid, 'testMode': True})
             return
 
+        # This is the charge. It happens here and nowhere else, so a vehicle
+        # only ever pays for an opening it was present for.
         result = self._process_tag(tid)
 
         plate = result.get('vehicle', '')
@@ -555,10 +891,10 @@ class GateController:
             self._show_denied(plate, result.get('current_balance'))
             return
 
-        plate        = result.get('vehicle', '')
         offline_flag = " [OFFLINE]" if result.get('offline') else ""
         self._last_tx = time.monotonic()
-        self._recent_ok[tid] = time.monotonic()
+        with self._lock:
+            self._recent_ok[tid] = time.monotonic()
 
         if self.gate_mode == 'exit':
             self.stdout.write(
@@ -576,19 +912,8 @@ class GateController:
             def display_fn():
                 self._show_entry(result.get('current_balance', '0'), plate)
 
-        # Queue the barrier open — if barrier busy, car waits its turn
-        with self._lock:
-            if self._barrier_busy:
-                self._pending_queue.append((tid, display_fn))
-                self.stdout.write(
-                    f"[queue] {plate} queued — position {len(self._pending_queue)}"
-                )
-                return
-            self._barrier_busy = True
-
         display_fn()
-        self._open_barrier()
-        self._schedule_close()
+        self._hold_open_for_vehicle({'tagId': tid, 'plate': plate})
 
     # ── Empty TID guard ───────────────────────────────────────────────────────
 
@@ -620,13 +945,20 @@ class GateController:
                     if not tid:
                         gate.on_tag_empty_tid(epc)
                         return
-                    rssi = tag.RSSI()
-                    gate.stdout.write(f"[rssi] {tid} → {rssi:.1f} dBm")
-                    if not gate._rssi_accepts(tid, rssi):
-                        return
-                    gate.on_tag(epc, tid)
+                    # Staging (and its logging) happens in on_tag, which needs
+                    # the raw reading to decide. Logging every read here as well
+                    # buried the stage changes that actually matter.
+                    gate.on_tag(epc, tid, tag.RSSI())
                 except Exception as exc:
-                    gate.stdout.write(f"[error] OutputTags: {exc}")
+                    # This catch exists so one bad read cannot kill the SDK's
+                    # receive thread and with it the whole lane. But a bare
+                    # message is what made the stale-connection fault so hard to
+                    # find: the barrier silently stopped opening and the log said
+                    # only "[error] OutputTags: ...". Anything landing here is a
+                    # vehicle that was not let through, so log it as an error
+                    # with the traceback that names the real cause.
+                    gate.stdout.write(f"[error] OutputTags — tag NOT processed: {exc}")
+                    log.exception("[gate] unhandled error processing tag %s", tid)
 
             def OutputTagsOver(self, conn_id):
                 pass
@@ -656,8 +988,36 @@ class GateController:
         RECONNECT_DELAY = 5  # seconds between reconnect attempts
         MAX_CONSECUTIVE_FAILURES = 3
 
+        # The SDK keeps a process-wide registry of open connections keyed by
+        # "host:port", and CreateTcpConn REFUSES outright — without so much as
+        # attempting a socket — if the endpoint is already in it. Dropping a
+        # Reader without closing it therefore does not just leak its two
+        # non-daemon threads; it makes every future reconnect to that same
+        # reader impossible. The gate would sit in "Cannot connect — retrying in
+        # 5s" for ever against a reader that was perfectly healthy, and only a
+        # process restart cleared it.
+        #
+        # The registry is only self-cleaning when the socket itself raises:
+        # rcvThread's handler calls CloseConn on the way out. An inventory loop
+        # that fails for any other reason (a wedged reader, an antenna fault, a
+        # desynced protocol stream) leaves the entry behind — which is exactly
+        # the path that breaks out of the loop below.
+        reader = None
+
+        def _drop_reader():
+            """Release the SDK registry entry so a reconnect can succeed."""
+            nonlocal reader
+            if reader is None:
+                return
+            try:
+                reader.closeConnect()
+            except Exception as exc:
+                self.stdout.write(f"[reader] Error closing connection: {exc}")
+            reader = None
+
         try:
             while self._running:
+                _drop_reader()
                 listener = _Listener()
                 reader = Reader()
 
@@ -665,6 +1025,7 @@ class GateController:
                     self.stdout.write(
                         f"[reader] Cannot connect to {tcp} — retrying in {RECONNECT_DELAY}s"
                     )
+                    _drop_reader()
                     time.sleep(RECONNECT_DELAY)
                     continue
 
@@ -727,5 +1088,16 @@ class GateController:
             self.stdout.write("\n[gate] Interrupted — shutting down")
         finally:
             self._running = False
-            if self._serial and self._serial.is_open:
-                self._serial.close()
+            # Clears _IsConnect/_IsStartReceive, which is what the SDK's receive
+            # thread loops on. Without it those non-daemon threads keep the
+            # interpreter alive and PM2 has to SIGKILL the process.
+            _drop_reader()
+            # A held barrier has no timer of its own — the watcher that would
+            # drop it is stopping too. Release explicitly, and before cleanup,
+            # so it is queued ahead of the worker's shutdown sentinel.
+            if self._barrier_open:
+                self.stdout.write("[barrier] RELEASING — gate shutting down")
+                self._barrier_open = False
+                self._open_until = 0.0
+                self.barrier.release()
+            self.barrier.cleanup()

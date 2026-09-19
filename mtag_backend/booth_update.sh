@@ -89,6 +89,18 @@ elif ! pip install -q -r requirements.txt; then
   exit 5
 fi
 
+# `hid` was replaced by `hidapi` (see requirements.txt). pip never uninstalls a
+# package that merely stopped being required, and this script reuses an existing
+# venv — so every booth deployed before the swap keeps `hid` installed, where its
+# `hid/` package shadows hidapi's `hid` extension module and reader calls fail
+# with "module 'hid' has no attribute 'device'". Remove it explicitly. A no-op on
+# a booth that never had it.
+if pip show hid >/dev/null 2>&1; then
+  echo "--- removing obsolete 'hid' package (shadows hidapi) ---"
+  pip uninstall -y hid >/dev/null 2>&1 || \
+    echo "!!! could not uninstall 'hid' — reader calls may fail until it is gone" >&2
+fi
+
 # System library the RFID SDK imports unconditionally, even for TCP readers.
 # Not pip-installable. Best effort: a booth that already has it must not fail
 # here just because its apt sources are broken.
@@ -240,13 +252,12 @@ if ! ensure_pm2; then
 fi
 
 echo "--- (re)starting PM2 ---"
-# mtag-sync is deliberately NOT started. It replicates between a booth's local
-# database and master; with DB_* pointing at master both ends are the same
-# server, so every pass would copy master onto itself — advancing watermarks,
-# resyncing sequences and re-pushing trips for no reason. The delete below also
-# stops it on booths provisioned before this change.
+# There is no sync process any more: booths are online-only, so there is no
+# local database to replicate and apps/tolls/sync/ has been removed. mtag-sync
+# is still named in the delete below so an older booth's leftover process is
+# torn down on update rather than left running against deleted code.
 pm2 delete mtag-web mtag-gate mtag-sync >/dev/null 2>&1 || true
-pm2 start ecosystem.config.js --only mtag-web,mtag-gate
+pm2 start ecosystem.config.js
 pm2 save
 
 # Survive a power cut. `pm2 startup` only PRINTS the systemd command, it does not
@@ -263,6 +274,52 @@ if [ -n "$STARTUP_CMD" ]; then
   fi
 else
   echo "    pm2 boot service already configured"
+fi
+
+# ── 8. Log rotation ──────────────────────────────────────────────────────────
+# Nothing was rotating anything. PM2 appends stdout/stderr for the gate forever,
+# and barrierServer appends to logs/barrier.log on every barrier movement — on a
+# lane doing thousands of vehicles a day that fills the disk, and a booth with a
+# full disk cannot write a trip, so it stops charging and stops opening.
+#
+# system logrotate, not pm2-logrotate: the latter installs from the npm registry,
+# which these booths cannot reach. logrotate ships with Ubuntu and works offline.
+#
+# copytruncate because PM2 and the Node service hold their log files open — a
+# plain rename would leave them writing to an unlinked inode, so the "rotated"
+# log would keep growing invisibly and the new file would stay empty.
+echo "--- installing log rotation ---"
+LOGROTATE_CONF=/etc/logrotate.d/mtag
+if command -v logrotate >/dev/null 2>&1; then
+  if sudo tee "$LOGROTATE_CONF" >/dev/null <<LOGROTATE
+${HOME}/.pm2/logs/*.log
+${HOME}/mtag_backend/pm2/logs/*.log
+${HOME}/quick-toll-system-new/logs/*.log
+{
+    su ${USER} ${USER}
+    daily
+    rotate 14
+    maxsize 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}
+LOGROTATE
+  then
+    # Prove the config parses rather than discovering it is broken in a month.
+    if sudo logrotate -d "$LOGROTATE_CONF" >/dev/null 2>&1; then
+      echo "    rotating pm2 + barrier logs daily, 20M cap, 14 kept"
+    else
+      echo "!!! logrotate rejected $LOGROTATE_CONF — logs will grow unbounded" >&2
+      sudo logrotate -d "$LOGROTATE_CONF" 2>&1 | tail -5 >&2 || true
+    fi
+  else
+    echo "!!! could not write $LOGROTATE_CONF (sudo failed) — logs unbounded" >&2
+  fi
+else
+  echo "!!! logrotate not installed — logs will grow unbounded on this booth" >&2
 fi
 
 echo ""

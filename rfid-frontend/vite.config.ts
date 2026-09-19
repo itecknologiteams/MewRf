@@ -4,9 +4,36 @@ import { defineConfig } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: './',
-  plugins: [inspectAttr(), react()],
+export default defineConfig(({ command }) => ({
+  // Absolute, not './'. The app uses BrowserRouter, so a relative base resolves
+  // asset URLs against the CURRENT path: index.html loaded at /booth/12 asks for
+  // /booth/assets/index-*.js and the page comes up blank. index.html already
+  // references /favicon-32.png absolutely, so the app is served from the web root.
+  // Override with VITE_BASE=/portal/ if it ever moves under a sub-path.
+  base: process.env.VITE_BASE || '/',
+
+  // inspectAttr() stamps code-path="src/pages/Login.tsx:42:5" onto every element it
+  // compiles. That is a dev affordance (click an element, jump to its source), and in a
+  // shipped bundle it publishes the entire source tree — file names and line numbers —
+  // in the DOM of every page. `command === 'serve'` is true only for `vite dev`, so the
+  // plugin never reaches a production build.
+  plugins: [...(command === 'serve' ? [inspectAttr()] : []), react()],
+
+  build: {
+    // Never emit .map files next to the bundle — they are the original TypeScript,
+    // readable in devtools. Vite's default is already false; pinned so a future
+    // `--sourcemap` habit or config merge cannot turn it back on.
+    sourcemap: false,
+    // Strip the debug chatter. warn/error survive, so real failures are still
+    // reportable from an operator's browser console.
+    minify: 'esbuild',
+  },
+
+  esbuild: {
+    // pure (not `drop`) so only these calls are removed as side-effect-free; console.warn
+    // and console.error stay.
+    pure: command === 'build' ? ['console.log', 'console.debug', 'console.info'] : [],
+  },
   server: {
     port: 3001,
     // Bind to every interface, not just localhost.
@@ -55,4 +82,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-});
+}));

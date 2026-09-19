@@ -8,6 +8,15 @@
 ; not the current run_gate.py — don't copy that format, use this one.
 
 [gate]
+; Ceiling on any single database query from the gate process, in milliseconds.
+; Booths are online-only, so every query goes to master — whose own
+; statement_timeout is 15 minutes. One tag thread handles every vehicle, so a
+; query wedged behind a lock would hold the whole lane for that long. Every gate
+; query is a point lookup, so 10s is generous. Set 0 to disable.
+; Applies to this process only: `migrate`, load_fares and the portal's reports
+; are untouched.
+statement_timeout_ms = 10000
+
 ; "entry" or "exit"
 mode = entry
 
@@ -43,26 +52,82 @@ antenna_power = 20
 ; Seconds between reader inventory polls
 scan_interval = 1.0
 
-; Software RSSI filter — accept a tag only while its signal sits inside this
-; band, in dBm (0 = disabled). Use it to reject adjacent-lane vehicles. A
-; stationary tag still wanders a few dB, so leave ~5 dB of margin below the
-; weakest reading you want to keep.
-rssi_filter = 0
-rssi_filter_max = 0
+; ── RSSI STAGING ─────────────────────────────────────────────────────────────
+; Signal strength stands in for distance: closer vehicle, stronger (less
+; negative) reading. Three thresholds split one approach into two stages.
+;
+;   weaker than rssi_detect            ignored — not in this lane yet
+;   rssi_detect .. rssi_open_min       IN RANGE: balance goes on the UFD.
+;                                      Nothing is charged, barrier stays shut.
+;   rssi_open_min .. rssi_open_max     AT THE BARRIER: the trip is charged and
+;                                      the barrier opens.
+;   stronger than rssi_open_max        not treated as an arrival (a tag sitting
+;                                      on the reader, or in the wrong place)
+;
+; Why the split: the reader sees a tag many metres out. Acting on that read
+; charged the vehicle and cycled the boom while it was still approaching — and
+; with four cars moving together it spent one car's opening on another car's
+; tag, stranding the last one at a closed barrier. The money now moves only
+; when the signal says the vehicle is actually in front of the boom.
+;
+; All three at 0 disables staging entirely: every read opens, as before.
+; Setting only rssi_detect reproduces the old single-threshold behaviour.
+;
+; TUNING, in this order, with `rssi_open_*` at 0 to start:
+;   1. Park a vehicle at the boom and watch the [rssi] lines. That median is
+;      your arrival strength — centre the open band on it.
+;   2. Leave ~3 dB either side; a stationary tag wanders that much on its own.
+;      Narrower than the jitter and the lane will feel intermittent.
+;   3. Drive up from the back of the lane and note where you want the balance
+;      to appear. That is rssi_detect. It must be the WEAKER (more negative)
+;      of the two lower bounds, or run_gate refuses to start: a vehicle would
+;      reach the barrier band before the gate ever noticed it.
+;
+; A band that no vehicle ever reaches is a dead lane — the barrier never opens
+; and nothing is ever charged. Verify with a real vehicle before leaving site.
+rssi_detect = 0
+rssi_open_min = 0
+rssi_open_max = 0
 
-; Jitter tolerance for the two thresholds above. The gate compares the median
-; of the last `rssi_window` reads of a tag, and a tag already accepted has to
-; fall `rssi_hysteresis` dB clear of the band before it is dropped. Both are
-; inert while rssi_filter and rssi_filter_max are 0.
+; Jitter tolerance for the thresholds above. The gate decides on the median of
+; the last `rssi_window` reads of a tag, and a tag already at the barrier has to
+; fall `rssi_hysteresis` dB clear of the open band before it is let go. Without
+; this a tag parked on a boundary flips stage between consecutive reads.
 rssi_window = 5
 rssi_hysteresis = 3.0
 
+; Deprecated, still honoured so a tuned booth keeps working untouched:
+;   rssi_filter      → used for rssi_detect AND rssi_open_min if those are unset
+;   rssi_filter_max  → used for rssi_open_max if unset
+; Under the old scheme every accepted read both displayed and opened, so mapping
+; the old lower bound to both reproduces it exactly. Prefer the new keys.
+
 [barrier]
-; Serial port the barrier controller is wired to on THIS machine
+; HOW THE BARRIER IS DRIVEN
+; Booths running qtserver-v2-new have a barrier service (barrierServer.ts) that
+; holds the serial port open for its whole life and exposes an HTTP API on
+; 127.0.0.1:3005. Two processes writing to one tty interleave bytes on the same
+; relay, so where that service exists the gate asks it instead and never opens
+; the port itself.
+;
+; mode = auto    detect the service at startup, fall back to serial (default)
+;        serial  never use the service — always drive the port directly
+; Leave this alone unless a booth specifically must not use the service.
+mode = auto
+service_url = http://127.0.0.1:3005
+; Must match BARRIER_CLOSE_DELAY in that service's .env (500ms → 0.5). That is
+; the RELAY PULSE WIDTH, not how long the boom stays up — the barrier controller
+; decides that itself. The gate uses this only to know when the service is free
+; to take the next command; its own open_seconds below still paces the lane.
+service_cycle_seconds = 0.5
+
+; Serial port the barrier controller is wired to on THIS machine.
+; Used only when the barrier service is absent or mode = serial.
 port = /dev/ttyUSB0
 baudrate = 115200
 
-; How long the barrier stays open per vehicle
+; How long the barrier stays open per vehicle — serial mode only. In service
+; mode the service's own delay governs (see service_cycle_seconds above).
 open_seconds = 2.0
 
 [display]

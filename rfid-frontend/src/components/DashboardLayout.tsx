@@ -25,6 +25,8 @@ import {
   Wallet,
   Package,
   Tags,
+  SignpostBig,
+  Server,
 } from 'lucide-react';
 
 interface NavItem {
@@ -36,7 +38,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/register', label: 'M-Tag Registration', icon: CreditCard },
+  { path: '/register', label: 'ME-Tag Registration', icon: CreditCard },
   { path: '/vehicles', label: 'Vehicles', icon: Car },
   { path: '/operations', label: 'Toll Operations', icon: Gauge },
   { path: '/trips', label: 'Trip History', icon: Route },
@@ -49,6 +51,8 @@ const navItems: NavItem[] = [
   { path: '/admin/users', label: 'User Management', icon: Users, adminOnly: true },
   { path: '/admin/inventory', label: 'Inventory Management', icon: Package, adminOnly: true },
   { path: '/admin/booth-assignment', label: 'Booth Assignment', icon: Tags, adminOnly: true },
+  { path: '/admin/lanes', label: 'Lane Management', icon: SignpostBig, adminOnly: true },
+  { path: '/admin/booth-updates', label: 'Booth Code Updates', icon: Server, adminOnly: true },
 ];
 
 export default function DashboardLayout() {
@@ -62,6 +66,9 @@ export default function DashboardLayout() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === 'admin';
+  // Operators get the registration page alone (see App.tsx): no sidebar, no
+  // search, no links out.
+  const isOperator = user?.role === 'operator';
   const displayName = user?.full_name || user?.name || 'User';
   const initials =
     displayName
@@ -90,6 +97,8 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-canvas">
+      {!isOperator && (
+      <>
       {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 z-40 h-full w-[280px] flex flex-col bg-surface border-r border-line transform transition-transform duration-300 ease-out ${
@@ -152,21 +161,25 @@ export default function DashboardLayout() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+      </>
+      )}
 
       {/* Main content */}
-      <div className="lg:ml-[280px]">
+      <div className={isOperator ? undefined : 'lg:ml-[280px]'}>
         {/* Top navbar */}
         <header className="sticky top-0 z-20 h-16 bg-surface/85 backdrop-blur-xl border-b border-line flex items-center justify-between px-4 lg:px-8">
           <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open navigation"
-              className="lg:hidden p-2 rounded-lg text-ink-muted hover:bg-elevated transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            {/* The sidebar lockup is off-screen on mobile, so the mark rides here. */}
-            <BrandLogo className="h-6 lg:hidden" />
+            {!isOperator && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open navigation"
+                className="lg:hidden p-2 rounded-lg text-ink-muted hover:bg-elevated transition-colors"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            {/* The sidebar lockup is off-screen on mobile (and absent for operators), so the mark rides here. */}
+            <BrandLogo className={isOperator ? 'h-6' : 'h-6 lg:hidden'} />
             <div className="hidden md:flex items-center gap-2 rounded-full bg-success/10 pl-2 pr-3 py-1 text-xs font-medium text-success">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
@@ -178,7 +191,7 @@ export default function DashboardLayout() {
 
           <div className="flex items-center gap-2">
             {/* Search */}
-            <div className="relative">
+            <div className={isOperator ? 'hidden' : 'relative'}>
               <button
                 onClick={() => setSearchOpen(!searchOpen)}
                 aria-label="Search"
@@ -209,13 +222,15 @@ export default function DashboardLayout() {
             </button>
 
             {/* Notifications */}
-            <button
-              aria-label="Notifications"
-              className="relative p-2 rounded-lg text-ink-muted hover:bg-elevated hover:text-brand transition-colors"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full ring-2 ring-surface" />
-            </button>
+            {!isOperator && (
+              <button
+                aria-label="Notifications"
+                className="relative p-2 rounded-lg text-ink-muted hover:bg-elevated hover:text-brand transition-colors"
+              >
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full ring-2 ring-surface" />
+              </button>
+            )}
 
             {/* Profile */}
             <div className="relative" ref={profileRef}>
@@ -245,16 +260,18 @@ export default function DashboardLayout() {
                       </span>
                     )}
                   </div>
-                  <button
-                    onClick={() => {
-                      navigate('/profile');
-                      setProfileOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-elevated hover:text-ink transition-colors"
-                  >
-                    <User className="w-4 h-4" />
-                    Profile
-                  </button>
+                  {!isOperator && (
+                    <button
+                      onClick={() => {
+                        navigate('/profile');
+                        setProfileOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-elevated hover:text-ink transition-colors"
+                    >
+                      <User className="w-4 h-4" />
+                      Profile
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       toggleTheme();

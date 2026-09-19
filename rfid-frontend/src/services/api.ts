@@ -223,6 +223,16 @@ export const vehiclesApi = {
     return apiFetch<{ id: number; tag_serial: string; epc: string }[]>(`/vehicles/tags/available/${qs}`);
   },
 
+  /** Identify a physically scanned tag. A reader reports a TID (sometimes only
+   *  an EPC), never the printed serial, so this is what turns "the tag in my
+   *  hand" into a serial the registration form can use. */
+  scanLookup: (params: { tid?: string; epc?: string }) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v) as [string, string][]
+    ).toString();
+    return apiFetch<TagScanLookup>(`/vehicles/tags/scan-lookup/?${qs}`);
+  },
+
   uploadTagInventory: async (file: File) => {
     const form = new FormData();
     form.append('file', file);
@@ -372,8 +382,16 @@ export const tollsApi = {
   adminUpdatePlaza: (id: number, data: { is_active?: boolean; name?: string }) =>
     apiFetch<Plaza>(`/tolls/admin/plazas/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
 
+  adminLanes: (plazaId: number) => apiFetch<Lane[]>(`/tolls/admin/plazas/${plazaId}/lanes/`),
+
   adminCreateLane: (plazaId: number, data: { lane_number: number; is_active?: boolean }) =>
     apiFetch<Lane>(`/tolls/admin/plazas/${plazaId}/lanes/`, { method: 'POST', body: JSON.stringify(data) }),
+
+  adminUpdateLane: (id: number, data: { lane_number?: number; is_active?: boolean }) =>
+    apiFetch<Lane>(`/tolls/admin/lanes/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  adminDeleteLane: (id: number) =>
+    apiFetch<null>(`/tolls/admin/lanes/${id}/`, { method: 'DELETE' }),
 
   adminCreateRate: (data: {
     from_plaza: number;
@@ -416,6 +434,104 @@ export const tollsApi = {
       `/tolls/admin/gate-events/${qs}`
     );
   },
+};
+
+// ─── Booth code deployment ────────────────────────────────────────────────────
+export interface BoothJobBrief {
+  id: number;
+  action: 'check' | 'update';
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  requested_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+/** One lane's booth machine. `id` is null for a lane with no machine configured
+ *  yet — those rows still come back so the operator can add one. */
+export interface BoothDeployment {
+  id: number | null;
+  lane: number;
+  lane_number: number;
+  lane_is_active?: boolean;
+  plaza_id: number;
+  plaza_name: string;
+  plaza_display_id: string;
+  host: string;
+  ssh_port?: number;
+  ssh_user?: string;
+  ssh_user_effective?: string;
+  reported_version: string;
+  pm2_summary?: string;
+  reachable: boolean | null;
+  last_error?: string;
+  last_checked_at?: string | null;
+  last_deployed_at?: string | null;
+  active_job: BoothJobBrief | null;
+}
+
+export interface BoothDeployJob extends BoothJobBrief {
+  machine: number;
+  lane_number: number;
+  requested_by_name?: string;
+  from_version: string;
+  to_version: string;
+  exit_code: number | null;
+  log: string;
+}
+
+export interface BoothDeployJobSummary {
+  id: number;
+  machine: number;
+  lane_number: number;
+  plaza_name: string;
+  action: 'check' | 'update';
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  requested_by_name?: string;
+  requested_at: string;
+  finished_at: string | null;
+  from_version: string;
+  to_version: string;
+  exit_code: number | null;
+}
+
+export interface TagScanLookup {
+  tid: string;
+  epc: string;
+  tag_serial: string | null;
+  in_inventory: boolean;
+  available: boolean;
+  status:
+    | 'available'
+    | 'in_inventory'
+    | 'already_issued'
+    | 'already_activated'
+    | 'tag_not_active'
+    | 'not_in_inventory';
+  message: string;
+  assigned_plate?: string;
+  booth_assigned_id?: number | null;
+}
+
+export const boothsApi = {
+  deployments: () =>
+    apiFetch<{ master_version: string; booths: BoothDeployment[] }>('/tolls/admin/booth-deployments/'),
+
+  saveMachine: (data: { lane: number; host: string; ssh_port?: number; ssh_user?: string }) =>
+    apiFetch<BoothDeployment>('/tolls/admin/booth-deployments/', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+
+  deleteMachine: (id: number) =>
+    apiFetch<null>(`/tolls/admin/booth-machines/${id}/`, { method: 'DELETE' }),
+
+  queueJob: (machineId: number, action: 'check' | 'update') =>
+    apiFetch<BoothDeployJob>(`/tolls/admin/booth-machines/${machineId}/jobs/`, {
+      method: 'POST', body: JSON.stringify({ action }),
+    }),
+
+  job: (id: number) => apiFetch<BoothDeployJob>(`/tolls/admin/booth-jobs/${id}/`),
+
+  jobHistory: () => apiFetch<BoothDeployJobSummary[]>('/tolls/admin/booth-jobs/'),
 };
 
 // ─── Account types ────────────────────────────────────────────────────────────

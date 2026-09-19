@@ -204,3 +204,89 @@ class PendingGateOpen(models.Model):
 
     class Meta:
         db_table = 'pending_gate_opens'
+
+
+class BoothMachine(models.Model):
+    """The physical booth PC that runs one lane, and its last known deploy state.
+
+    Only the address lives here. SSH credentials deliberately do NOT: master
+    reads BOOTH_SSH_USER / BOOTH_SSH_PASSWORD from its own .env, the same shared
+    values deploy_booths.sh already uses. Putting a password for 21 lanes in a
+    table the web app can read would hand anyone with database access a shell on
+    every booth, and the credential is identical across booths anyway.
+
+    `reported_version` is a cache of what the last check found on the booth. It
+    is only ever as fresh as `last_checked_at` — a booth updated by hand over
+    SSH will read stale here until the next check.
+    """
+
+    lane = models.OneToOneField(TollLane, on_delete=models.CASCADE, related_name='machine')
+    host = models.CharField(max_length=255, help_text="Booth LAN IP or hostname")
+    ssh_port = models.PositiveIntegerField(default=22)
+    # Blank means "use master's BOOTH_SSH_USER". Set per booth only when one
+    # machine was imaged with a different account.
+    ssh_user = models.CharField(max_length=64, blank=True, default='')
+
+    reported_version = models.CharField(max_length=64, blank=True, default='')
+    pm2_summary = models.TextField(blank=True, default='')
+    reachable = models.BooleanField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default='')
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    last_deployed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'booth_machines'
+        ordering = ['lane__plaza__plaza_id', 'lane__lane_number']
+
+    def __str__(self):
+        return f"{self.lane} @ {self.host}"
+
+
+class BoothJobAction(models.TextChoices):
+    CHECK = 'check', 'Check version'
+    UPDATE = 'update', 'Update code'
+
+
+class BoothJobStatus(models.TextChoices):
+    PENDING = 'pending', 'Pending'
+    RUNNING = 'running', 'Running'
+    SUCCEEDED = 'succeeded', 'Succeeded'
+    FAILED = 'failed', 'Failed'
+
+
+class BoothDeployJob(models.Model):
+    """One queued SSH operation against one booth.
+
+    The web process only ever writes the row. booth_deploy_worker on master
+    claims it and does the work, because an update takes minutes — far longer
+    than a gunicorn worker can be tied up for — and must survive the request
+    that asked for it going away.
+    """
+
+    machine = models.ForeignKey(BoothMachine, on_delete=models.CASCADE, related_name='jobs')
+    action = models.CharField(max_length=16, choices=BoothJobAction.choices)
+    status = models.CharField(
+        max_length=16, choices=BoothJobStatus.choices,
+        default=BoothJobStatus.PENDING, db_index=True,
+    )
+    requested_by = models.ForeignKey(
+        'users.User', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='booth_jobs',
+    )
+    requested_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    from_version = models.CharField(max_length=64, blank=True, default='')
+    to_version = models.CharField(max_length=64, blank=True, default='')
+    exit_code = models.IntegerField(null=True, blank=True)
+    log = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'booth_deploy_jobs'
+        ordering = ['-requested_at']
+        indexes = [models.Index(fields=['status', 'requested_at'])]
+
+    def __str__(self):
+        return f"{self.action} {self.machine_id} ({self.status})"

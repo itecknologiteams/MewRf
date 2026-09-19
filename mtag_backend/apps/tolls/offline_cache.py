@@ -684,11 +684,18 @@ def start_sync_thread(
             "[cache] Sync thread started — interval=%ds db=%s",
             interval_seconds, db_path,
         )
+        from django.db import close_old_connections, connections
         while True:
             try:
+                # This thread holds its own ORM connection and uses it once per
+                # interval. Nothing here reaches a request boundary, so without
+                # recycling it the first dropped socket makes every later cycle
+                # fail on the same dead handle — see run_gate.db_call.
+                close_old_connections()
                 sync.run_full_sync()
             except Exception:
                 logger.exception("[cache] Unexpected error in sync thread")
+                connections.close_all()
             time.sleep(interval_seconds)
 
     t = threading.Thread(target=_loop, name="offline-cache-sync", daemon=True)

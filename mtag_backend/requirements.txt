@@ -17,7 +17,13 @@ pyserial==3.5
 pyusb==1.3.1
 six==1.17.0
 gmssl==3.2.2
-hid==1.0.9
+# The vendored RFID SDK calls hid.device() — that is cython-hidapi, published as
+# `hidapi`. The similarly-named `hid` package is a different project whose API is
+# hid.Device(), and worse, it ships a `hid/` PACKAGE that shadows hidapi's `hid`
+# extension module when both are installed. With `hid` present every USB/HID
+# reader fails with "module 'hid' has no attribute 'device'". Booths use TCP
+# readers, so this only shows up on a USB desktop reader.
+hidapi==0.15.0
 
 # FCM HTTP v1 push. The legacy server-key API was shut down by Google in June 2024, so v1 +
 # a service account is the only working path — and that needs OAuth2 token minting.

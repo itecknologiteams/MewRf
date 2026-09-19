@@ -105,6 +105,58 @@ class RegistrationGatingTest(TestCase):
         self.assertTrue(User.objects.filter(phone='03211112222').exists())
 
 
+class UserLookupAccessTest(TestCase):
+    """GET /auth/admin/users/ backs the operator's owner lookup at registration."""
+
+    URL = '/api/v1/auth/admin/users/'
+
+    def setUp(self):
+        self.client = APIClient()
+        self.holder = User.objects.create_user(
+            phone='03211112222', password='holderpass123', full_name='Tag Holder'
+        )
+        # Created last, so it is the newest row: the old unfiltered list put it
+        # first and the registration page took it as the match.
+        self.other = User.objects.create_user(
+            phone='03339998888', password='otherpass123', full_name='Someone Else'
+        )
+        self.operator = User.objects.create_user(
+            phone='03007776655', password='oppass123456', full_name='Booth Operator',
+            user_role=UserRole.OPERATOR,
+        )
+
+    def test_operator_search_returns_only_the_matching_user(self):
+        self.client.force_authenticate(user=self.operator)
+        response = self.client.get(self.URL, {'search': '03211112222'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        phones = [u['phone'] for u in response.json()['data']]
+        self.assertEqual(phones, ['03211112222'])
+
+    def test_operator_cannot_list_everyone(self):
+        self.client.force_authenticate(user=self.operator)
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_consumer_is_refused_even_with_a_search(self):
+        self.client.force_authenticate(user=self.holder)
+        response = self.client.get(self.URL, {'search': '03339998888'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_lists_all_and_can_filter_by_role(self):
+        admin = User.objects.create_user(
+            phone='03001234567', password='adminpass123', full_name='Admin',
+            user_role=UserRole.ADMIN, is_staff=True,
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.json()['data']), 4)
+
+        response = self.client.get(self.URL, {'role': UserRole.OPERATOR})
+        phones = [u['phone'] for u in response.json()['data']]
+        self.assertEqual(phones, ['03007776655'])
+
+
 class LoginResponseShapeTest(TestCase):
     """The consumer app depends on these exact shapes; pin them."""
 

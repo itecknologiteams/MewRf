@@ -35,6 +35,7 @@ Sample anpr_config.ini:
 """
 import configparser
 import json
+import logging
 import os
 import re
 import threading
@@ -45,6 +46,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import CharField, F, Func
 
 from apps.tolls.management.commands.run_gate import (
+    db_call,
+    install_statement_timeout,
     GateController,
     resolve_plaza_lane,
 )
@@ -55,6 +58,9 @@ class _NormPlate(Func):
     function = 'REGEXP_REPLACE'
     template = "UPPER(%(function)s(%(expressions)s, '[^A-Za-z0-9]', '', 'g'))"
     output_field = CharField()
+
+
+log = logging.getLogger('apps.tolls.gate')
 
 
 def _normalize(plate: str) -> str:
@@ -92,13 +98,19 @@ class AnprGateController(GateController):
         # Resolve plate → vehicle → tag
         # Normalize both sides: strip dashes/spaces, uppercase, then compare.
         # KDE-1836 == KDE1836 == KDE 1836
-        vehicle = (
-            Vehicle.objects
-            .annotate(norm=_NormPlate(F('plate_number')))
-            .filter(norm=norm_key)
-            .select_related('tag')
-            .first()
-        )
+        def _lookup():
+            return (
+                Vehicle.objects
+                .annotate(norm=_NormPlate(F('plate_number')))
+                .filter(norm=norm_key)
+                .select_related('tag')
+                .first()
+            )
+
+        # The websocket thread holds its own database connection and touches it
+        # only when a plate arrives, so on a quiet lane it goes stale exactly as
+        # the RFID reader thread's did. Same remedy — see db_call in run_gate.
+        vehicle = db_call(_lookup)
         if vehicle is None:
             self.stdout.write(f"[anpr] DENIED — plate {key} not registered")
             self._show_denied()
@@ -135,9 +147,14 @@ class AnprGateController(GateController):
 
         offline_flag = " [OFFLINE]" if result.get('offline') else ""
         fare = result.get('charge') or result.get('current_balance', '0')
+        self._last_tx = time.monotonic()
         self._show_fare(fare)
-        self._open_barrier()
-        self._schedule_close()
+        # _open_barrier/_schedule_close were GateController's old pulse-per-
+        # vehicle pair and no longer exist — the shared hold/extend window
+        # replaced them. Calling them raised AttributeError AFTER _process_tag
+        # had already committed the charge, so an ANPR vehicle was billed and
+        # then left in front of a barrier that never moved.
+        self._hold_open_for_vehicle({'plate': key, 'tagId': tag.tid})
 
         if self.gate_mode == 'exit':
             self.stdout.write(
@@ -166,7 +183,15 @@ class AnprGateController(GateController):
             if msg.get('type') == 'plateNumber':
                 plate = (msg.get('data') or {}).get('plateNumber', '').strip()
                 if plate:
-                    self.on_plate(plate)
+                    try:
+                        self.on_plate(plate)
+                    except Exception as exc:
+                        # Anything landing here is a vehicle that was not let
+                        # through; log it loudly rather than losing it inside
+                        # the websocket library's own callback handling.
+                        self.stdout.write(
+                            f"[anpr] ERROR — plate {plate} NOT processed: {exc}")
+                        log.exception("[anpr] unhandled error on plate %s", plate)
 
         def on_open(ws_app):
             self.stdout.write(f"[anpr] Connected to {ws_url}")
@@ -245,6 +270,13 @@ class Command(BaseCommand):
         serial_baud  = int(cfg.get('barrier', 'baudrate', fallback='115200'))
         open_secs    = float(cfg.get('barrier', 'open_seconds', fallback='2.0'))
         display_ip   = cfg.get('display', 'display_ip', fallback='192.168.78.12')
+        # See install_statement_timeout: a wedged query on the plate path would
+        # otherwise hold the lane open to master's 15-minute ceiling. 0 disables.
+        statement_timeout_ms = int(
+            cfg.get('gate', 'statement_timeout_ms', fallback='10000'))
+
+        if statement_timeout_ms > 0:
+            install_statement_timeout(statement_timeout_ms, self.stdout)
 
         if gate_mode not in ('entry', 'exit'):
             raise CommandError(f"Invalid gate mode '{gate_mode}' — must be 'entry' or 'exit'.")

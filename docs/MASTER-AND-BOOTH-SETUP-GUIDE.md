@@ -12,61 +12,52 @@ wrong in several places.
 
 | Process | Command | Notes |
 |---|---|---|
-| `mtag-master` | `gunicorn config.wsgi` | API + admin portal. No gate, no sync agent. |
+| `mtag-master` | `gunicorn config.wsgi` | API + admin portal. No gate. |
 
-**Each booth** runs three, deliberately separated:
+**Each booth** runs two:
 
 | Process | Command | Talks to | Purpose |
 |---|---|---|---|
-| `mtag-gate` | `manage.py run_gate` | **local DB only** | RFID reader → barrier. Zero replication logic. |
-| `mtag-sync` | `manage.py sync_service` | local DB **+ master** | The *only* process that reaches master. |
-| `mtag-web` | `manage.py runserver` | local DB only | Booth-local API. |
+| `mtag-gate` | `manage.py run_gate` | **master** | RFID reader → barrier. |
+| `mtag-web` | `gunicorn config.wsgi` | **master** | Booth-local operator API. |
 
-The point of the split: if master is unreachable, `mtag-sync` retries and backs
-off while `mtag-gate` keeps the lane open off local data. The gate never writes
-to master.
+> **There is no `mtag-sync` any more.** Booths are online-only:
+> `booth_bootstrap.sh` installs no local Postgres and points `DB_*` and
+> `MASTER_DB_*` at master, so a booth has no database of its own to replicate.
+> The `apps/tolls/sync/` package and the `sync_service`, `run_sync_agent` and
+> `trip_sync` commands have been deleted. `booth_update.sh` still runs
+> `pm2 delete mtag-sync` so an older booth's leftover process is torn down.
+
+**What this costs you, stated plainly:** master is now every lane's single point
+of failure. If master is unreachable the gate cannot validate a tag, cannot
+charge, and will not open the barrier — there is no local fallback and nothing
+retries in the background. In exchange there is no replication lag, no watermark
+drift and no way for two databases to disagree about a trip.
 
 ### Data flow
 
 ```
        Entry booth                  MASTER                   Exit booth
        ───────────                  ──────                   ──────────
- 1. trip created locally
- 2.        ──push──▶            open trip
- 3.                             open trip   ──pull──▶   local copy
- 4.                                                     charges the fare,
-                                                        closes trip locally
- 5.                             ◀──push──                closed trip
- 6.        ◀──pull──            closed trip ──pull──▶    every booth learns
-                                                         the trip is closed
+ 1. trip created  ──────────────▶  open trip
+ 2.                               open trip  ◀────────────  read directly
+ 3.                                                         charges the fare,
+                                                            closes the trip
+ 4.                              closed trip  ◀─────────────────┘
 ```
 
-Step 6 matters more than it looks: without it a completed trip stays `active` in
-every other booth's DB forever, which blocks that vehicle's **next entry**.
-
-### What each booth mode syncs
-
-`GATE_MODE` in `.env` selects the passes. It is picked up automatically by
-`mtag-sync` — there is nothing else to enable, and no setting turns syncing on
-or off; the `mtag-sync` process running IS the switch:
-
-| Pass | entry | exit |
-|---|---|---|
-| reference (plazas, lanes, **vehicle_categories**, **fare_matrix**, tags, **tag_assignments**, users, vehicles, accounts) | ✓ | ✓ |
-| closed trips | ✓ | ✓ |
-| **open trips** | — | ✓ |
-| push (trips, transactions, balances, tags, tag history) | ✓ | ✓ |
-
-An entry booth still pulls reference data — without tags/vehicles/accounts it
-cannot validate anyone. Open trips are the only real difference.
+Every booth reads and writes the same rows, so a trip closed at the exit is
+closed everywhere the instant it commits. The old failure mode — a completed
+trip staying `active` in another booth's database and blocking that vehicle's
+next entry — cannot occur.
 
 ---
 
 ## 2. Order of operations
 
-**Master must be fully set up before any booth.** A booth's pull selects
-`plaza_id`, `vehicle_categories` and `fare_matrix` from master; and once master
-migrates, un-updated booths break because `Plaza.code` no longer exists.
+**Master must be fully set up before any booth.** A booth reads `plaza_id`,
+`vehicle_categories` and `fare_matrix` straight out of master at startup, so a
+booth pointed at an unmigrated or unloaded master will not start.
 Do master and all booths in one maintenance window.
 
 ```
@@ -94,14 +85,11 @@ creates the DB, runs `migrate`, `collectstatic`, and starts PM2.
 
 It deliberately differs from the booth script in three ways:
 
-- **Never truncates** `plazas`/`lanes`/`rates`/`tags`. The booth script clears
-  those so the sync agent can refill them *from* master; doing it here wipes the
-  network.
-- Sets **`ANPR_GATE_ENABLED=False`** (master has no reader). Note this does NOT
-  control syncing — master never syncs simply because it does not run the
-  `mtag-sync` process. Syncing is not gated by any setting.
-- Warns if Postgres `listen_addresses` is loopback-only — booths push to master's
-  Postgres over the LAN, so without this every booth push fails.
+- **Never truncates** `plazas`/`lanes`/`rates`/`tags`. Master owns this data and
+  is the only copy of it; truncating here wipes the network.
+- Sets **`ANPR_GATE_ENABLED=False`** (master has no reader).
+- Warns if Postgres `listen_addresses` is loopback-only — every booth connects to
+  master's Postgres over the LAN, so without this no booth can open a barrier.
 
 ### 3a. Load the plazas (master only)
 
@@ -224,23 +212,23 @@ PM2 processes.
 `booth_bootstrap.sh` writes both from one `$GATE_MODE`, so a scripted deploy is
 always consistent. A hand-edit to one desyncs them, and the failure is silent:
 an exit lane whose sync runs in entry mode never pulls open trips, so **every
-exiting vehicle is refused with "No active trip found."** `run_gate` prints a
-loud `MODE MISMATCH` error at startup if they disagree.
+exiting vehicle is refused with "No active trip found."** That coupling is gone
+with the sync service: only `mode` in `rfid_config.ini` decides what the gate
+does. `run_gate` still prints a one-line warning if `.env`'s `GATE_MODE`
+disagrees, but nothing reads `GATE_MODE` any more.
 
 ### 4d. Verify each booth
 
 ```bash
-pm2 status                            # mtag-web, mtag-gate, mtag-sync all online
-pm2 logs mtag-sync --lines 30         # "[sync] Agent started — mode=entry|exit"
-pm2 logs mtag-gate  --lines 30        # plaza resolves, reader connects, no MODE MISMATCH
-
-python manage.py sync_service --once  # one verbose cycle; non-zero exit if a push held
-python manage.py trip_sync            # DRIFT must be 0
-python manage.py migrate --check
+pm2 status                            # mtag-web and mtag-gate online (no mtag-sync)
+pm2 logs mtag-gate  --lines 30        # plaza resolves, reader connects
+python manage.py migrate --check      # run on MASTER; a booth shares master's schema
 ```
 
-`sync_service --once` is the important one — it fails loudly if any push held its
-watermark, meaning those rows are **not** on master.
+The gate log is the one that matters. `[gate] Mode: ... | Plaza: ...` followed by
+`[reader] Connected to TCP:<reader-ip>:9090` means the booth reached master,
+resolved its plaza and lane, and opened the reader. Any database error here is
+now fatal to the lane rather than something a sync pass will pick up later.
 
 ---
 
@@ -249,12 +237,11 @@ watermark, meaning those rows are **not** on master.
 | Symptom | Cause |
 |---|---|
 | `Tag not found` on every scan | `tags.tid` is null. The gate matches on `tid` only. Check `SELECT COUNT(*) FROM tags WHERE tid IS NULL OR tid=''`. |
-| `Toll rate not configured for this route` | No `fare_matrix` row for that plaza pair + category. Run `load_fares` on master, then re-sync the booth. |
-| `No active trip found` at an exit | Exit booth in entry mode (`GATE_MODE`), so open trips are never pulled. |
-| `Vehicle already has an active trip` on a valid entry | Closed-trip pull isn't reaching this booth. Run `trip_sync` and check DRIFT. |
+| `Toll rate not configured for this route` | No `fare_matrix` row for that plaza pair + category. Run `load_fares` on master. The booth reads master directly, so the fix applies as soon as the gate's fare cache expires (10 min). |
+| `No active trip found` at an exit | The vehicle has no open trip on master — check it was not already closed at another lane. `GATE_MODE` is no longer involved. |
+| `Vehicle already has an active trip` on a valid entry | A genuinely open trip on master, usually an entry never closed at an exit. Close it on master. |
 | `relation "vehicles" already exists` during migrate | DB was restored from `sql/schema.sql` and has no `django_migrations` rows. Needs `migrate --fake-initial` once. |
-| `[push] <table> FAILED, watermark held` | Push failed; rows are **not** on master and will retry. Investigate — this is money. |
-| `duplicate key ... plazas_plaza_id_key` on first pull | Booth has pre-seeded plazas with different UUIDs. Bootstrap clears these automatically when the booth has no trips. |
+| Barrier stops opening, gate logs a database error | Master is unreachable. There is no local fallback — the lane is down until master returns. Check the LAN and master's Postgres. |
 
 ---
 

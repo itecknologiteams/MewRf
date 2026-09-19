@@ -20,6 +20,8 @@ import BalanceTransfer from '@/pages/BalanceTransfer';
 import TopupPage from '@/pages/TopupPage';
 import InventoryManagement from '@/pages/InventoryManagement';
 import BoothAssignmentPage from '@/pages/BoothAssignmentPage';
+import LanesPage from '@/pages/LanesPage';
+import BoothDeploymentsPage from '@/pages/BoothDeploymentsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -34,6 +36,31 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
+
+  // Operators staff the registration desk and nothing else: one page, and any
+  // other URL — including the /dashboard that Login sends everyone to — lands
+  // back on it.
+  if (user?.role === 'operator') {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="register" element={<Registration />} />
+          <Route index element={<Navigate to="/register" replace />} />
+          <Route path="*" element={<Navigate to="/register" replace />} />
+        </Route>
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -58,6 +85,8 @@ function AppRoutes() {
         <Route path="admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
         <Route path="admin/inventory" element={<AdminRoute><InventoryManagement /></AdminRoute>} />
         <Route path="admin/booth-assignment" element={<AdminRoute><BoothAssignmentPage /></AdminRoute>} />
+        <Route path="admin/lanes" element={<AdminRoute><LanesPage /></AdminRoute>} />
+        <Route path="admin/booth-updates" element={<AdminRoute><BoothDeploymentsPage /></AdminRoute>} />
         <Route path="transfer" element={<BalanceTransfer />} />
         <Route path="topup" element={<TopupPage />} />
       </Route>

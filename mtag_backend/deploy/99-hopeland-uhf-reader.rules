@@ -1,0 +1,24 @@
+# HopeLand UHF desktop reader (USB 2121:8633) — registration desk.
+#
+# Install on each PC that has a reader plugged in:
+#     sudo cp deploy/99-hopeland-uhf-reader.rules /etc/udev/rules.d/
+#     sudo udevadm control --reload-rules && sudo udevadm trigger
+#     # unplug and replug the reader
+#
+# Why this is needed: the reader is a composite USB device exposing BOTH a CDC
+# serial port (/dev/ttyACM0) and a HID interface (/dev/hidrawN). The vendored
+# com.rfid SDK talks to it over HID, and /dev/hidraw* is created root-only by
+# default — so without this rule every open fails with a bare "open failed".
+#
+# The CDC serial port is silent on this model; it is the HID interface that
+# carries the protocol. The dialout line below is only for completeness, so the
+# same rule covers a reader that does present a working serial port.
+
+# HID interface — this is the one the SDK uses.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2121", ATTRS{idProduct}=="8633", MODE="0660", GROUP="dialout"
+
+# Raw USB node, for the libusb backend of hidapi.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2121", ATTRS{idProduct}=="8633", MODE="0660", GROUP="dialout"
+
+# CDC serial interface on the same device.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2121", ATTRS{idProduct}=="8633", MODE="0660", GROUP="dialout"

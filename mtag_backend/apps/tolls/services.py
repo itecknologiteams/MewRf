@@ -3,6 +3,7 @@ import threading
 import time
 from decimal import Decimal
 from django.conf import settings
+from django.db import close_old_connections, connection
 from django.db import transaction as db_transaction
 from django.utils import timezone
 from apps.vehicles.models import Tag, TagStatus
@@ -58,8 +59,24 @@ def invalidate_rate_cache():
 
 
 def _bg(fn, *args, **kwargs):
-    """Fire-and-forget background thread for non-critical DB writes."""
-    threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
+    """Fire-and-forget background thread for non-critical DB writes.
+
+    Django connections are thread-local and are only cleaned up at request
+    boundaries, which a thread started by hand never reaches. Every scan starts
+    two of these, so without the close below each vehicle left a Postgres
+    session open for good — a booth ran out of connections long before anyone
+    connected it to the gate, and the symptom was the lane refusing vehicles
+    with a database error. The connection is also recycled on the way in, so a
+    thread never inherits a socket that died while the lane was quiet.
+    """
+    def _run():
+        close_old_connections()
+        try:
+            fn(*args, **kwargs)
+        finally:
+            connection.close()
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _update_last_scanned(tag_id):
@@ -96,15 +113,61 @@ def _inc_summary_exit(plaza_id, lane_id, vehicle_type, date, charge):
         logger.warning("daily_summary exit update failed: %s", exc)
 
 
-# ── Master reads (no master WRITES from the gate path) ────────────────────────
+# How long a read of master may take before the gate gives up on it. Both
+# master reads below run inside the charging transaction, on the SDK's receive
+# thread — the one thread that processes every tag. A master that accepts the
+# connection and then stalls (a half-open link, an overloaded server, a network
+# partition after the TCP handshake) would otherwise block that thread with a
+# row lock held, and the lane stops passing vehicles entirely. connect_timeout
+# does not help: it only bounds establishing the connection, not the query.
 #
-# The gate writes to the LOCAL database only. Everything reaching master goes
-# through the separate sync service (apps/tolls/sync/), so a master outage can
-# never close a lane and the gate carries no replication logic.
+# Both callers already treat an unreachable master as "keep the local answer",
+# so timing out is a path they handle. Five seconds is far longer than these
+# point lookups need and far shorter than a driver will wait.
+MASTER_QUERY_TIMEOUT_MS = 5000
+
+
+def _master_cursor():
+    """A cursor on master whose queries cannot hang the lane.
+
+    statement_timeout is set per session; the gate's master_pg connection is
+    used for nothing but these two lookups, and the sync service is a separate
+    process with its own connection, so bounding it here cannot cut short a
+    bulk pull or push.
+    """
+    from django.db import connections
+    cursor = connections['master_pg'].cursor()
+    cursor.execute(f"SET statement_timeout = {MASTER_QUERY_TIMEOUT_MS}")
+    return cursor
+
+
+def _drop_master_connection():
+    """Throw away the master connection after a failed read.
+
+    Without this a connection that died while the lane was quiet stayed in
+    place: every later entry hit the same dead handle, the exception was caught
+    below as "could not verify", and every vehicle with an open trip was refused
+    with 'Vehicle already has an active trip' until the process was restarted.
+    """
+    from django.db import connections
+    try:
+        connections['master_pg'].close()
+    except Exception:
+        pass
+
+
+# ── Master reads ──────────────────────────────────────────────────────────────
 #
-# The two helpers below are READS, kept because correctness needs them: an exit
-# must be able to find an entry made moments ago at another plaza, and an entry
-# must not be refused by a local row that master already knows is closed.
+# Booths are online-only: booth_bootstrap.sh points DB_* and MASTER_DB_* at the
+# same server, so on a booth the 'default' connection and the explicit
+# 'master_pg' one resolve to the same database. The sync service that used to
+# replicate between a local DB and master is gone.
+#
+# The two helpers below are therefore usually redundant on a booth and are kept
+# for the deployment where they are not: a machine whose 'default' really is a
+# separate database still needs an exit to find an entry made moments ago at
+# another plaza, and an entry not to be refused by a local row master knows is
+# closed. They stay READ-ONLY either way — nothing here writes to master.
 
 def _refresh_trips_from_master(trip_ids) -> dict:
     """Overwrite local trip rows with master's authoritative values.
@@ -122,7 +185,7 @@ def _refresh_trips_from_master(trip_ids) -> dict:
     if not trip_ids:
         return {}
 
-    with connections['master_pg'].cursor() as mcur:
+    with _master_cursor() as mcur:
         mcur.execute("""
             SELECT id, exit_plaza_id, exit_lane_id, exit_time, charge_amount,
                    balance_before, balance_after, status, updated_at
@@ -169,6 +232,7 @@ def _reconcile_local_active_trips(trip_ids) -> list:
     except Exception as exc:
         # Can't verify — keep the existing conservative behaviour and reject.
         logger.warning("Could not verify active trips against master: %s", exc)
+        _drop_master_connection()
         return trip_ids
 
     still_active = []
@@ -189,6 +253,53 @@ def _reconcile_local_active_trips(trip_ids) -> list:
 
 
 # ── Entry ─────────────────────────────────────────────────────────────────────
+
+def preview_tag(tag_serial: str) -> dict:
+    """What this tag's account looks like, without charging it anything.
+
+    The gate reads a tag long before the vehicle reaches the barrier. Showing a
+    balance that early is useful; creating a trip that early is not — it charged
+    cars that had not arrived yet, and in a convoy it charged one while another
+    was still at the boom. So the far-field read comes through here, and the
+    money only moves when the vehicle is actually in front of the barrier and
+    process_entry/process_exit runs.
+
+    Strictly read-only: no atomic block, no select_for_update, no writes, not
+    even the last_scanned bookkeeping. It runs on every read of every tag in
+    range, so it must stay one cheap query.
+    """
+    try:
+        tag = Tag.objects.select_related('vehicle').get(tid=tag_serial)
+    except Tag.DoesNotExist:
+        return {'success': False, 'reason': 'Tag not found'}
+
+    if not tag.is_valid:
+        if tag.vehicle_id is None:
+            return {'success': False, 'reason': 'Tag not assigned to any vehicle'}
+        if tag.status != TagStatus.ACTIVE:
+            return {'success': False, 'reason': f'Tag is {tag.status}'}
+        return {'success': False, 'reason': 'Tag expired'}
+
+    vehicle = tag.vehicle
+    if vehicle.status != 'active':
+        return {'success': False, 'reason': f'Vehicle is {vehicle.status}'}
+
+    try:
+        account = Account.objects.only('balance').get(vehicle=vehicle)
+    except Account.DoesNotExist:
+        return {'success': False, 'reason': 'No account found for this vehicle'}
+
+    # Reported, not enforced. Whether this balance is enough is decided at the
+    # barrier by process_entry/process_exit against the fare of the moment; a
+    # preview that refused here would only be guessing at it early.
+    return {
+        'success': True,
+        'vehicle': vehicle.plate_number,
+        'vehicle_type': vehicle.vehicle_type,
+        'current_balance': str(account.balance),
+        'sufficient': account.balance >= MINIMUM_BALANCE,
+    }
+
 
 class EntryService:
     @staticmethod
@@ -314,7 +425,7 @@ def _find_active_trip(vehicle):
         return trip
 
     try:
-        with connections['master_pg'].cursor() as mcur:
+        with _master_cursor() as mcur:
             mcur.execute("""
                 SELECT id, vehicle_id, tag_id, account_id, entry_plaza_id,
                        entry_lane_id, entry_time, exit_plaza_id, exit_lane_id,
@@ -344,6 +455,7 @@ def _find_active_trip(vehicle):
                 ).get(id=row[0])
     except Exception as exc:
         logger.warning("Master fallback trip lookup failed: %s", exc)
+        _drop_master_connection()
 
     return None
 
@@ -438,7 +550,7 @@ class ExitService:
         # The exit, balance deduction and audit transaction are all committed
         # locally in the atomic block above. The sync service's push pass sends
         # the trip, the balance and the transaction to master, and refuses to
-        # overwrite an exit master has already recorded (see push_toll_trips).
+        # overwrite an exit master has already recorded.
 
         # Non-critical background updates
         _bg(_update_last_scanned, tag.id)

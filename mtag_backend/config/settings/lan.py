@@ -22,3 +22,19 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+
+# ── Configuration invariants ─────────────────────────────────────────────────
+# This is the module every deployment actually loads, so this is where the
+# checks have to be. See config/settings/hardening.py for why each one refuses
+# to boot rather than warning.
+from .hardening import enforce  # noqa: E402
+
+enforce(
+    settings_module='config.settings.lan',
+    secret_key=SECRET_KEY,
+    debug=DEBUG,
+    allowed_hosts=ALLOWED_HOSTS,
+    otp_push_to_requesting_device=OTP_PUSH_TO_REQUESTING_DEVICE,  # noqa: F405
+    cors_allow_all_origins=globals().get('CORS_ALLOW_ALL_ORIGINS', False),
+    cors_allow_credentials=globals().get('CORS_ALLOW_CREDENTIALS', False),
+)

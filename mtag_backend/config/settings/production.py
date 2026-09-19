@@ -1,12 +1,5 @@
 from .base import *
 
-# ─── Safety guards ────────────────────────────────────────────────────────────
-if SECRET_KEY == 'your-secret-key-here':
-    raise ValueError(
-        "SECRET_KEY must be set to a cryptographically secure random value. "
-        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(50))\""
-    )
-
 # ALLOWED_HOSTS is required in production — no default fallback
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
@@ -38,22 +31,17 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
 
-# ─── Refuse to start with the dev OTP mode on ─────────────────────────────────
-# OTP_PUSH_TO_REQUESTING_DEVICE sends the verification code to whatever device asked for it.
-# In development that is how the onboarding flow is exercised on a real phone before an SMS
-# gateway exists. In production it is a one-step account takeover: an OTP proves possession
-# of a phone NUMBER, and a code delivered to the requester's own handset proves only that
-# they installed the app — so knowing a customer's number would be enough to receive their
-# code, set a new password and empty their wallet.
-#
-# A hard failure at import, not a warning. The setting is read from the environment, and an
-# environment variable set for a dev box has an obvious way of following a deployment to a
-# real one — a copied .env, a shared shell profile, a pasted command. A warning in a log
-# nobody tails is not a control; refusing to boot is.
-if OTP_PUSH_TO_REQUESTING_DEVICE:  # noqa: F405
-    raise ValueError(
-        'OTP_PUSH_TO_REQUESTING_DEVICE is enabled under production settings. It delivers '
-        'verification codes to whichever device requests them, which lets anyone who knows '
-        'a phone number take over that account. Unset it, or use SMS_BACKEND for real '
-        'delivery.'
-    )
+# ── Configuration invariants ─────────────────────────────────────────────────
+# Shared with config.settings.lan rather than duplicated here — the checks that
+# only existed in this module went unenforced for as long as nothing loaded it.
+from .hardening import enforce  # noqa: E402
+
+enforce(
+    settings_module='config.settings.production',
+    secret_key=SECRET_KEY,
+    debug=DEBUG,
+    allowed_hosts=ALLOWED_HOSTS,
+    otp_push_to_requesting_device=OTP_PUSH_TO_REQUESTING_DEVICE,  # noqa: F405
+    cors_allow_all_origins=globals().get('CORS_ALLOW_ALL_ORIGINS', False),
+    cors_allow_credentials=CORS_ALLOW_CREDENTIALS,  # noqa: F405
+)

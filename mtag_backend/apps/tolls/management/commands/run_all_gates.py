@@ -113,6 +113,13 @@ class Command(BaseCommand):
                 display_ip=get(section, 'display_ip', '192.168.78.12'),
                 tag_cooldown=float(get(section, 'tag_cooldown', '5.0')),
                 stdout=PrefixWriter(self.stdout, section),
+                # Pinned to serial on purpose. This command drives SEVERAL
+                # barriers from one machine, each on its own tty, while the
+                # barrier service is a single localhost endpoint bound to one
+                # port — auto-detecting it would make every booth here raise
+                # the same barrier. One-booth-per-machine (run_gate,
+                # run_anpr_gate) is where the service applies.
+                barrier_mode='serial',
             )
 
             reader_host = get(section, 'reader_host', '192.168.78.8')

@@ -268,7 +268,15 @@ class OtpFlowController extends Notifier<OtpFlowState> {
     try {
       final delivery = await ref
           .read(authRepositoryProvider)
-          .requestOtp(phone: state.phone, deviceToken: await _deviceToken());
+          .requestOtp(
+            phone: state.phone,
+            deviceToken: await _deviceToken(),
+            // MUST be the same purpose `verify` and `setPassword` will send. The server
+            // scopes the OTP row by (phone, purpose) and derives the token's signing salt
+            // from it, so a request/verify mismatch does not fail loudly — it reports
+            // `not_found`, which is indistinguishable on screen from a mistyped code.
+            purpose: state.purpose,
+          );
       state = state.copyWith(
         busy: false,
         step: OtpStep.code,

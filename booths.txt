@@ -1,0 +1,57 @@
+# Booth addresses recovered from deploy_booths.sh before the list moved into
+# master's database. One-time seed:
+#     scp booths.txt master:~/
+#     ssh master 'cd mtag_backend && DJANGO_SETTINGS_MODULE=config.settings.lan \
+#       venv/bin/python manage.py discover_booths --from-file ~/booths.txt'
+# Each booth is asked which lane it is (from its own rfid_config.ini), so no
+# lane→address mapping has to be reconstructed by hand.
+# Once every booth is recorded, this file is disposable.
+192.168.78.2
+192.168.78.7
+192.168.78.13
+192.168.78.19
+192.168.78.242
+192.168.78.31
+192.168.78.37
+192.168.78.43
+192.168.78.127
+192.168.78.49
+192.168.78.55
+192.168.78.61
+192.168.78.67
+192.168.78.73
+192.168.78.79
+192.168.78.85
+192.168.78.103
+192.168.78.91
+192.168.78.97
+192.168.78.109
+192.168.79.2
+192.168.79.9
+192.168.79.16
+192.168.79.23
+192.168.79.30
+192.168.79.44
+192.168.79.51
+192.168.79.58
+192.168.79.65
+192.168.79.72
+192.168.79.79
+192.168.79.86
+192.168.79.93
+192.168.79.100
+192.168.79.107
+192.168.79.114
+192.168.79.121
+192.168.79.129
+192.168.79.137
+192.168.79.143
+192.168.79.150
+192.168.79.157
+192.168.79.164
+192.168.79.171
+192.168.79.178
+192.168.79.185
+192.168.79.192
+192.168.79.199
+192.168.79.206

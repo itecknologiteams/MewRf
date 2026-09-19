@@ -179,11 +179,17 @@ class Command(BaseCommand):
             f"[sync] Entering loop — will sync every {DEFAULT_LOOP_INTERVAL}s. "
             f"Press Ctrl+C to stop."
         )
+        from django.db import close_old_connections, connections
         while True:
             try:
+                # Long-running command, no request cycle: recycle the ORM
+                # connection each pass or one dropped socket wedges every
+                # later cycle. Same fix as the gate and the sync agent.
+                close_old_connections()
                 self._run_cycle(db_path)
             except Exception as exc:
                 logger.exception("[sync] Unexpected error in loop cycle")
+                connections.close_all()
                 self.stderr.write(
                     self.style.ERROR(
                         f"[sync] Cycle error: {exc.__class__.__name__}: {exc} "

@@ -7,6 +7,7 @@ import 'package:mtag_user_app/design_system/clay.dart';
 import 'package:mtag_user_app/features/auth/presentation/biometric_gate.dart';
 import 'package:mtag_user_app/features/auth/presentation/login_screen.dart';
 import 'package:mtag_user_app/features/auth/presentation/session_controller.dart';
+import 'package:mtag_user_app/features/auth/presentation/signed_in_exit.dart';
 import 'package:mtag_user_app/features/auth/presentation/splash_screen.dart';
 import 'package:mtag_user_app/features/auth/presentation/unlock_screen.dart';
 import 'package:mtag_user_app/features/dashboard/presentation/dashboard_screen.dart';
@@ -197,12 +198,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.setPassword,
         parentNavigatorKey: _rootKey,
-        pageBuilder: (context, state) =>
-            _clayPage(state, const SetPasswordScreen()),
+        // Same reason as login, and more of it: by the time a password is set the user is
+        // three imperative pushes deep (phone -> otp -> password). `go` discards all of
+        // them; popping would leave the OTP screen underneath the dashboard.
+        pageBuilder: (context, state) => _clayPage(
+          state,
+          const SignedInExit(child: SetPasswordScreen()),
+        ),
       ),
       GoRoute(
         path: Routes.login,
-        builder: (context, state) => const LoginScreen(),
+        // Wrapped because this screen is reached with `context.push`, and go_router leaves an
+        // imperatively pushed page on top of whatever `redirect` decides. Without this the
+        // redirect below puts the dashboard underneath and the login form stays visible —
+        // login looks like it did nothing until the app is restarted.
+        builder: (context, state) => const SignedInExit(child: LoginScreen()),
       ),
 
       // The four bottom-nav tabs keep their own navigation stacks inside the shell,

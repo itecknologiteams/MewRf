@@ -3,12 +3,16 @@ import io
 import logging
 from datetime import date
 from django.db import IntegrityError
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser
 from utils.response import success_response, error_response
-from .models import Vehicle, Tag, TagStatus, UnregisteredInventory, UnregisteredInventoryStatus, TagActivation
+from .models import (
+    Vehicle, Tag, TagStatus, TagAssignment, UnregisteredInventory,
+    UnregisteredInventoryStatus, TagActivation,
+)
 from .serializers import (
     VehicleSerializer, VehicleCreateSerializer, TagSerializer, TagReissueSerializer, normalize_plate,
     MyVehicleSerializer,
@@ -166,14 +170,31 @@ class TagReissueView(APIView):
 
 
 class AvailableTagsView(APIView):
+    """Tags an operator can issue right now.
+
+    Filtering on ACTIVE alone returned nothing on a real system: TagBulkCreateView
+    inserts stock as DEACTIVATED and unassigned ("inventory tags", per its
+    docstring), and TagReissueView then picks any unassigned tag and flips it to
+    ACTIVE on issue. So DEACTIVATED-and-unassigned IS the in-stock state, and
+    excluding it hid every tag the operator actually had.
+
+    A tag that was taken OFF a vehicle also lands in that state, and it was
+    usually replaced for a reason. Those are told apart by their assignment
+    history and left out here — see TagScanLookupView, which reports them
+    explicitly rather than silently offering them.
+    """
+
     permission_classes = [IsOperator]
 
     def get(self, request):
         search = request.query_params.get('search', '').strip()
+        retired = TagAssignment.objects.filter(tag_serial=OuterRef('tag_serial'))
         qs = Tag.objects.filter(
             vehicle__isnull=True,
-            status=TagStatus.ACTIVE,
-        ).order_by('tag_serial')
+            status__in=(TagStatus.ACTIVE, TagStatus.DEACTIVATED),
+        ).annotate(
+            _was_issued=Exists(retired),
+        ).filter(_was_issued=False).order_by('tag_serial')
         if search:
             qs = qs.filter(tag_serial__icontains=search)
         tags = qs.values('id', 'tag_serial', 'epc')[:20]
@@ -282,33 +303,6 @@ class TagBulkCreateView(APIView):
             message=f"{len(added)} tag(s) added",
             status_code=201,
         )
-
-
-class ScanDebugView(APIView):
-    """TEMPORARY: logs whatever the device/AppCenter app sends, so we can learn
-    its exact payload format + headers. Point the device's upload URL here, scan
-    one tag, then check the server console. Remove after the format is known."""
-    permission_classes = [AllowAny]
-
-    def _log(self, request):
-        try:
-            raw = request.body.decode('utf-8', errors='replace')
-        except Exception:
-            raw = '<unreadable>'
-        hdrs = {k[5:]: v for k, v in request.META.items() if k.startswith('HTTP_')}
-        logger.warning(
-            "[scan-debug] %s %s\n  content-type: %s\n  query: %s\n  headers: %s\n  body: %s",
-            request.method, request.get_full_path(),
-            request.content_type, dict(request.query_params), hdrs, raw,
-        )
-
-    def post(self, request):
-        self._log(request)
-        return success_response(data={'received': True}, message="logged")
-
-    def get(self, request):
-        self._log(request)
-        return success_response(data={'received': True}, message="logged")
 
 
 class TagExistsCheckView(APIView):
@@ -847,3 +841,148 @@ class InventoryCheckView(APIView):
                     'activation_required': False,
                 }
             )
+
+
+class TagScanLookupView(APIView):
+    """Identify a physically-scanned tag and say whether it can be issued.
+
+    A reader gives a TID (and sometimes an EPC) — never the printed tag_serial
+    an operator sees in the registration dropdown. InventoryCheckView is keyed
+    on tag_serial, so it cannot answer "what did I just put on the reader?".
+    This can, and it answers the operator's actual question in one call: is this
+    tag known, is it still free, and what serial should I put in the form?
+
+    Deliberately reports rather than acts. Issuing the tag stays with the
+    existing registration call, so a scan can never mutate anything.
+    """
+
+    permission_classes = [IsOperator]
+
+    def get(self, request):
+        tid = (request.query_params.get('tid') or '').strip().replace(' ', '').upper()
+        epc = (request.query_params.get('epc') or '').strip().replace(' ', '').upper()
+        if not tid and not epc:
+            return error_response("Pass tid or epc")
+
+        # The TID is the chip's factory-unique id, so it identifies the physical
+        # tag even after an EPC rewrite. EPC is the fallback for readers that
+        # only report EPC.
+        tag = None
+        if tid:
+            tag = Tag.objects.select_related('vehicle').filter(tid=tid).first()
+        if tag is None and epc:
+            tag = Tag.objects.select_related('vehicle').filter(epc=epc).first()
+
+        inv = None
+        if tid:
+            inv = UnregisteredInventory.objects.filter(tid=tid).first()
+        if inv is None and epc:
+            inv = UnregisteredInventory.objects.filter(epc=epc).first()
+
+        return success_response(data=self._describe(tag, inv, tid, epc))
+
+    def _describe(self, tag, inv, tid, epc):
+        base = {
+            'tid': tid or (tag.tid if tag else '') or (inv.tid if inv else ''),
+            'epc': epc or (tag.epc if tag else '') or (inv.epc if inv else ''),
+            'in_inventory': inv is not None,
+            'tag_serial': (tag.tag_serial if tag else None) or (inv.tag_serial if inv else None),
+        }
+
+        # An issued tag already on a vehicle is the case that matters most:
+        # handing it to a second customer would silently bill one for the other.
+        if tag is not None and tag.vehicle_id is not None:
+            return {
+                **base,
+                'available': False,
+                'status': 'already_issued',
+                'message': (
+                    f"Already issued to {tag.vehicle.plate_number}. "
+                    "Use a different tag."
+                ),
+                'assigned_plate': tag.vehicle.plate_number,
+            }
+
+        if tag is not None and tag.status == TagStatus.DEACTIVATED:
+            # DEACTIVATED + unassigned is this system's IN-STOCK state:
+            # TagBulkCreateView inserts inventory that way, and TagReissueView
+            # flips whatever unassigned tag it picks to ACTIVE on issue. But a
+            # tag taken OFF a vehicle lands in the same state, and that one was
+            # replaced for a reason. Assignment history is what tells them
+            # apart — fresh stock has none.
+            previous = (
+                TagAssignment.objects
+                .filter(tag_serial=tag.tag_serial)
+                .order_by('-assigned_at')
+                .first()
+            )
+            if previous is None:
+                return {
+                    **base,
+                    'available': True,
+                    'status': 'in_stock',
+                    'message': f"Tag {tag.tag_serial} is in stock — ready to issue.",
+                }
+            # plate_number is denormalised on the history row precisely so it
+            # survives the vehicle being deleted.
+            was = previous.plate_number or None
+            return {
+                **base,
+                'available': False,
+                'status': 'previously_issued',
+                'assigned_plate': was,
+                'message': (
+                    f"This tag was previously issued{' to ' + was if was else ''} and "
+                    "retired. Check why before reusing it."
+                ),
+            }
+
+        if tag is not None and tag.status != TagStatus.ACTIVE:
+            return {
+                **base,
+                'available': False,
+                'status': 'tag_not_active',
+                'message': f"This tag is {tag.get_status_display().lower()} and cannot be issued.",
+            }
+
+        if tag is not None:
+            # In the Tag table, unassigned and active — exactly what the
+            # registration dropdown offers.
+            return {
+                **base,
+                'available': True,
+                'status': 'available',
+                'message': f"Tag {tag.tag_serial} is free — ready to issue.",
+            }
+
+        if inv is not None:
+            if inv.status == UnregisteredInventoryStatus.ACTIVATED:
+                return {
+                    **base,
+                    'available': False,
+                    'status': 'already_activated',
+                    'message': (
+                        f"Already activated{' for ' + inv.vehicle_plate if inv.vehicle_plate else ''}. "
+                        "Use a different tag."
+                    ),
+                    'assigned_plate': inv.vehicle_plate,
+                }
+            # In inventory and not yet activated. It has no Tag row yet, so the
+            # operator issues it through the normal activation path.
+            return {
+                **base,
+                'available': True,
+                'status': 'in_inventory',
+                'booth_assigned_id': inv.booth_assigned_id,
+                'message': f"Tag {inv.tag_serial} is in inventory — ready to issue.",
+            }
+
+        return {
+            **base,
+            'available': False,
+            'status': 'not_in_inventory',
+            'message': (
+                "This tag is not in inventory. Upload it before issuing, or "
+                "check you scanned the right tag."
+            ),
+        }

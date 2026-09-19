@@ -2,17 +2,24 @@ import logging
 import calendar
 from datetime import timedelta, datetime
 from django.utils import timezone
+from django.db import IntegrityError, transaction
 from django.db.models import Sum, Count, Q
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from utils.response import success_response, error_response
 from utils.pagination import StandardPagination
 from apps.vehicles.models import VehicleCategory
-from .models import FareMatrix, Plaza, TollTrip, TripStatus, PendingGateOpen, DailySummary
+from .models import (
+    FareMatrix, Plaza, TollLane, TollTrip, TripStatus, PendingGateOpen, DailySummary,
+    BoothMachine, BoothDeployJob, BoothJobAction, BoothJobStatus,
+)
 from .serializers import (
     PlazaSerializer, FareSerializer, FareCreateSerializer, VehicleCategorySerializer,
     TollTripSerializer, TollLaneSerializer, PlazaCreateSerializer, LaneCreateSerializer,
+    BoothMachineSerializer, BoothMachineWriteSerializer,
+    BoothDeployJobSerializer, BoothDeployJobListSerializer,
 )
+from utils.code_version import get_code_version
 from .services import EntryService, ExitService, invalidate_rate_cache
 from apps.users.permissions import IsAdmin, IsOperator, scope_to_owner
 
@@ -200,6 +207,14 @@ class AdminPlazaDetailView(APIView):
 class AdminLaneView(APIView):
     permission_classes = [IsAdmin]
 
+    def get(self, request, plaza_id):
+        try:
+            plaza = Plaza.objects.get(pk=plaza_id)
+        except Plaza.DoesNotExist:
+            return error_response("Plaza not found", status_code=404)
+        lanes = plaza.lanes.all().order_by('lane_number')
+        return success_response(data=TollLaneSerializer(lanes, many=True).data)
+
     def post(self, request, plaza_id):
         try:
             plaza = Plaza.objects.get(pk=plaza_id)
@@ -208,8 +223,11 @@ class AdminLaneView(APIView):
         serializer = LaneCreateSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                from django.db import IntegrityError
-                lane = serializer.save(plaza=plaza)
+                # Savepoint: the unique_together violation is caught and turned
+                # into a 400, so the failed INSERT must be rolled back on its own
+                # or any enclosing transaction stays unusable.
+                with transaction.atomic():
+                    lane = serializer.save(plaza=plaza)
             except IntegrityError:
                 return error_response(
                     f"Lane {serializer.validated_data['lane_number']} already exists for this plaza.",
@@ -221,6 +239,56 @@ class AdminLaneView(APIView):
                 status_code=201,
             )
         return error_response("Invalid data", errors=serializer.errors)
+
+
+class AdminLaneDetailView(APIView):
+    """Rename / activate / delete a single lane.
+
+    Every FK pointing at a lane is SET_NULL, so a delete would quietly detach
+    the lane from trips and daily summaries that were recorded on it. That is
+    history loss with no way back, so a lane that has ever been used is refused
+    and the operator is told to deactivate it instead — the same rule plazas
+    already follow.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def _get(self, pk):
+        try:
+            return TollLane.objects.select_related('plaza').get(pk=pk)
+        except TollLane.DoesNotExist:
+            return None
+
+    def patch(self, request, pk):
+        lane = self._get(pk)
+        if lane is None:
+            return error_response("Lane not found", status_code=404)
+        serializer = LaneCreateSerializer(lane, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return error_response("Invalid data", errors=serializer.errors)
+        try:
+            with transaction.atomic():
+                serializer.save()
+        except IntegrityError:
+            return error_response(
+                f"Lane {request.data.get('lane_number')} already exists for this plaza.",
+                status_code=400,
+            )
+        lane.refresh_from_db()
+        return success_response(data=TollLaneSerializer(lane).data, message="Lane updated")
+
+    def delete(self, request, pk):
+        lane = self._get(pk)
+        if lane is None:
+            return error_response("Lane not found", status_code=404)
+        if (lane.entry_trips.exists() or lane.exit_trips.exists()
+                or lane.daily_summaries.exists()):
+            return error_response(
+                "Cannot delete a lane with recorded traffic. Deactivate it instead.",
+                status_code=409,
+            )
+        lane.delete()
+        return success_response(message="Lane deleted")
 
 
 class AdminTollRateView(APIView):
@@ -585,3 +653,177 @@ class AdminDailyReportView(APIView):
                 'revenue': grand_revenue,
             },
         })
+
+
+# ── Booth code deployment ────────────────────────────────────────────────────
+
+class AdminBoothDeploymentView(APIView):
+    """Every lane, what code its booth runs, and whether that matches master.
+
+    Returns a row per lane — including lanes with no booth machine configured
+    yet, since "this lane has nowhere to deploy to" is exactly what an operator
+    needs to see here. Rows are built from the cached last check; refreshing
+    them is an explicit action, because reaching 21 booths over SSH is far too
+    slow to do on a page load.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        machines = list(
+            BoothMachine.objects
+            .select_related('lane', 'lane__plaza')
+            .all()
+        )
+        _attach_active_jobs(machines)
+        configured = {m.lane_id: m for m in machines}
+
+        lanes = (
+            TollLane.objects
+            .select_related('plaza')
+            .all()
+            .order_by('plaza__plaza_id', 'lane_number')
+        )
+        rows = []
+        for lane in lanes:
+            machine = configured.get(lane.id)
+            if machine is not None:
+                rows.append(BoothMachineSerializer(machine).data)
+            else:
+                rows.append({
+                    'id': None,
+                    'lane': lane.id,
+                    'lane_number': lane.lane_number,
+                    'lane_is_active': lane.is_active,
+                    'plaza_id': lane.plaza_id,
+                    'plaza_name': lane.plaza.name,
+                    'plaza_display_id': lane.plaza.display_id,
+                    'host': '',
+                    'reported_version': '',
+                    'reachable': None,
+                    'active_job': None,
+                })
+        return success_response(data={
+            'master_version': get_code_version(),
+            'booths': rows,
+        })
+
+    def post(self, request):
+        """Point a lane at the booth machine that runs it."""
+        serializer = BoothMachineWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response("Invalid data", errors=serializer.errors)
+        lane = serializer.validated_data['lane']
+        machine, _ = BoothMachine.objects.update_or_create(
+            lane=lane,
+            defaults={k: v for k, v in serializer.validated_data.items() if k != 'lane'},
+        )
+        machine = BoothMachine.objects.select_related('lane', 'lane__plaza').get(pk=machine.pk)
+        return success_response(
+            data=BoothMachineSerializer(machine).data,
+            message="Booth machine saved",
+        )
+
+
+class AdminBoothMachineDetailView(APIView):
+    permission_classes = [IsAdmin]
+
+    def delete(self, request, pk):
+        try:
+            machine = BoothMachine.objects.get(pk=pk)
+        except BoothMachine.DoesNotExist:
+            return error_response("Booth machine not found", status_code=404)
+        machine.delete()
+        return success_response(message="Booth machine removed")
+
+
+class AdminBoothJobView(APIView):
+    """Queue a check or an update for one booth.
+
+    Nothing is executed here — booth_deploy_worker on master picks the row up.
+    A lane that already has a job in flight is refused rather than queued behind
+    it, so a double click cannot end up deploying to the same booth twice.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        action = request.data.get('action')
+        if action not in BoothJobAction.values:
+            return error_response(
+                f"action must be one of {', '.join(BoothJobAction.values)}"
+            )
+        try:
+            machine = BoothMachine.objects.select_related('lane').get(pk=pk)
+        except BoothMachine.DoesNotExist:
+            return error_response("Booth machine not found", status_code=404)
+
+        in_flight = machine.jobs.filter(
+            status__in=[BoothJobStatus.PENDING, BoothJobStatus.RUNNING]
+        ).first()
+        if in_flight is not None:
+            return error_response(
+                f"A {in_flight.get_action_display().lower()} is already running for this booth.",
+                status_code=409,
+            )
+
+        job = BoothDeployJob.objects.create(
+            machine=machine, action=action, requested_by=request.user,
+            to_version=get_code_version(),
+        )
+        return success_response(
+            data=BoothDeployJobSerializer(job).data,
+            message="Queued", status_code=201,
+        )
+
+
+class AdminBoothJobDetailView(APIView):
+    """Poll one job for its status and transcript while it runs."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        try:
+            job = BoothDeployJob.objects.select_related(
+                'machine', 'machine__lane', 'requested_by',
+            ).get(pk=pk)
+        except BoothDeployJob.DoesNotExist:
+            return error_response("Job not found", status_code=404)
+        return success_response(data=BoothDeployJobSerializer(job).data)
+
+
+class AdminBoothJobListView(APIView):
+    """Recent deploy history, newest first."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        jobs = (
+            BoothDeployJob.objects
+            .select_related('machine', 'machine__lane', 'requested_by')
+            .all()[:50]
+        )
+        return success_response(data=BoothDeployJobListSerializer(jobs, many=True).data)
+
+
+def _attach_active_jobs(machines):
+    """Cache each machine's in-flight job on the instance for the serializer.
+
+    One query for all of them — a per-row lookup would be 21 queries on a page
+    the operator refreshes while watching a deploy.
+    """
+    if not machines:
+        return
+    active = (
+        BoothDeployJob.objects
+        .filter(
+            machine__in=machines,
+            status__in=[BoothJobStatus.PENDING, BoothJobStatus.RUNNING],
+        )
+        .order_by('machine_id', '-requested_at')
+    )
+    by_machine = {}
+    for job in active:
+        by_machine.setdefault(job.machine_id, job)
+    for machine in machines:
+        machine.active_job_cached = by_machine.get(machine.id)

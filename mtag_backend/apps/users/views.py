@@ -10,8 +10,9 @@ from .serializers import (
     RegisterSerializer, LoginSerializer, UserDetailSerializer, UserListSerializer,
     SelfProfileUpdateSerializer,
 )
-from .models import OtpPurpose, User
-from .permissions import IsAdmin, is_privileged
+from django.db.models import Q
+from .models import OtpPurpose, User, UserRole
+from .permissions import IsAdmin, IsOperator, is_privileged
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class RegisterView(APIView):
         )
         if not (is_privileged(request.user) or self_signup_allowed):
             return error_response(
-                "Self-registration is not available. M-Tag accounts are created "
+                "Self-registration is not available. ME-Tag accounts are created "
                 "at a toll booth — please visit a booth or contact support.",
                 status_code=403,
             )
@@ -165,10 +166,30 @@ class MeView(APIView):
 
 
 class AdminUserListView(APIView):
-    permission_classes = [IsAdmin]
+    """The admin Users page, and the owner lookup on the ME-Tag Registration page.
+
+    Operators get the lookup only: a search term is required, so a booth account
+    cannot use this to pull every consumer's name and phone number in one call.
+
+    search/role/status used to be ignored, so the registration lookup took the
+    newest account in the system as the "found" owner whatever phone was typed.
+    """
+    permission_classes = [IsOperator]
 
     def get(self, request):
+        search = request.query_params.get('search', '').strip()
+        if request.user.user_role != UserRole.ADMIN and not search:
+            return error_response("A search term is required", status_code=403)
+
         users = User.objects.all().order_by('-id')
+        if search:
+            users = users.filter(Q(phone__icontains=search) | Q(full_name__icontains=search))
+        role = request.query_params.get('role')
+        if role:
+            users = users.filter(user_role=role)
+        user_status = request.query_params.get('status')
+        if user_status:
+            users = users.filter(status=user_status)
         serializer = UserListSerializer(users, many=True)
         return success_response(data=serializer.data)
 
@@ -291,7 +312,7 @@ class OtpRequestView(APIView):
         # Reported plainly — see request_code for why enumeration is the right trade here.
         return error_response(
             {
-                'no_account': 'No M-Tag account exists for this number. Accounts are '
+                'no_account': 'No ME-Tag account exists for this number. Accounts are '
                               'created at a toll booth when your tag is fitted.',
                 'blocked': 'This account is blocked. Contact support.',
             }.get(result['reason'], 'Could not send the verification code.'),

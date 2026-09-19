@@ -12,8 +12,10 @@
 #     truth for those; the booth script clears them precisely so the sync agent
 #     can refill them FROM master. Doing that here would wipe the network.
 #   * No mtag-sync process. Master is the sync SOURCE, so it never syncs — that
-#     is enforced by ecosystem.master.config.js defining only mtag-master, NOT
-#     by any setting. ANPR_GATE_ENABLED=False only stops the ANPR gate.
+#     is enforced by ecosystem.master.config.js never defining mtag-sync or
+#     mtag-gate, NOT by any setting. ANPR_GATE_ENABLED=False only stops the ANPR
+#     gate. Master does run a second app, mtag-deploy: the worker that pushes
+#     code to booths when an operator asks for it in the portal.
 #   * Runs gunicorn via ecosystem.master.config.js, not `manage.py runserver`.
 #
 # Safe to re-run — venv/DB/pm2 steps are idempotent, and an existing SECRET_KEY
@@ -96,6 +98,13 @@ OLD_OTP_PUSH_TO_REQUESTING_DEVICE="$(old_env OTP_PUSH_TO_REQUESTING_DEVICE)"
 : "${OLD_OTP_PUSH_TO_REQUESTING_DEVICE:=False}"
 OLD_OTP_PUSH_SUPPRESSES_SMS="$(old_env OTP_PUSH_SUPPRESSES_SMS)"
 : "${OLD_OTP_PUSH_SUPPRESSES_SMS:=False}"
+# Credentials mtag-deploy uses to SSH into a booth. Carried forward for the same
+# reason as the keys above: a redeploy that blanked them would leave every
+# portal-triggered booth update failing on authentication.
+OLD_BOOTH_SSH_USER="$(old_env BOOTH_SSH_USER)"
+: "${OLD_BOOTH_SSH_USER:=${BOOTH_SSH_USER:-iteck}}"
+OLD_BOOTH_SSH_PASSWORD="$(old_env BOOTH_SSH_PASSWORD)"
+: "${OLD_BOOTH_SSH_PASSWORD:=${BOOTH_SSH_PASSWORD:-}}"
 
 if [ -f .env ] && grep -q '^SECRET_KEY=..*' .env; then
   SECRET_KEY="$(grep '^SECRET_KEY=' .env | head -1 | cut -d= -f2-)"
@@ -134,6 +143,13 @@ MASTER_DB_PASSWORD=${DB_PASSWORD}
 # process (see ecosystem.master.config.js) — that is what keeps it from syncing
 # against itself.
 ANPR_GATE_ENABLED=False
+
+# ── Booth code updates (portal → mtag-deploy → booth) ───────────────────────
+# The account the deploy worker SSHes into a booth as, and its password. Same
+# shared credentials deploy_booths.sh uses. Leave the password empty to use SSH
+# keys instead — then master's key must be in each booth's authorized_keys.
+BOOTH_SSH_USER=${OLD_BOOTH_SSH_USER}
+BOOTH_SSH_PASSWORD=${OLD_BOOTH_SSH_PASSWORD}
 
 JAZZCASH_MERCHANT_ID=${OLD_JAZZCASH_MERCHANT_ID}
 JAZZCASH_PASSWORD=${OLD_JAZZCASH_PASSWORD}
@@ -388,6 +404,16 @@ else
 fi
 
 # ── 6. PM2 ────────────────────────────────────────────────────────────────
+# sshpass is how mtag-deploy authenticates to a booth when BOOTH_SSH_PASSWORD is
+# set in master's .env. Without it every portal-triggered booth update fails on a
+# password prompt no one can answer. Best effort — a master using SSH keys
+# instead does not need it, and broken apt sources must not stop the bootstrap.
+if ! command -v sshpass >/dev/null 2>&1; then
+  echo "--- installing sshpass (booth deploys) ---"
+  sudo apt-get install -y sshpass || \
+    echo "!!! sshpass install failed — portal booth updates need it unless master uses SSH keys" >&2
+fi
+
 if ! command -v pm2 >/dev/null 2>&1; then
   echo "--- pm2 not found — installing Node.js + PM2 ---"
   sudo apt-get install -y nodejs npm
@@ -395,7 +421,7 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 echo "--- starting PM2 (gunicorn) ---"
-pm2 delete mtag-master >/dev/null 2>&1 || true
+pm2 delete mtag-master mtag-deploy >/dev/null 2>&1 || true
 pm2 start ecosystem.master.config.js
 pm2 save
 

@@ -14,7 +14,7 @@ class MTagApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'M-Tag',
+      title: 'ME-Tag',
       debugShowCheckedModeBanner: false,
       routerConfig: router,
 
