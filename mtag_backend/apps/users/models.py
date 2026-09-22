@@ -2,6 +2,7 @@ import uuid
 from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from .cnic import normalize_cnic
 from .managers import UserManager
 
 
@@ -59,6 +60,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.full_name} ({self.phone})"
+
+    def save(self, *args, **kwargs):
+        self.cnic = normalize_cnic(self.cnic) or None
+        super().save(*args, **kwargs)
 
 
 class OtpPurpose(models.TextChoices):

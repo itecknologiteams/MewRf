@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, User, Phone, CreditCard, CheckCircle, Wallet } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { accountsApi, type CashTopupResult, type TopupLookupResult } from '@/services/api';
+import { formatCnic } from '@/lib/cnic';
 
 interface InventoryActivationModalProps {
   tag: {
@@ -17,14 +18,6 @@ interface InventoryActivationModalProps {
 }
 
 const PRESETS = [500, 1000, 2000, 5000];
-
-// Format digits into CNIC XXXXX-XXXXXXX-X (UI only; digits-only sent to API).
-const formatCnic = (raw: string) => {
-  const d = raw.replace(/\D/g, '').slice(0, 13);
-  if (d.length <= 5) return d;
-  if (d.length <= 12) return `${d.slice(0, 5)}-${d.slice(5)}`;
-  return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12)}`;
-};
 
 export default function InventoryActivationModal({
   tag,

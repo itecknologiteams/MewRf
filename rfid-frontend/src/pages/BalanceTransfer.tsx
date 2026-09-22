@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useToast } from '@/context/ToastContext';
 import { vehiclesApi, accountsApi } from '@/services/api';
+import { formatCnic } from '@/lib/cnic';
 import { normalizePlate } from '@/lib/plate';
 import type { Account } from '@/types';
 import {
@@ -341,7 +342,7 @@ export default function BalanceTransfer() {
                 <input
                   type="text"
                   value={cnic}
-                  onChange={(e) => setCnic(e.target.value)}
+                  onChange={(e) => setCnic(formatCnic(e.target.value))}
                   placeholder="35201-1234567-8"
                   className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                 />

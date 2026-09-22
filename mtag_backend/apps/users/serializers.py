@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
+from .cnic import normalize_cnic
 from .models import User
 
 
@@ -11,6 +12,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['full_name', 'phone', 'cnic', 'password']
+
+    def validate_cnic(self, value):
+        return normalize_cnic(value)
 
     def create(self, validated_data):
         if 'password' not in validated_data:
@@ -50,6 +54,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'uuid', 'full_name', 'phone', 'cnic', 'user_role', 'status', 'created_at']
         read_only_fields = ['id', 'uuid', 'created_at']
 
+    def validate_cnic(self, value):
+        return normalize_cnic(value)
+
 
 class SelfProfileUpdateSerializer(serializers.ModelSerializer):
     """What a user may change about THEMSELVES via PATCH /auth/me/.
@@ -69,6 +76,9 @@ class SelfProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['full_name', 'cnic']
+
+    def validate_cnic(self, value):
+        return normalize_cnic(value)
 
 
 class UserListSerializer(serializers.ModelSerializer):

@@ -2,6 +2,7 @@ import uuid
 import logging
 from decimal import Decimal
 from django.db import transaction as db_transaction
+from apps.users.cnic import normalize_cnic
 from apps.vehicles.models import Tag, TagStatus
 from .models import Account, Transaction, TransactionType, TransactionStatus
 
@@ -34,7 +35,7 @@ class TransferService:
 
         # ── KYC — verify against the source vehicle's registered owner ────────
         owner = source_account.user
-        stored_cnic = (owner.cnic or '').strip()
+        stored_cnic = normalize_cnic(owner.cnic)
         if not stored_cnic:
             return {
                 'success': False,
@@ -44,7 +45,7 @@ class TransferService:
 
         phone_ok = (owner.phone or '').strip() == phone.strip()
         name_ok = (owner.full_name or '').strip().lower() == name.strip().lower()
-        cnic_ok = stored_cnic.lower() == cnic.strip().lower()
+        cnic_ok = stored_cnic == normalize_cnic(cnic)
 
         if not phone_ok:
             logger.warning("KYC phone mismatch — owner %s", owner.id)

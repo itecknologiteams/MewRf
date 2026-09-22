@@ -102,12 +102,19 @@ class CashTopupView(APIView):
             Tag, TagStatus, Vehicle, VehicleType, UnregisteredInventory,
             UnregisteredInventoryStatus, TagActivation, default_tag_expiry,
         )
+        from apps.users.cnic import normalize_cnic
         from apps.users.models import User
 
         tid = _norm_tid(request.data.get('tid'))
         epc = (request.data.get('epc') or '').strip()
         name = (request.data.get('consumer_name') or '').strip()
-        cnic = (request.data.get('cnic') or '').strip()
+        try:
+            cnic = normalize_cnic(request.data.get('cnic'))
+        except Exception as exc:
+            messages = getattr(exc, 'messages', None)
+            if messages:
+                return error_response(str(messages[0]))
+            return error_response(str(exc))
         phone = (request.data.get('phone') or '').strip()
         plate_raw = (request.data.get('vehicle_reg') or '').strip()
         vehicle_type = (request.data.get('vehicle_type') or '').strip().lower()
