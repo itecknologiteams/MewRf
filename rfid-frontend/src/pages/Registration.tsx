@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { vehiclesApi, authApi } from '@/services/api';
+import { formatCnic } from '@/lib/cnic';
 import { normalizePlate } from '@/lib/plate';
 import type { MeResponse, TagScanLookup } from '@/services/api';
 import {
@@ -472,7 +473,7 @@ export default function Registration() {
                         <input
                           type="text"
                           value={newCnic}
-                          onChange={(e) => setNewCnic(e.target.value)}
+                          onChange={(e) => setNewCnic(formatCnic(e.target.value))}
                           placeholder="35201-1234567-8"
                           className="w-full px-4 py-3 bg-elevated border border-line rounded-xl text-sm text-ink placeholder:text-ink-subtle outline-none focus:border-brand focus:ring-2 focus:ring-brand/35 transition-all"
                         />

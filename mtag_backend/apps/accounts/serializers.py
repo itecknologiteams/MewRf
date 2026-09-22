@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Account, Transaction
 from apps.vehicles.models import Vehicle
+from apps.users.cnic import normalize_cnic
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -40,4 +41,5 @@ class TransferSerializer(serializers.Serializer):
     def validate(self, data):
         if data['source_vehicle_id'] == data['target_vehicle_id']:
             raise serializers.ValidationError("Source and target vehicle must be different.")
+        data['cnic'] = normalize_cnic(data.get('cnic'), required=True)
         return data
