@@ -42,6 +42,10 @@ enforce(
     debug=DEBUG,
     allowed_hosts=ALLOWED_HOSTS,
     otp_push_to_requesting_device=OTP_PUSH_TO_REQUESTING_DEVICE,  # noqa: F405
+    # `scoped_otp_dev_push_permitted` is deliberately NOT passed: the test-number
+    # exemption config.settings.lan has does not exist here, because no number on an
+    # internet-facing payment API is a test number.
+    otp_dev_push_phones=OTP_DEV_PUSH_PHONES,  # noqa: F405
     cors_allow_all_origins=globals().get('CORS_ALLOW_ALL_ORIGINS', False),
     cors_allow_credentials=CORS_ALLOW_CREDENTIALS,  # noqa: F405
 )

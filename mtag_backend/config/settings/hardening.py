@@ -40,6 +40,8 @@ def enforce(
     debug,
     allowed_hosts,
     otp_push_to_requesting_device,
+    otp_dev_push_phones=(),
+    scoped_otp_dev_push_permitted=False,
     cors_allow_all_origins=False,
     cors_allow_credentials=False,
 ):
@@ -81,13 +83,38 @@ def enforce(
             f"control. List this node's real hostnames and IPs instead."
         )
 
-    if otp_push_to_requesting_device:
+    # The dev OTP push is the one check with a way through, because the alternative
+    # was worse: there is no SMS gateway yet, so refusing it outright left the only
+    # real-phone test of onboarding impossible, and the pressure then goes on the
+    # guard rather than on the hole. The way through is an explicit list of test
+    # numbers — with it set, a request for any other number falls back to SMS, so the
+    # takeover reaches only handsets the operator controls. Production gets no such
+    # door: nothing there is a test account.
+    if otp_push_to_requesting_device and not scoped_otp_dev_push_permitted:
         raise ImproperlyConfigured(
             f"OTP_PUSH_TO_REQUESTING_DEVICE is enabled {where}. It delivers the "
             f"verification code to whichever device asked for it, so knowing a "
             f"customer's phone number is enough to receive their code, set a new "
-            f"password and empty their wallet. Development only — unset it, and set "
-            f"SMS_BACKEND for real delivery."
+            f"password and empty their wallet. There is no test-number exemption "
+            f"here — unset it, and set SMS_BACKEND for real delivery."
+        )
+
+    # Blank entries dropped before the list is judged non-empty. `OTP_DEV_PUSH_PHONES=`
+    # already parses to [], but a value of spaces parses to [' '] — truthy here, and
+    # discarded later by the matcher in otp_service, which would leave the mode booting
+    # and running UNFENCED. That is the one failure this check exists to prevent, so it
+    # must count the same entries the matcher will.
+    if otp_push_to_requesting_device and not [
+        entry for entry in otp_dev_push_phones if str(entry).strip()
+    ]:
+        raise ImproperlyConfigured(
+            f"OTP_PUSH_TO_REQUESTING_DEVICE is enabled {where} with no "
+            f"OTP_DEV_PUSH_PHONES. Unfenced it delivers the verification code to "
+            f"whichever device asked for it, so knowing ANY customer's phone number "
+            f"is enough to receive their code, set a new password and empty their "
+            f"wallet. List the handsets under test — nothing else can then reach the "
+            f"mode:\n"
+            f"  OTP_DEV_PUSH_PHONES=03001234567,03009876543"
         )
 
     if cors_allow_all_origins and cors_allow_credentials:

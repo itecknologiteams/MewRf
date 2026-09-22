@@ -100,15 +100,51 @@ def _push_code(user, code: str, purpose: str) -> int:
         return 0
 
 
+def _dev_push_allowed_for(phone: str) -> bool:
+    """Is this number one of the handsets under test?
+
+    The fence around the dev push, and the reason the mode can be on at all outside a dev
+    box. Nothing about an OTP request establishes that the caller's handset belongs to the
+    number they typed, so the mode has to be narrowed by something the CALLER cannot
+    choose — and the number being asked about is exactly that.
+
+    A number not on the list is not refused a code; it falls back to SMS/console as if the
+    mode were off. So the takeover shape in the module docstring stays reachable only for
+    the accounts the operator deliberately exposed.
+
+    An empty list means unfenced. `config.settings.lan` refuses to boot in that state (see
+    config/settings/hardening.py) and `config.settings.production` refuses the mode
+    outright, so "empty allows everything" is reachable only under `config.settings.local`,
+    where the database holds nothing worth taking.
+    """
+    allowed = {
+        normalize_phone(entry)
+        for entry in getattr(settings, 'OTP_DEV_PUSH_PHONES', [])
+        if entry and entry.strip()
+    }
+    if not allowed:
+        return True
+    if normalize_phone(phone) in allowed:
+        return True
+    # INFO, not WARNING: on a server in this mode every real customer takes this path, so
+    # it is the ordinary case, and logging it loudly would bury the WARNING that marks an
+    # actual dev delivery.
+    logger.info(
+        'Dev OTP push not offered for %s — not in OTP_DEV_PUSH_PHONES; using SMS', phone
+    )
+    return False
+
+
 def _push_code_to_requesting_device(
     device_token: str, code: str, purpose: str
 ) -> bool:
-    """DEV ONLY. Push the code to whatever device asked for it.
+    """TESTING ONLY. Push the code to whatever device asked for it.
 
-    Off unless `OTP_PUSH_TO_REQUESTING_DEVICE` is set, and `config.settings.production`
-    refuses to start with it on — because in production this IS the account-takeover path
-    described in the module docstring. Nothing about the request establishes that the
-    caller's handset belongs to the number they typed.
+    Off unless `OTP_PUSH_TO_REQUESTING_DEVICE` is set, and then reachable only for the
+    numbers in `OTP_DEV_PUSH_PHONES` (see `_dev_push_allowed_for`). `config.settings.lan`
+    refuses to start with the mode on and no such list; `config.settings.production`
+    refuses to start with it on at all — because for any account that is not a handset
+    under test, this IS the account-takeover path described in the module docstring.
 
     It exists because there is no SMS gateway yet: the console sender writes the code to the
     server log, which is fine for a curl-driven test and useless for exercising the real app
@@ -208,11 +244,16 @@ def request_code(
     if pushed:
         channels.append('push')
 
-    # DEV ONLY, and only when the bound-device push above found nothing — a fresh install,
-    # which is the case the console sender cannot help with on a real phone.
+    # TESTING ONLY, and only when the bound-device push above found nothing — a fresh
+    # install, which is the case the console sender cannot help with on a real phone.
+    #
+    # `_dev_push_allowed_for` is the fence and is checked HERE rather than inside the
+    # sender, so the settings flag alone can never deliver: a number that is not under
+    # test falls through to the SMS branch below exactly as if the mode were off.
     if (
         not pushed
         and getattr(settings, 'OTP_PUSH_TO_REQUESTING_DEVICE', False)
+        and _dev_push_allowed_for(phone)
         and _push_code_to_requesting_device(device_token, code, purpose)
     ):
         channels.append('push_dev')

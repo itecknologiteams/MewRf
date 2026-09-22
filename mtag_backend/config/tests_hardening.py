@@ -65,6 +65,52 @@ class HardeningGuardTests(SimpleTestCase):
         ):
             enforce(**_with(otp_push_to_requesting_device=True))
 
+    def test_otp_takeover_mode_is_refused_unfenced_even_where_it_is_permitted(self):
+        """The test-number list is the whole reason the mode is allowed to run.
+
+        Without it, `scoped_otp_dev_push_permitted` would just be the old blanket
+        takeover wearing a longer name.
+        """
+        with self.assertRaisesMessage(ImproperlyConfigured, 'OTP_DEV_PUSH_PHONES'):
+            enforce(**_with(
+                otp_push_to_requesting_device=True,
+                scoped_otp_dev_push_permitted=True,
+            ))
+
+    def test_a_blank_test_number_list_does_not_count_as_fenced(self):
+        """`OTP_DEV_PUSH_PHONES=' '` parses to [' '] — truthy, but it fences nothing.
+
+        The matcher in otp_service discards blank entries, so accepting this here would
+        boot a server that believes it is fenced and delivers to every number.
+        """
+        with self.assertRaisesMessage(ImproperlyConfigured, 'OTP_DEV_PUSH_PHONES'):
+            enforce(**_with(
+                otp_push_to_requesting_device=True,
+                scoped_otp_dev_push_permitted=True,
+                otp_dev_push_phones=['   ', ''],
+            ))
+
+    def test_otp_takeover_mode_boots_when_fenced_to_test_numbers(self):
+        enforce(**_with(
+            otp_push_to_requesting_device=True,
+            scoped_otp_dev_push_permitted=True,
+            otp_dev_push_phones=['03001112233'],
+        ))
+
+    def test_a_test_number_list_does_not_unlock_the_mode_in_production(self):
+        """config.settings.production never passes `scoped_otp_dev_push_permitted`.
+
+        Asserted here rather than left to that module because the list is the kind of
+        thing that gets copied between .env files, and on an internet-facing payment
+        API no number is a test number.
+        """
+        with self.assertRaisesMessage(ImproperlyConfigured, 'no test-number exemption'):
+            enforce(**_with(
+                settings_module='config.settings.production',
+                otp_push_to_requesting_device=True,
+                otp_dev_push_phones=['03001112233'],
+            ))
+
     def test_open_cors_with_credentials_is_refused(self):
         with self.assertRaisesMessage(ImproperlyConfigured, 'CORS_ALLOW_ALL_ORIGINS'):
             enforce(**_with(cors_allow_all_origins=True, cors_allow_credentials=True))
@@ -98,6 +144,13 @@ class LiveSettingsTests(SimpleTestCase):
             debug=settings.DEBUG,
             allowed_hosts=settings.ALLOWED_HOSTS,
             otp_push_to_requesting_device=settings.OTP_PUSH_TO_REQUESTING_DEVICE,
+            otp_dev_push_phones=getattr(settings, 'OTP_DEV_PUSH_PHONES', []),
+            # Mirrors the one module that grants it, so running the suite under `lan`
+            # with the dev push fenced to test numbers is a pass, and running it under
+            # any other deployed module with the mode on is still a failure.
+            scoped_otp_dev_push_permitted=(
+                settings.SETTINGS_MODULE == 'config.settings.lan'
+            ),
             cors_allow_all_origins=getattr(settings, 'CORS_ALLOW_ALL_ORIGINS', False),
             cors_allow_credentials=getattr(settings, 'CORS_ALLOW_CREDENTIALS', False),
         )

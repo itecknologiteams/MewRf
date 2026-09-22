@@ -282,8 +282,9 @@ class OtpRequestView(APIView):
     def post(self, request):
         from .otp_service import request_code
 
-        # `device_token` is IGNORED unless OTP_PUSH_TO_REQUESTING_DEVICE is on, which is a
-        # dev-only setting that production settings refuse to boot with. Accepting the field
+        # `device_token` is IGNORED unless OTP_PUSH_TO_REQUESTING_DEVICE is on AND this
+        # phone is one of the test numbers in OTP_DEV_PUSH_PHONES — a testing-only mode
+        # config.settings.production refuses to boot with at all. Accepting the field
         # unconditionally keeps the client identical across environments; what changes is
         # whether the server is willing to act on it.
         purpose = _otp_purpose(request)

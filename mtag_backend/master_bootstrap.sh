@@ -94,10 +94,15 @@ OLD_FCM_PROJECT_ID="$(old_env FCM_PROJECT_ID)"
 OLD_FCM_CREDENTIALS_FILE="$(old_env FCM_CREDENTIALS_FILE)"
 OLD_USER_SELF_REGISTRATION_ENABLED="$(old_env USER_SELF_REGISTRATION_ENABLED)"
 : "${OLD_USER_SELF_REGISTRATION_ENABLED:=False}"
-OLD_OTP_PUSH_TO_REQUESTING_DEVICE="$(old_env OTP_PUSH_TO_REQUESTING_DEVICE)"
-: "${OLD_OTP_PUSH_TO_REQUESTING_DEVICE:=False}"
 OLD_OTP_PUSH_SUPPRESSES_SMS="$(old_env OTP_PUSH_SUPPRESSES_SMS)"
 : "${OLD_OTP_PUSH_SUPPRESSES_SMS:=False}"
+# The dev OTP push and the list of test numbers it is confined to. Carried forward
+# TOGETHER and never one without the other: config.settings.lan refuses to boot with
+# the mode on and the list empty, so a redeploy that preserved only the flag would
+# write an .env that crash-loops gunicorn.
+OLD_OTP_PUSH_TO_REQUESTING_DEVICE="$(old_env OTP_PUSH_TO_REQUESTING_DEVICE)"
+: "${OLD_OTP_PUSH_TO_REQUESTING_DEVICE:=False}"
+OLD_OTP_DEV_PUSH_PHONES="$(old_env OTP_DEV_PUSH_PHONES)"
 # Credentials mtag-deploy uses to SSH into a booth. Carried forward for the same
 # reason as the keys above: a redeploy that blanked them would leave every
 # portal-triggered booth update failing on authentication.
@@ -168,16 +173,26 @@ FCM_CREDENTIALS_FILE=${OLD_FCM_CREDENTIALS_FILE}
 USER_SELF_REGISTRATION_ENABLED=${OLD_USER_SELF_REGISTRATION_ENABLED}
 
 # ── OTP delivery ─────────────────────────────────────────────────────────────
-# Both listed here so a deploy PRESERVES them. This file is rewritten wholesale on
-# every run, and only keys named in this template survive — a value appended by hand
-# is silently dropped on the next deploy, which is exactly how dev OTP push stopped
+# Listed here so a deploy PRESERVES them. This file is rewritten wholesale on every
+# run, and only keys named in this template survive — a value appended by hand is
+# silently dropped on the next deploy, which is exactly how dev OTP push stopped
 # working after appearing to have been configured correctly.
 #
-# DEVELOPMENT ONLY. Delivers the code to whatever device asked for it, which in
-# production is a one-step account takeover: nothing about the request proves the
-# caller's handset belongs to the number they typed. config.settings.production
-# refuses to boot with it on.
+# TESTING ONLY, and the two lines below are a PAIR. The mode delivers the code to
+# whatever device asked for it; OTP_DEV_PUSH_PHONES is what stops that being a
+# one-step takeover of every account on the system, by confining it to the handsets
+# actually under test — any other number falls back to SMS as if the mode were off.
+#
+# Master runs config.settings.lan, which refuses to boot with the mode on and the
+# list empty (config/settings/hardening.py). So: set both, or neither. Master is also
+# reachable from the internet as api.maliroperations.com, not just from the plaza
+# LAN, so every number on this list is exposed to anyone who knows it — keep the list
+# to the handsets being tested and empty it when testing ends.
+#
+# Leave the mode off and the console SMS backend writes every code to the log instead:
+#     pm2 logs mtag-master | grep SMS:console
 OTP_PUSH_TO_REQUESTING_DEVICE=${OLD_OTP_PUSH_TO_REQUESTING_DEVICE}
+OTP_DEV_PUSH_PHONES=${OLD_OTP_DEV_PUSH_PHONES}
 
 # Skip the SMS when a push demonstrably reached a device already bound to the
 # account. Off by default: a bound device may be one the holder no longer carries,

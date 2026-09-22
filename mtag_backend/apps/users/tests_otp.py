@@ -589,6 +589,48 @@ class OtpDevPushToRequestingDeviceTest(TestCase):
         self.assertEqual(destinations, ['caller-supplied-token'])
         self.assertIn('push_dev', response.data['data']['channels'])
 
+    @override_settings(
+        OTP_PUSH_TO_REQUESTING_DEVICE=True,
+        OTP_DEV_PUSH_PHONES=['03009998877'],
+    )
+    def test_a_number_not_under_test_gets_no_dev_push(self):
+        """The fence, and the only reason this mode may run on a deployed server.
+
+        With a list set, every account that is not on it behaves as if the mode were
+        off — so an attacker who knows a real customer's number gets nothing back but
+        an SMS sent to the SIM, which is the safe path.
+        """
+        with self._fcm() as destinations:
+            response = self.client.post(
+                '/api/v1/auth/otp/request/',
+                {'phone': '03001112233', 'device_token': 'caller-supplied-token'},
+                format='json',
+            )
+
+        self.assertEqual(destinations, [])
+        self.assertNotIn('push_dev', response.data['data']['channels'])
+        self.assertIn('console', response.data['data']['channels'])
+
+    @override_settings(
+        OTP_PUSH_TO_REQUESTING_DEVICE=True,
+        OTP_DEV_PUSH_PHONES=['0300-111-2233', '03009998877'],
+    )
+    def test_a_listed_number_still_gets_the_dev_push_however_it_is_punctuated(self):
+        """The list goes through the same normalisation as the requested number.
+
+        Spaces and dashes only — `+923001112233` would NOT match this account, which is
+        why the setting's comment says to write the number as the account stores it.
+        """
+        with self._fcm() as destinations:
+            response = self.client.post(
+                '/api/v1/auth/otp/request/',
+                {'phone': '03001112233', 'device_token': 'caller-supplied-token'},
+                format='json',
+            )
+
+        self.assertEqual(destinations, ['caller-supplied-token'])
+        self.assertIn('push_dev', response.data['data']['channels'])
+
     @override_settings(OTP_PUSH_TO_REQUESTING_DEVICE=True)
     def test_a_bound_device_still_wins_over_the_dev_path(self):
         """The safe channel takes precedence wherever it can work.

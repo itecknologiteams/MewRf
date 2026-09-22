@@ -335,21 +335,44 @@ TWILIO_FROM = env('TWILIO_FROM', default='')
 # distinction is an account takeover rather than a nicety.
 OTP_PUSH_SUPPRESSES_SMS = env.bool('OTP_PUSH_SUPPRESSES_SMS', default=False)
 
-# DEVELOPMENT ONLY. Push the OTP to whatever device asked for it.
+# TESTING ONLY. Push the OTP to whatever device asked for it.
 #
-# `config.settings.production` raises at import if this is on, because in production it is a
-# one-step account takeover: an OTP proves possession of a phone NUMBER, and a code sent to
-# the requester's own handset proves only that they installed the app. Anyone knowing a
-# customer's number could receive their code, set a new password and take the wallet.
+# Unrestricted, this is a one-step account takeover: an OTP proves possession of a phone
+# NUMBER, and a code sent to the requester's own handset proves only that they installed the
+# app. Anyone knowing a customer's number could receive their code, set a new password and
+# take the wallet.
 #
 # It exists because there is no SMS gateway yet. The console sender writes the code to the
 # server log, which is fine for curl and useless for exercising the real app on a real
 # phone — so this makes the whole onboarding flow testable end to end until a gateway is
 # contracted, at which point it goes back off and SMS becomes the channel of record.
 #
+# On a DEPLOYED server it is allowed only alongside OTP_DEV_PUSH_PHONES below, which is what
+# keeps the takeover off every account that is not a test account:
+#
+#   config.settings.local       any number; a dev box has nothing to take over.
+#   config.settings.lan         only the numbers in OTP_DEV_PUSH_PHONES. Refuses to boot
+#                               with this on and that list empty.
+#   config.settings.production  refused outright, list or no list.
+#
 # Only ever consulted when the account has NO already-bound device; a returning holder gets
 # the safe `send_to_user` path instead. Every use logs a WARNING.
 OTP_PUSH_TO_REQUESTING_DEVICE = env.bool('OTP_PUSH_TO_REQUESTING_DEVICE', default=False)
+
+# The numbers allowed to receive a code on the device that asked for it. Comma-separated.
+#
+# Matched after the same normalisation the OTP endpoints apply, which strips spaces and
+# dashes and nothing else — so 0300-111-2233 and 03001112233 are one entry, while
+# +923001112233 is a DIFFERENT one. Write each number exactly as the account is stored, or
+# the fence silently never matches and the handset falls back to SMS.
+#
+# This is the fence, not a convenience: with it set, a request for any OTHER number falls
+# back to SMS/console exactly as if the mode were off, so the takeover reaches only handsets
+# you control. Empty means unfenced, which only `config.settings.local` will start with.
+#
+# Keep it to the handsets actually being tested, and shorten it as testing ends — every
+# number on this list is an account anyone who knows the number can take over.
+OTP_DEV_PUSH_PHONES = env.list('OTP_DEV_PUSH_PHONES', default=[])
 
 # ── API documentation (drf-spectacular) ──────────────────────────────────────
 #
