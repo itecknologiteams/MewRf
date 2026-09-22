@@ -89,6 +89,8 @@ export default function BoothDeploymentsPage() {
 
   const [confirmRemove, setConfirmRemove] = useState<BoothDeployment | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [confirmUpdateAll, setConfirmUpdateAll] = useState(false);
+  const [isQueueingAll, setIsQueueingAll] = useState(false);
 
   // Job transcript drawer
   const [openJob, setOpenJob] = useState<BoothDeployJob | null>(null);
@@ -243,6 +245,41 @@ export default function BoothDeploymentsPage() {
     }
   };
 
+  const updateAllTargets = useMemo(
+    () => rows.filter((row) => row.id && !row.active_job),
+    [rows],
+  );
+
+  const handleUpdateAll = async () => {
+    if (updateAllTargets.length === 0) return;
+    setIsQueueingAll(true);
+    const targetIds = updateAllTargets.map((row) => row.id as number);
+    setQueueing((ids) => Array.from(new Set([...ids, ...targetIds])));
+    try {
+      const results = await Promise.allSettled(
+        updateAllTargets.map((row) => boothsApi.queueJob(row.id as number, 'update')),
+      );
+      const queued = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.length - queued;
+      addToast({
+        type: failed ? 'error' : 'success',
+        title: failed ? 'Some updates failed to queue' : 'Updates queued',
+        message: failed
+          ? `${queued} booth${queued === 1 ? '' : 's'} queued, ${failed} failed.`
+          : `${queued} booth${queued === 1 ? '' : 's'} queued for update.`,
+      });
+      const firstJob = results.find(
+        (result): result is PromiseFulfilledResult<BoothDeployJob> => result.status === 'fulfilled',
+      );
+      if (firstJob) setOpenJob(firstJob.value);
+      setConfirmUpdateAll(false);
+      fetchData({ quiet: true });
+    } finally {
+      setIsQueueingAll(false);
+      setQueueing((ids) => ids.filter((id) => !targetIds.includes(id)));
+    }
+  };
+
   const openHistory = async () => {
     setShowHistory(true);
     try {
@@ -270,6 +307,15 @@ export default function BoothDeploymentsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setConfirmUpdateAll(true)}
+            disabled={updateAllTargets.length === 0 || isQueueingAll}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-on text-sm font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+            title={updateAllTargets.length === 0 ? 'No configured idle booths to update' : 'Queue updates for every configured booth'}
+          >
+            {isQueueingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Update All
+          </button>
           <button
             onClick={openHistory}
             className="flex items-center gap-2 px-4 py-2.5 bg-elevated border border-line text-ink-muted text-sm font-medium rounded-xl hover:bg-surface transition-colors"
@@ -571,6 +617,45 @@ export default function BoothDeploymentsPage() {
               >
                 {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update all confirm */}
+      {confirmUpdateAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in-up" onClick={() => !isQueueingAll && setConfirmUpdateAll(false)}>
+          <div className="bg-surface border border-line rounded-2xl skeu-card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-brand/10 rounded-full flex items-center justify-center">
+                <Download className="w-5 h-5 text-brand" />
+              </div>
+              <div>
+                <p className="font-semibold text-ink">Update All Booths?</p>
+                <p className="text-xs text-ink-muted">
+                  {updateAllTargets.length} configured booth{updateAllTargets.length === 1 ? '' : 's'} will be queued.
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-ink-muted mb-5">
+              This will ask every idle configured booth to download the latest code from master/GitHub and restart its PM2 services.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmUpdateAll(false)}
+                disabled={isQueueingAll}
+                className="flex-1 py-2.5 bg-elevated border border-line text-sm font-medium text-ink rounded-xl hover:bg-surface transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateAll}
+                disabled={isQueueingAll || updateAllTargets.length === 0}
+                className="flex-1 py-2.5 bg-brand text-brand-on text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isQueueingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Okay, Update
               </button>
             </div>
           </div>
