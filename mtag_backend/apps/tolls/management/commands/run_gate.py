@@ -24,6 +24,7 @@ from django.core.management.color import no_style
 from django.db import InterfaceError, OperationalError, close_old_connections, connections
 
 from apps.tolls import barrier as barrier_mod
+from apps.tolls import booth_activity
 
 # Ceiling on one continuous opening, however many vehicles keep extending it.
 # A lane that has been open this long is not a convoy any more — it is a fault,
@@ -397,6 +398,7 @@ class GateController:
         rssi_window=5, rssi_hysteresis=3.0, test_mode=False,
         barrier_service_url=barrier_mod.DEFAULT_SERVICE_URL,
         barrier_service_cycle=0.5, barrier_mode='auto', style=None,
+        record_activity=True,
     ):
         self.gate_mode     = gate_mode
         self.plaza_id      = plaza_id
@@ -449,6 +451,16 @@ class GateController:
         self._barrier_open        = False
         self._lock = threading.Lock()
         self._running = True
+
+        # Every read, decision and barrier command also goes to the local
+        # activity file, which is what the booth console at /booth/ draws. It is
+        # queue-backed and swallows its own errors, so nothing here can stall a
+        # lane — see apps/tolls/booth_activity.py. Tests construct controllers in
+        # bulk and want neither the thread nor the file, hence the switch.
+        self.activity = (
+            booth_activity.get_recorder() if record_activity
+            else booth_activity.NullRecorder()
+        )
 
         self.barrier = barrier_mod.BarrierBackend(
             serial_port=serial_port, serial_baud=serial_baud,
@@ -544,12 +556,20 @@ class GateController:
 
         if not first:
             self.stdout.write(f"[barrier] EXTENDING open window — {held:.1f}s left")
+            self.activity.record_barrier(
+                action='extend', source=source, backend=self.barrier.mode,
+                ok=True, detail=f"{held:.1f}s left",
+            )
             return True
 
         self.stdout.write(f"[barrier] HOLDING OPEN ({self.barrier.mode}) — {held:.1f}s")
         meta = {'lane': self.lane_id, 'mode': self.gate_mode}
         meta.update(metadata or {})
         ok = self.barrier.hold(meta, source=source)
+        self.activity.record_barrier(
+            action='hold', source=source, backend=self.barrier.mode, ok=ok,
+            detail=(metadata or {}).get('plate') or (metadata or {}).get('tagId') or '',
+        )
         threading.Thread(target=self._release_when_clear, daemon=True).start()
         return ok
 
@@ -577,7 +597,10 @@ class GateController:
             time.sleep(min(remaining, 0.2))
 
         self.stdout.write("[barrier] RELEASING")
-        return self.barrier.release()
+        ok = self.barrier.release()
+        self.activity.record_barrier(
+            action='release', source='gate', backend=self.barrier.mode, ok=ok)
+        return ok
 
     # ── Display ───────────────────────────────────────────────────────────────
 
@@ -722,6 +745,23 @@ class GateController:
             )
         return stage
 
+    def _rssi_snapshot(self, tid: str, rssi: float):
+        """The level the gate just decided on, and how many reads it came from.
+
+        `_rssi_stage` keeps this in `_rssi_hist`, but it returns only the stage —
+        and its return type is what the staging tests assert on, so it stays a
+        plain string. Peeking at the window afterwards gets the console the
+        median without changing that contract.
+
+        With filtering off the window is never populated, so the raw read is the
+        level and it stands on its own.
+        """
+        with self._rssi_lock:
+            hist = self._rssi_hist.get(tid)
+            if not hist:
+                return rssi, 1
+            return statistics.median(hist), len(hist)
+
     def _prune_tag_state(self, now_dt):
         """Drop per-tag bookkeeping for vehicles long gone. Caller holds _lock.
 
@@ -783,6 +823,16 @@ class GateController:
         _at_barrier — when the signal says the vehicle is actually there.
         """
         stage = self._rssi_stage(tid, rssi)
+        # Recorded BEFORE the 'ignore' return and before the 1-second dedup
+        # below, so the console shows every read the reader actually reported.
+        # A tag sitting too far out to act on is precisely what someone tuning
+        # rssi_detect needs to see; a history of only the reads that passed
+        # would answer the question by assuming it.
+        median, samples = self._rssi_snapshot(tid, rssi)
+        self.activity.record_read(
+            epc=epc, tid=tid, rssi=rssi, median=median,
+            samples=samples, stage=stage,
+        )
         if stage == 'ignore':
             return
 
@@ -829,6 +879,10 @@ class GateController:
             # off the UFD. The operator still gets it, once per approach.
             self.stdout.write(
                 f"[gate] In range, not chargeable — {preview.get('reason')} ({tid})")
+            self.activity.record_gate_event(
+                kind='preview', tid=tid, result='denied',
+                reason=preview.get('reason', ''),
+            )
             return
 
         balance = preview.get('current_balance', '0')
@@ -838,6 +892,11 @@ class GateController:
             f"balance: Rs.{balance}{short}"
         )
         self._last_tx = time.monotonic()
+        self.activity.record_gate_event(
+            kind='preview', tid=tid, plate=preview.get('vehicle', ''),
+            result='ok', balance=balance,
+            reason='' if preview.get('sufficient') else 'below minimum',
+        )
         self._show_balance(balance)
 
     # ── Stage 2: at the barrier — charge, then open ──────────────────────────
@@ -873,6 +932,10 @@ class GateController:
         if self.test_mode:
             self.stdout.write(f"[TEST] Tag at barrier — opening (DB check skipped)")
             self._last_tx = time.monotonic()
+            self.activity.record_gate_event(
+                kind='test', tid=tid, epc=epc, result='ok',
+                reason='test mode — no DB check',
+            )
             self._hold_open_for_vehicle({'tagId': tid, 'testMode': True})
             return
 
@@ -885,6 +948,11 @@ class GateController:
             reason = result.get('reason', 'denied')
             self.stdout.write(f"[gate] DENIED — {reason}")
             self._last_tx = time.monotonic()
+            self.activity.record_gate_event(
+                kind=self.gate_mode, tid=tid, epc=epc, plate=plate,
+                result='denied', reason=reason,
+                balance=result.get('current_balance', ''),
+            )
             # Pass the balance through when the refusal carries one, so the
             # display can still show it. Absent (unknown tag, no account), it
             # stays None and the display is left untouched.
@@ -902,6 +970,13 @@ class GateController:
                 f"charge: Rs.{result.get('charge')} "
                 f"balance: Rs.{result.get('balance_remaining')}"
             )
+            self.activity.record_gate_event(
+                kind='exit', tid=tid, epc=epc, plate=plate, result='ok',
+                charge=result.get('charge', ''),
+                balance=result.get('balance_remaining', ''),
+                offline=bool(result.get('offline')),
+            )
+
             def display_fn():
                 self._show_exit(result.get('charge', '0'), result.get('balance_remaining', '0'), plate)
         else:
@@ -909,6 +984,12 @@ class GateController:
                 f"[gate] ENTRY OK{offline_flag} — vehicle: {result.get('vehicle')} "
                 f"balance: Rs.{result.get('current_balance')}"
             )
+            self.activity.record_gate_event(
+                kind='entry', tid=tid, epc=epc, plate=plate, result='ok',
+                balance=result.get('current_balance', ''),
+                offline=bool(result.get('offline')),
+            )
+
             def display_fn():
                 self._show_entry(result.get('current_balance', '0'), plate)
 
@@ -1101,3 +1182,5 @@ class GateController:
                 self._open_until = 0.0
                 self.barrier.release()
             self.barrier.cleanup()
+            # Last, so the release above is recorded before the writer stops.
+            self.activity.close()

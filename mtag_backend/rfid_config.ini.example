@@ -133,3 +133,19 @@ open_seconds = 2.0
 [display]
 ; IP of the local fare/status display device
 display_ip = 192.168.78.72
+
+[camera]
+# LPR / ANPR camera, for the booth console at /booth/ . Plate recognition
+# itself runs in quick-toll-system (run_anpr_gate subscribes to its WebSocket on
+# :3003) — this is only so an engineer at the lane can confirm the camera is up,
+# aimed and in focus without leaving the console.
+#
+# A browser cannot play RTSP, so the booth decodes one frame with ffmpeg and
+# serves it as a still. Leave rtsp_url blank to hide the panel.
+rtsp_url =
+# tcp is right almost always: UDP loses packets over a booth's wiring and shows
+# as a torn frame that looks like a camera fault.
+transport = tcp
+# Optional. If the camera already serves a JPEG over HTTP, the console prefers
+# it — it is far cheaper than spinning ffmpeg up for every frame.
+snapshot_url =

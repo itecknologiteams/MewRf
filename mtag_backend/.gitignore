@@ -21,11 +21,16 @@ media/
 
 # ── Database & Cache ──────────────────────────────────────────────────────────
 offline_cache.db
+# The booth console's local activity ring buffer, and the WAL/SHM files
+# SQLite keeps beside it — '*.db' below does not match those suffixes.
+booth_activity.db*
 *.db
 *.sqlite3
 
 # ── Hardware Config (contain IPs, ports, device settings) ────────────────────
 rfid_config.ini
+# Left behind by set_rssi.sh and by a config write from the booth console.
+rfid_config.ini.bak
 anpr_config.ini
 gates.ini
 booth_configs/

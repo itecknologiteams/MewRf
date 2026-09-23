@@ -226,6 +226,67 @@ Record mila → executed_at set → Barrier OPEN
 
 ---
 
+## Booth Console — `http://<booth-lan-ip>:8000/booth/`
+
+Har booth apni **apni** diagnostics page serve karta hai. Lane pe khare ho kar
+browser mein booth ka LAN IP kholo — koi SSH nahi, koi install nahi. Portal wale
+hi credentials chalte hain (padhne ke liye operator, kuch badalne ke liye admin).
+
+```
+Laptop browser ──► http://192.168.1.61:8000/booth/
+                        │
+                        ├── mtag-web (gunicorn)  ── rfid_config.ini padhta/likhta
+                        │                         ── reader / barrier / display probe
+                        │                         ── booth_activity.db se history
+                        │
+                        └── mtag-gate (run_gate)  ── har read booth_activity.db mein likhta
+```
+
+### Kya dikhata hai
+
+| Tab | Kya |
+|---|---|
+| **Overview** | Reader, barrier, master DB, display, pm2 — sab ka live status |
+| **Detections** | Har tag read, RSSI ke saath, threshold bands ke upar chart. Dots = raw read, line = wo median jis pe gate faisla karta hai |
+| **Barrier** | Is gate ne jo commands bheje, aur portal ne jo maange. Do test buttons |
+| **LPR Camera** | RTSP se ek frame (ffmpeg), plus stream ka codec/resolution |
+| **Balance Validator** | TID / tag serial / plate → wahi verdict jo barrier pe milega. Kuch charge nahi hota |
+| **Reader Config** | `rfid_config.ini` edit + validate + `pm2 restart mtag-gate` |
+| **Gate Log** | `pm2 logs mtag-gate` ka tail |
+
+### RSSI tuning — asal kaam
+
+Detections tab isi liye banaya hai. Gaadi ko aate hue dekho, boom pe pahunchte
+waqt dBm note karo, phir Reader Config mein band set karo:
+
+```
+rssi_detect    = -70   ← itna door se balance dikhana shuru
+rssi_open_min  = -55   ← boom sirf is band ke andar khulta hai
+rssi_open_max  = -45   ← itna qareeb = doosri lane / hath mein pakda tag
+```
+
+Likhne se **pehle** validate hota hai — wahi rules jo `run_gate` start pe lagata
+hai. Ghalat ordering reject ho jati hai, warna PM2 crash-loop mein chala jata aur
+lane band ho jati. Har write ke sath `rfid_config.ini.bak` chhoot jata hai.
+
+### Do cheezein jo confuse karti hain
+
+- **`antenna_power` gate apply nahi karta.** `run_gate` value parhta hai lekin
+  reader ko bhejta nahi — `RW_RFIDAntPower` set karne se TID reads band ho jate
+  the. Power reader ki apni utility se badlo; lane ki reach RSSI band se control
+  karo. Console yeh field ke neeche warning mein likhta hai.
+- **Plaza / lane / mode console se edit nahi hote.** Yeh decide karte hain kis
+  plaza pe billing hogi — SSH ka kaam hai, browser ka nahi.
+
+### Activity file
+
+`booth_activity.db` — booth pe local SQLite ring buffer (WAL). `mtag-gate` likhta
+hai, `mtag-web` parhta hai. Capped hai (20k reads / 5k events / 5k barrier
+commands), kabhi bhi delete kar sakte ho, gate dobara bana leta hai. Ismein koi
+paisa/trip nahi — sab master pe hai.
+
+---
+
 ## Balance Top-Up
 
 ### JazzCash (Online)
@@ -338,6 +399,10 @@ psql -U postgres -d tag_db -f C:\backups\tag_db_2026-05-06_14h.sql
 | `apps/tolls/services.py` | Entry aur Exit logic |
 | `apps/tolls/offline_cache.py` | DB down hone pe SQLite fallback |
 | `apps/tolls/management/commands/run_gate.py` | RFID gate controller |
+| `apps/tolls/booth_console.py` | Booth console ke API endpoints (`/booth/api/...`) |
+| `apps/tolls/booth_probe.py` | `rfid_config.ini` parhna/likhna + hardware probes |
+| `apps/tolls/booth_activity.py` | Local ring buffer — reads, decisions, barrier commands |
+| `apps/tolls/templates/booth_console.html` | Console ka poora UI (ek file, koi build step nahi) |
 | `apps/tolls/management/commands/run_all_gates.py` | Sab gates ek saath start |
 | `apps/tolls/models.py` | Plaza, Lane, Rate, Trip, PendingGateOpen |
 | `apps/vehicles/models.py` | Vehicle, Tag |

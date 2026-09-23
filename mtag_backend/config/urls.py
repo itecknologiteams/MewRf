@@ -11,6 +11,12 @@ urlpatterns = [
     path('api/v1/tolls/', include('apps.tolls.urls')),
     path('api/v1/payments/', include('apps.payments.urls')),
     path('api/v1/notifications/', include('apps.notifications.urls')),
+
+    # The booth console — a diagnostics page a booth serves about ITSELF, at
+    # http://<booth-lan-ip>:8000/booth/. Present on master too, since master
+    # runs the same code; it detects the absence of rfid_config.ini and says so
+    # rather than rendering a lane that is not there.
+    path('booth/', include('apps.tolls.booth_urls')),
 ]
 
 # ── API documentation ─────────────────────────────────────────────────────────

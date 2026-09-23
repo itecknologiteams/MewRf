@@ -1,0 +1,2199 @@
+<!doctype html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booth Console</title>
+<meta name="description" content="Live diagnostics for one RFID toll lane: reader, RSSI detections, barrier, LPR camera and balances.">
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   Tokens. Light is the default; dark is a SELECTED set of steps for the dark
+   surface, not an inversion. Both are declared under two scopes so the theme
+   button wins over the OS setting in either direction.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+  --plane:          #f9f9f7;
+  --surface:        #fcfcfb;
+  --surface-sunk:   #f2f1ed;
+  --text-primary:   #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted:     #898781;
+  --grid:           #e1e0d9;
+  --axis:           #c3c2b7;
+  --border:         rgba(11, 11, 11, 0.10);
+  --border-strong:  rgba(11, 11, 11, 0.18);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-other: #898781;
+
+  --good:     #0ca30c;
+  --warning:  #fab219;
+  --serious:  #ec835a;
+  --critical: #d03b3b;
+
+  --zone-open:   rgba(11, 11, 11, 0.055);
+  --zone-detect: rgba(11, 11, 11, 0.022);
+
+  --radius: 10px;
+  --gutter: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:          #0d0d0d;
+    --surface:        #1a1a19;
+    --surface-sunk:   #131312;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --axis:           #383835;
+    --border:         rgba(255, 255, 255, 0.10);
+    --border-strong:  rgba(255, 255, 255, 0.20);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --zone-open:   rgba(255, 255, 255, 0.06);
+    --zone-detect: rgba(255, 255, 255, 0.025);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:          #0d0d0d;
+  --surface:        #1a1a19;
+  --surface-sunk:   #131312;
+  --text-primary:   #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #898781;
+  --grid:           #2c2c2a;
+  --axis:           #383835;
+  --border:         rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.20);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --zone-open:   rgba(255, 255, 255, 0.06);
+  --zone-detect: rgba(255, 255, 255, 0.025);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--plane);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--series-1); }
+
+/* ── Shell ──────────────────────────────────────────────────────────────── */
+.wrap { max-width: 1400px; margin: 0 auto; padding: 0 var(--gutter); }
+
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  display: flex; align-items: center; gap: 20px;
+  min-height: 60px; padding: 10px var(--gutter);
+  max-width: 1400px; margin: 0 auto; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-name { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.brand-sub { font-size: 12px; color: var(--text-muted); }
+
+.live-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--text-muted); flex: none;
+}
+.live-dot.on { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.live-dot.off { background: var(--critical); box-shadow: 0 0 0 3px color-mix(in srgb, var(--critical) 22%, transparent); }
+.live-dot.paused { background: var(--warning); }
+
+.identity { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
+.chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunk);
+  font-size: 12px; white-space: nowrap;
+}
+.chip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip span { color: var(--text-muted); }
+
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .12s ease, border-color .12s ease;
+}
+.btn:hover { background: var(--surface-sunk); }
+.btn:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { border-color: var(--critical); color: var(--critical); }
+.btn.danger:hover { background: color-mix(in srgb, var(--critical) 10%, transparent); }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+.tabs {
+  position: sticky; top: 60px; z-index: 30;
+  background: var(--plane);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tabs-inner { display: flex; gap: 2px; max-width: 1400px; margin: 0 auto; padding: 0 var(--gutter); }
+.tab {
+  appearance: none; border: 0; background: none;
+  padding: 11px 14px; cursor: pointer;
+  font-size: 13.5px; color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text-primary); }
+.tab[aria-selected="true"] { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--series-1); }
+.tab .count {
+  display: inline-block; margin-left: 6px; padding: 0 6px;
+  border-radius: 999px; background: var(--surface-sunk);
+  font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+
+main { padding: 20px 0 64px; }
+.panel[hidden] { display: none; }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.card-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.card-head h2 { font-size: 14px; }
+.card-head .sub { font-size: 12px; color: var(--text-muted); }
+.card-head .spacer { flex: 1 1 auto; }
+.card-body { padding: 16px; }
+.card-body.tight { padding: 0; }
+
+.grid { display: grid; gap: 12px; }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); }
+
+/* ── Stat tiles ─────────────────────────────────────────────────────────── */
+.tile {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 13px 15px;
+}
+.tile .label {
+  font-size: 11.5px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.tile .value { font-size: 26px; font-weight: 600; line-height: 1.25; margin-top: 3px; }
+.tile .value .unit { font-size: 13px; font-weight: 500; color: var(--text-muted); margin-left: 3px; }
+.tile .foot { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ── Health rows ────────────────────────────────────────────────────────── */
+.health {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 13px 15px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface);
+}
+.health .icon { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+.health .body { min-width: 0; flex: 1 1 auto; }
+.health .name { font-weight: 600; font-size: 13px; }
+.health .state { font-size: 12.5px; margin-top: 1px; }
+.health .detail {
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+  font-family: var(--mono); word-break: break-word;
+}
+.s-good    { color: var(--good); }
+.s-warning { color: var(--warning); }
+.s-serious { color: var(--serious); }
+.s-critical{ color: var(--critical); }
+.s-unknown { color: var(--text-muted); }
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.table-scroll { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface);
+  text-align: left; font-weight: 600; font-size: 11.5px;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
+  padding: 9px 14px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+tbody td { padding: 8px 14px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-sunk); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.mono { font-family: var(--mono); font-size: 12px; }
+.empty { padding: 34px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  border: 1px solid var(--border-strong);
+}
+.badge .swatch { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.badge.stage-open   { border-color: color-mix(in srgb, var(--good) 55%, transparent); color: var(--good); }
+.badge.stage-detect { border-color: color-mix(in srgb, var(--warning) 60%, transparent); color: var(--warning); }
+.badge.stage-ignore { border-color: var(--border-strong); color: var(--text-muted); }
+.badge.ok       { border-color: color-mix(in srgb, var(--good) 55%, transparent); color: var(--good); }
+.badge.denied   { border-color: color-mix(in srgb, var(--critical) 55%, transparent); color: var(--critical); }
+.badge.neutral  { border-color: var(--border-strong); color: var(--text-secondary); }
+
+/* ── Chart ──────────────────────────────────────────────────────────────── */
+.filterbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface-sunk);
+}
+.filterbar label { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+select, input[type="text"], input[type="password"], input[type="number"] {
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: 7px;
+  padding: 5px 9px; font-size: 13px;
+}
+select:focus, input:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
+
+.chart-holder { position: relative; padding: 8px 4px 0; }
+svg.chart { display: block; width: 100%; height: auto; }
+svg.chart text { font-family: var(--font); }
+.tick { fill: var(--text-muted); font-size: 10.5px; }
+.tick.tabular { font-variant-numeric: tabular-nums; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.axisline { stroke: var(--axis); stroke-width: 1; }
+.threshold-rule { stroke: var(--axis); stroke-width: 1; }
+.zone-label { fill: var(--text-muted); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+/* Zone and threshold labels sit INSIDE the plot, so a dot lands on top of them
+   whenever a tag happens to be at that dBm. A surface-coloured stroke painted
+   underneath the glyphs knocks a halo out of whatever is behind, which keeps
+   them readable without a filled box crowding the plot. */
+.zone-label, .threshold-label {
+  paint-order: stroke fill;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.threshold-label { fill: var(--text-secondary); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.series-dot { stroke: var(--surface); stroke-width: 1; }
+.end-label { font-size: 11px; font-weight: 600; }
+.crosshair { stroke: var(--text-muted); stroke-width: 1; pointer-events: none; }
+
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 4px 16px 14px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.legend-item .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.legend-item .swatch.line { height: 3px; border-radius: 2px; }
+
+.tooltip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+  min-width: 150px; opacity: 0; transition: opacity .1s ease;
+}
+.tooltip.on { opacity: 1; }
+.tooltip .tt-title { font-weight: 600; margin-bottom: 4px; font-family: var(--mono); font-size: 11.5px; }
+.tooltip .tt-row { display: flex; justify-content: space-between; gap: 14px; color: var(--text-secondary); }
+.tooltip .tt-row b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+/* ── Notes / callouts ───────────────────────────────────────────────────── */
+.note {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 11px 13px; border-radius: 9px; font-size: 12.5px;
+  border: 1px solid var(--border-strong); background: var(--surface-sunk);
+  color: var(--text-secondary); line-height: 1.5;
+}
+.note.warn   { border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
+.note.severe { border-color: color-mix(in srgb, var(--critical) 55%, transparent); }
+.note .icon { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.note b { color: var(--text-primary); }
+.note + .note { margin-top: 10px; }
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.field label { font-size: 12.5px; font-weight: 600; }
+.field .help { font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }
+.field input { width: 100%; }
+.field.changed input { border-color: var(--series-2); }
+.field.changed label::after { content: " • changed"; color: var(--series-2); font-weight: 500; }
+fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px 2px; margin: 0 0 16px; }
+legend { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 0 6px; text-transform: uppercase; letter-spacing: .05em; }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 5px 16px; font-size: 13px; }
+.kv dt { color: var(--text-muted); }
+.kv dd { margin: 0; font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+
+pre.logbox {
+  margin: 0; padding: 14px 16px; max-height: 520px; overflow: auto;
+  background: var(--surface-sunk); font-family: var(--mono);
+  font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+}
+
+/* ── Camera ─────────────────────────────────────────────────────────────── */
+.camera-frame {
+  position: relative; background: #000; border-radius: 9px; overflow: hidden;
+  aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center;
+  /* Capped and centred: at full window width a 16:9 box is most of the
+     viewport, and the connection details underneath — which are what someone
+     debugging a camera actually needs beside the picture — end up below the
+     fold. This is a diagnostic still, not a video wall. */
+  max-width: 860px; margin: 0 auto;
+}
+.camera-frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.camera-frame .placeholder { color: #a7a7a0; font-size: 13px; padding: 20px; text-align: center; }
+
+/* ── Login overlay ──────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: color-mix(in srgb, var(--plane) 86%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; padding: var(--gutter);
+}
+.overlay[hidden] { display: none; }
+.login-card {
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 14px; padding: 26px; width: 100%; max-width: 380px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .22);
+}
+.login-card h2 { font-size: 17px; margin-bottom: 4px; }
+.login-card p { margin: 0 0 18px; font-size: 12.5px; color: var(--text-muted); }
+.login-error { color: var(--critical); font-size: 12.5px; margin-top: 10px; min-height: 18px; }
+
+/* ── Toasts ─────────────────────────────────────────────────────────────── */
+#toasts {
+  position: fixed; right: 16px; bottom: 16px; z-index: 200;
+  display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px));
+}
+.toast {
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-left-width: 3px; border-radius: 9px; padding: 11px 13px;
+  font-size: 13px; box-shadow: 0 8px 26px rgba(0, 0, 0, .2);
+}
+.toast.ok   { border-left-color: var(--good); }
+.toast.err  { border-left-color: var(--critical); }
+.toast.info { border-left-color: var(--series-1); }
+.toast .t-title { font-weight: 600; margin-bottom: 2px; }
+.toast .t-body { color: var(--text-secondary); font-size: 12.5px; }
+
+footer {
+  border-top: 1px solid var(--border); padding: 16px 0 36px;
+  font-size: 12px; color: var(--text-muted);
+}
+.stale { opacity: .55; transition: opacity .2s ease; }
+
+@media (max-width: 720px) {
+  .topbar-inner { min-height: 0; }
+  .identity { order: 3; width: 100%; }
+  .tabs { top: 0; position: static; }
+  .tile .value { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="live-dot" id="live-dot" title="Polling status"></span>
+      <div>
+        <div class="brand-name">Booth Console</div>
+        <div class="brand-sub" id="brand-sub">connecting…</div>
+      </div>
+    </div>
+    <div class="identity" id="identity-strip"></div>
+    <div class="topbar-actions">
+      <button class="btn sm" id="pause-btn" title="Stop polling">Pause</button>
+      <button class="btn sm" id="theme-btn" title="Switch light / dark">Theme</button>
+      <button class="btn sm" id="signout-btn" hidden>Sign out</button>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-inner" role="tablist">
+    <button class="tab" role="tab" data-tab="overview"    aria-selected="true">Overview</button>
+    <button class="tab" role="tab" data-tab="detections"  aria-selected="false">Detections<span class="count" id="count-detections">0</span></button>
+    <button class="tab" role="tab" data-tab="barrier"     aria-selected="false">Barrier<span class="count" id="count-barrier">0</span></button>
+    <button class="tab" role="tab" data-tab="camera"      aria-selected="false">LPR Camera</button>
+    <button class="tab" role="tab" data-tab="balance"     aria-selected="false">Balance Validator</button>
+    <button class="tab" role="tab" data-tab="reader"      aria-selected="false">Reader Config</button>
+    <button class="tab" role="tab" data-tab="logs"        aria-selected="false">Gate Log</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <div id="not-a-booth" class="card" hidden>
+    <div class="card-body">
+      <div class="note severe">
+        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm0 3.6L3.6 13h8.8L8 5.1ZM7.3 7h1.4v3.2H7.3V7Zm0 4h1.4v1.3H7.3V11Z"/></svg>
+        <div id="not-a-booth-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Overview ───────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-overview" role="tabpanel">
+    <div class="grid cols-3" id="health-grid" style="margin-bottom:16px"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Lane activity</h2>
+        <span class="sub" id="activity-window">last hour</span>
+        <span class="spacer"></span>
+      </div>
+      <div class="card-body">
+        <div class="grid cols-4" id="activity-tiles"></div>
+      </div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><h2>Identity</h2><span class="sub">from rfid_config.ini</span></div>
+        <div class="card-body"><dl class="kv" id="identity-kv"></dl></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><h2>Processes</h2><span class="sub">pm2</span></div>
+        <div class="card-body tight">
+          <div class="table-scroll" style="max-height:none">
+            <table>
+              <thead><tr><th>Process</th><th>Status</th><th class="num">Uptime</th><th class="num">Restarts</th><th class="num">CPU</th><th class="num">Memory</th></tr></thead>
+              <tbody id="pm2-body"></tbody>
+            </table>
+          </div>
+          <div id="pm2-note" style="padding:12px 16px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Detections ─────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-detections" role="tabpanel" hidden>
+    <div class="card">
+      <div class="filterbar">
+        <label>Window
+          <select id="chart-window">
+            <option value="60">1 min</option>
+            <option value="120" selected>2 min</option>
+            <option value="300">5 min</option>
+            <option value="900">15 min</option>
+          </select>
+        </label>
+        <label>Tag
+          <select id="tag-filter"><option value="">All tags</option></select>
+        </label>
+        <label>Stage
+          <select id="stage-filter">
+            <option value="">All stages</option>
+            <option value="open">At barrier (open)</option>
+            <option value="detect">In range (detect)</option>
+            <option value="ignore">Below detect (ignored)</option>
+          </select>
+        </label>
+        <span class="spacer" style="flex:1 1 auto"></span>
+        <span class="sub" id="chart-status" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+
+      <div id="rssi-note-holder" style="padding:12px 16px 0"></div>
+
+      <div class="chart-holder" id="chart-holder">
+        <svg class="chart" id="rssi-chart" role="img"
+             aria-label="Signal strength of each tag read over time, against the gate's staging thresholds."></svg>
+        <div class="tooltip" id="chart-tooltip" role="status"></div>
+      </div>
+      <div class="legend" id="chart-legend"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Detection history</h2>
+        <span class="sub">every read the reader reported, newest first</span>
+        <span class="spacer"></span>
+        <button class="btn sm" id="export-reads">Export CSV</button>
+      </div>
+      <div class="card-body tight">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th><th>TID</th><th>EPC</th>
+                <th class="num">RSSI</th><th class="num">Median</th><th class="num">Window</th>
+                <th>Stage</th>
+              </tr>
+            </thead>
+            <tbody id="reads-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="reads-empty">No reads recorded yet.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Gate decisions</h2>
+        <span class="sub">what the lane did about those reads</span>
+      </div>
+      <div class="card-body tight">
+        <div class="table-scroll" style="max-height:320px">
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Kind</th><th>TID</th><th>Vehicle</th><th>Result</th><th class="num">Charge</th><th class="num">Balance</th><th>Reason</th></tr>
+            </thead>
+            <tbody id="events-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="events-empty">No decisions recorded yet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Barrier ────────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-barrier" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Open the barrier</h2><span class="sub">admin only</span></div>
+      <div class="card-body">
+        <div class="grid cols-2">
+          <div>
+            <p style="margin-top:0;font-size:13px;color:var(--text-secondary)">
+              <b>Through the gate.</b> Writes a pending open on master, exactly as the
+              portal's own button does. The gate polls every second and claims it.
+              A boom that moves proves the whole chain — master, the gate process,
+              and the relay.
+            </p>
+            <button class="btn primary" id="open-via-gate">Open via gate</button>
+          </div>
+          <div>
+            <p style="margin-top:0;font-size:13px;color:var(--text-secondary)">
+              <b>Straight to the relay.</b> Posts to the local barrier service and
+              bypasses the gate entirely. If this moves the boom and the other does
+              not, the fault is the gate, not the hardware.
+            </p>
+            <button class="btn" id="open-via-service">Open via barrier service</button>
+          </div>
+        </div>
+        <div id="barrier-route-note" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Barrier commands</h2><span class="sub">issued by this gate</span></div>
+      <div class="card-body tight">
+        <div class="table-scroll" style="max-height:380px">
+          <table>
+            <thead><tr><th>Time</th><th>Action</th><th>Source</th><th>Route</th><th>Dispatched</th><th>Detail</th></tr></thead>
+            <tbody id="barrier-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="barrier-empty">No barrier commands recorded yet.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Portal-requested opens</h2>
+        <span class="sub">pending_gate_opens on master, for this plaza</span>
+      </div>
+      <div class="card-body tight">
+        <div class="table-scroll" style="max-height:300px">
+          <table>
+            <thead><tr><th>Requested</th><th>Lane</th><th>Claimed by gate</th><th>Status</th></tr></thead>
+            <tbody id="portal-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="portal-empty">Nothing requested from the portal.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Camera ─────────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-camera" role="tabpanel" hidden>
+    <div class="card">
+      <div class="filterbar">
+        <button class="btn sm primary" id="camera-grab">Grab frame</button>
+        <label><input type="checkbox" id="camera-auto"> Auto-refresh every 2s</label>
+        <button class="btn sm" id="camera-probe">Probe stream</button>
+        <span class="spacer" style="flex:1 1 auto"></span>
+        <span style="font-size:12px;color:var(--text-muted)" id="camera-status"></span>
+      </div>
+      <div class="card-body">
+        <div class="camera-frame" id="camera-frame">
+          <div class="placeholder" id="camera-placeholder">No frame yet — press <b>Grab frame</b>.</div>
+        </div>
+        <div style="margin-top:14px" id="camera-notes"></div>
+      </div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><h2>Connection</h2></div>
+        <div class="card-body"><dl class="kv" id="camera-kv"></dl></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><h2>Stream</h2><span class="sub">ffprobe</span></div>
+        <div class="card-body" id="camera-probe-out">
+          <div class="empty" style="padding:20px 0">Press <b>Probe stream</b> to read the stream's codec and resolution.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Balance validator ──────────────────────────────────────────────── -->
+  <section class="panel" id="panel-balance" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Balance validator</h2><span class="sub">read-only — nothing is charged</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="balance-query" placeholder="Chip TID, tag serial, or plate number"
+                 style="flex:1 1 280px" autocomplete="off" spellcheck="false">
+          <button class="btn primary" id="balance-go">Look up</button>
+          <button class="btn" id="balance-last" title="Use the most recently detected tag">Last detected tag</button>
+        </div>
+        <div style="margin-top:14px" id="balance-result">
+          <div class="note">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 1.4A5.6 5.6 0 1 1 8 13.6 5.6 5.6 0 0 1 8 2.4ZM7.3 4.4h1.4v1.4H7.3V4.4Zm0 2.7h1.4v4.5H7.3V7.1Z"/></svg>
+            <div>This runs the same read-only preview the gate uses on a far-field read,
+            so the verdict here is the verdict the lane gives. No trip is created and no
+            money moves.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Reader config ──────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-reader" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head">
+        <h2>Reader &amp; lane configuration</h2>
+        <span class="sub" id="config-path"></span>
+        <span class="spacer"></span>
+        <button class="btn sm" id="config-reload">Reload</button>
+      </div>
+      <div class="card-body">
+        <div id="config-notes" style="margin-bottom:16px"></div>
+        <form id="config-form" autocomplete="off"></form>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+          <button class="btn" id="config-validate" type="button">Validate only</button>
+          <button class="btn primary" id="config-apply" type="button">Apply changes</button>
+          <label style="font-size:12.5px;display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="config-restart" checked> restart mtag-gate after applying
+          </label>
+          <span class="spacer" style="flex:1 1 auto"></span>
+          <button class="btn danger" id="config-restore" type="button">Restore .bak</button>
+        </div>
+        <div id="config-result" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Raw rfid_config.ini</h2><span class="sub">secrets redacted</span></div>
+      <div class="card-body tight"><pre class="logbox" id="config-raw"></pre></div>
+    </div>
+  </section>
+
+  <!-- ── Logs ───────────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-logs" role="tabpanel" hidden>
+    <div class="card">
+      <div class="filterbar">
+        <label>Process
+          <select id="log-process">
+            <option value="mtag-gate" selected>mtag-gate</option>
+            <option value="mtag-web">mtag-web</option>
+          </select>
+        </label>
+        <label>Lines
+          <select id="log-lines">
+            <option value="100">100</option>
+            <option value="200" selected>200</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+          </select>
+        </label>
+        <button class="btn sm" id="log-refresh">Refresh</button>
+        <label><input type="checkbox" id="log-auto"> Follow</label>
+        <span class="spacer" style="flex:1 1 auto"></span>
+        <button class="btn sm danger" id="gate-restart">Restart mtag-gate</button>
+      </div>
+      <div class="card-body tight"><pre class="logbox" id="log-box">Press Refresh.</pre></div>
+    </div>
+  </section>
+
+  <footer class="wrap" style="padding-left:0;padding-right:0">
+    m-tag {{ code_version }} · booth console · this page reports on the machine that served it.
+  </footer>
+</main>
+
+<div class="overlay" id="login-overlay" hidden>
+  <form class="login-card" id="login-form">
+    <h2>Sign in</h2>
+    <p>Booth diagnostics use your portal account. Reads need an operator; changing
+       configuration or raising the boom needs an admin.</p>
+    <div class="field">
+      <label for="login-phone">Phone</label>
+      <input type="text" id="login-phone" autocomplete="username" inputmode="tel" required>
+    </div>
+    <div class="field">
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" autocomplete="current-password" required>
+    </div>
+    <button class="btn primary" type="submit" style="width:100%" id="login-submit">Sign in</button>
+    <div class="login-error" id="login-error"></div>
+  </form>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+<script>
+"use strict";
+/* ───────────────────────────────────────────────────────────────────────────
+   Booth console.
+
+   Everything on this page is fetched from the booth that served it; there is no
+   build step and no dependency, because a booth has no node and no network to
+   fetch one over.
+
+   Two conventions run through the code:
+     - every API answer is the project's envelope, {success, message, data};
+     - a 401 means "sign in" and raises the overlay, while a 403 means "you are
+       signed in but this needs an admin" and is reported without logging anyone
+       out. Conflating them is what makes an operator think their password broke.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const API = '/booth/api';
+const POLL = { overview: 5000, detections: 2000, events: 6000, barrier: 6000 };
+const READ_BUFFER = 4000;      // rows held in memory for the chart and table
+const READ_MAX_AGE = 15 * 60;  // seconds
+
+const state = {
+  paused: false,
+  authed: false,
+  role: '',
+  isBooth: null,
+  clockOffset: 0,
+  overview: null,
+  reads: [], lastReadId: 0,
+  events: [], lastEventId: 0,
+  barrier: [], lastBarrierId: 0,
+  portalRequests: [],
+  thresholds: { detect: 0, open_min: 0, open_max: 0, window: 5, hysteresis: 3 },
+  config: null,
+  configDraft: {},
+  tab: 'overview',
+  hover: null,
+  cameraTimer: null,
+  logTimer: null,
+};
+
+/* ── Small helpers ──────────────────────────────────────────────────────── */
+const $ = (id) => document.getElementById(id);
+const nowSec = () => Date.now() / 1000 + state.clockOffset;
+
+function esc(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function clockTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+function agoText(ts) {
+  if (!ts) return '—';
+  const delta = Math.max(0, nowSec() - ts);
+  if (delta < 60) return Math.round(delta) + 's ago';
+  if (delta < 3600) return Math.round(delta / 60) + 'm ago';
+  if (delta < 86400) return Math.round(delta / 3600) + 'h ago';
+  return Math.round(delta / 86400) + 'd ago';
+}
+
+function duration(seconds) {
+  if (seconds === null || seconds === undefined) return '—';
+  if (seconds < 60) return Math.round(seconds) + 's';
+  if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+  if (seconds < 86400) return (seconds / 3600).toFixed(1) + 'h';
+  return (seconds / 86400).toFixed(1) + 'd';
+}
+
+function num(value, digits) {
+  if (value === null || value === undefined || value === '') return '—';
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(digits === undefined ? 1 : digits) : '—';
+}
+
+function toast(kind, title, body) {
+  const box = document.createElement('div');
+  box.className = 'toast ' + kind;
+  box.innerHTML = '<div class="t-title">' + esc(title) + '</div>' +
+    (body ? '<div class="t-body">' + esc(body) + '</div>' : '');
+  $('toasts').appendChild(box);
+  setTimeout(() => { box.remove(); }, kind === 'err' ? 9000 : 5000);
+}
+
+/* ── API ─────────────────────────────────────────────────────────────────── */
+class ApiError extends Error {
+  constructor(status, message, payload) {
+    super(message);
+    this.status = status;
+    this.payload = payload || {};
+  }
+}
+
+async function api(path, options) {
+  const opts = Object.assign({ credentials: 'same-origin', headers: {} }, options || {});
+  if (opts.body !== undefined && typeof opts.body !== 'string') {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+    opts.method = opts.method || 'POST';
+  }
+  const response = await fetch(path, opts);
+  let payload = null;
+  try { payload = await response.json(); } catch (err) { payload = null; }
+
+  if (response.status === 401) {
+    setAuthed(false);
+    throw new ApiError(401, 'Sign in to continue.', payload);
+  }
+  if (!response.ok) {
+    const detail = payload && payload.errors && payload.errors.validation
+      ? payload.errors.validation.join(' ')
+      : (payload && payload.message) || ('HTTP ' + response.status);
+    throw new ApiError(response.status, detail, payload);
+  }
+  setAuthed(true);
+  return payload && payload.data !== undefined ? payload.data : payload;
+}
+
+/* Report a failed action without tearing the page down over it. */
+function reportError(what, err) {
+  if (err instanceof ApiError && err.status === 401) return;
+  if (err instanceof ApiError && err.status === 403) {
+    toast('err', what, 'That needs an admin account. You are signed in as ' + (state.role || 'a non-admin') + '.');
+    return;
+  }
+  toast('err', what, err && err.message ? err.message : String(err));
+}
+
+/* ── Auth ────────────────────────────────────────────────────────────────── */
+function setAuthed(value) {
+  if (state.authed === value) return;
+  state.authed = value;
+  $('login-overlay').hidden = value;
+  $('signout-btn').hidden = !value;
+  if (value) {
+    whoAmI();
+    pollNow();
+  }
+}
+
+async function whoAmI() {
+  try {
+    const me = await api('/api/v1/auth/me/');
+    const user = me && (me.user || me);
+    state.role = (user && (user.user_role || user.role)) || '';
+    const name = (user && (user.full_name || user.phone)) || '';
+    $('signout-btn').textContent = 'Sign out' + (state.role ? ' (' + state.role + ')' : '');
+    $('signout-btn').title = name;
+    applyRoleGates();
+  } catch (err) { /* the overlay already handles a 401 */ }
+}
+
+/* Admin-only controls are disabled rather than hidden, with the reason in the
+   tooltip — an operator should be able to see that the control exists and why
+   they cannot use it, instead of wondering whether the page failed to load. */
+function applyRoleGates() {
+  const adminOnly = ['open-via-gate', 'open-via-service', 'config-apply',
+                     'config-restore', 'gate-restart'];
+  const isAdmin = state.role === 'admin';
+  adminOnly.forEach((id) => {
+    const node = $(id);
+    if (!node) return;
+    node.disabled = !isAdmin;
+    node.title = isAdmin ? '' : 'Requires an admin account.';
+  });
+}
+
+$('login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('login-submit');
+  button.disabled = true;
+  $('login-error').textContent = '';
+  try {
+    await api('/api/v1/auth/login/', {
+      body: { phone: $('login-phone').value.trim(), password: $('login-password').value },
+    });
+    $('login-password').value = '';
+    setAuthed(true);
+  } catch (err) {
+    $('login-error').textContent = err.message || 'Sign in failed.';
+    state.authed = false;
+    $('login-overlay').hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('signout-btn').addEventListener('click', async () => {
+  try { await api('/api/v1/auth/logout/', { body: {} }); } catch (err) { /* sign out regardless */ }
+  state.role = '';
+  setAuthed(false);
+  $('login-overlay').hidden = false;
+});
+
+/* ── Status icons — every status carries an icon and a word, never colour
+      alone, so a colour-blind reader and a greyscale screenshot both work. ── */
+const ICONS = {
+  good:     '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3.5 5.2-4 4.3a.8.8 0 0 1-1.15.02L4.5 8.7l1-1.05 1.35 1.3 3.5-3.75 1.15 1Z"/></svg>',
+  warning:  '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg>',
+  serious:  '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg>',
+  critical: '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3 9-1 1-2-2-2 2-1-1 2-2-2-2 1-1 2 2 2-2 1 1-2 2 2 2Z"/></svg>',
+  unknown:  '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.8 10.2h1.6v1.5H7.2v-1.5Zm.1-7.1c1.5 0 2.6.9 2.6 2.2 0 .9-.4 1.4-1.2 2-.6.4-.8.7-.8 1.2v.3H6.5v-.5c0-.9.3-1.4 1.1-2 .6-.4.8-.7.8-1.1 0-.5-.4-.9-1-.9s-1.1.4-1.1 1H4.8c0-1.3 1.1-2.2 2.5-2.2Z"/></svg>',
+};
+
+function healthTile(name, status, stateText, detail) {
+  return '<div class="health">' +
+    '<span class="s-' + status + '">' + ICONS[status] + '</span>' +
+    '<div class="body">' +
+      '<div class="name">' + esc(name) + '</div>' +
+      '<div class="state s-' + status + '">' + esc(stateText) + '</div>' +
+      (detail ? '<div class="detail">' + esc(detail) + '</div>' : '') +
+    '</div></div>';
+}
+
+/* ── Overview ────────────────────────────────────────────────────────────── */
+function renderOverview(data) {
+  state.overview = data;
+  state.isBooth = data.is_booth;
+  if (data.server_time) state.clockOffset = data.server_time - Date.now() / 1000;
+
+  if (!data.is_booth) {
+    $('not-a-booth').hidden = false;
+    $('not-a-booth-text').innerHTML = '<b>This host is not a booth.</b><br>' + esc(data.message);
+    ['panel-overview', 'panel-detections', 'panel-barrier', 'panel-camera',
+     'panel-reader', 'panel-logs'].forEach((id) => { const n = $(id); if (n) n.hidden = true; });
+    $('brand-sub').textContent = 'not a booth';
+    $('live-dot').className = 'live-dot off';
+    return;
+  }
+  $('not-a-booth').hidden = true;
+
+  const identity = data.identity || {};
+  const health = data.health || {};
+  const plaza = data.plaza || {};
+
+  /* Header identity strip. */
+  const chips = [
+    ['Mode', (identity.mode || '?').toUpperCase()],
+    ['Plaza', plaza.resolved ? (plaza.display_id + ' · ' + plaza.name) : (identity.plaza_id || '—')],
+    ['Lane', identity.lane_number || '—'],
+    ['Reader', (identity.reader_host || '—') + ':' + (identity.reader_port || '')],
+    ['Build', data.code_version || '—'],
+  ];
+  $('identity-strip').innerHTML = chips
+    .map((pair) => '<span class="chip"><span>' + esc(pair[0]) + '</span><b>' + esc(pair[1]) + '</b></span>')
+    .join('');
+  $('brand-sub').textContent = plaza.resolved
+    ? (plaza.name + ' · lane ' + (identity.lane_number || '?'))
+    : 'plaza unresolved';
+
+  /* Health tiles. */
+  const tiles = [];
+  const reader = health.reader || {};
+  tiles.push(healthTile(
+    'RFID reader', reader.ok ? 'good' : 'critical',
+    reader.ok ? 'Reachable · ' + num(reader.latency_ms) + ' ms' : 'Unreachable',
+    reader.ok ? reader.target : (reader.target || '') + ' — ' + (reader.error || '')
+  ));
+
+  const route = health.barrier_route;
+  const service = health.barrier_service || {};
+  const serial = health.barrier_serial || {};
+  let barrierStatus, barrierState, barrierDetail;
+  if (route === 'service') {
+    barrierStatus = 'good';
+    barrierState = 'Barrier service holds the port';
+    barrierDetail = service.service_url + ' — the gate asks it over HTTP';
+  } else if (serial.exists && serial.writable) {
+    barrierStatus = 'good';
+    barrierState = 'Serial port, driven by the gate';
+    barrierDetail = serial.target + ' — writable';
+  } else if (serial.exists) {
+    barrierStatus = 'serious';
+    barrierState = 'Serial port present but not writable';
+    barrierDetail = serial.target + ' — check the dialout group';
+  } else {
+    barrierStatus = 'critical';
+    barrierState = 'No route to the barrier';
+    barrierDetail = (serial.target || 'no port') + ' absent, and no barrier service answered';
+  }
+  tiles.push(healthTile('Barrier', barrierStatus, barrierState, barrierDetail));
+
+  const database = health.database || {};
+  tiles.push(healthTile(
+    'Master database', database.ok ? (database.latency_ms > 500 ? 'warning' : 'good') : 'critical',
+    database.ok
+      ? 'Connected · ' + num(database.latency_ms) + ' ms'
+      : 'Unreachable — the lane cannot charge anyone',
+    database.ok ? database.host + '/' + database.name : (database.error || '')
+  ));
+
+  const display = health.display || {};
+  tiles.push(healthTile(
+    'Customer display', display.ok ? 'good' : (identity.display_ip ? 'warning' : 'unknown'),
+    display.ok ? 'Answering · ' + num(display.latency_ms) + ' ms'
+      : (identity.display_ip ? 'No answer' : 'Not configured'),
+    display.ok ? identity.display_ip
+      : (identity.display_ip ? identity.display_ip + ' — ' + (display.error || '')
+         : 'set display_ip in [display]')
+  ));
+
+  const pm2 = health.pm2 || {};
+  const gateProc = (pm2.processes || []).filter((p) => p.name === 'mtag-gate')[0];
+  if (!pm2.available) {
+    tiles.push(healthTile('Gate process', 'unknown', 'pm2 not reachable from the web process', pm2.error || ''));
+  } else if (!gateProc) {
+    tiles.push(healthTile('Gate process', 'critical', 'mtag-gate is not under pm2', 'the lane is not running'));
+  } else {
+    const unstable = (gateProc.unstable_restarts || 0) > 0;
+    tiles.push(healthTile(
+      'Gate process',
+      gateProc.status === 'online' ? (unstable ? 'warning' : 'good') : 'critical',
+      gateProc.status === 'online'
+        ? 'Online · up ' + duration(gateProc.uptime_seconds)
+        : 'mtag-gate is ' + gateProc.status,
+      gateProc.restarts + ' restarts' + (unstable ? ' (' + gateProc.unstable_restarts + ' unstable — it is crash-looping)' : '')
+    ));
+  }
+
+  const recorder = data.recorder || {};
+  if (recorder.in_process === false && !recorder.db_exists) {
+    tiles.push(healthTile('Activity recorder', 'warning', 'Nothing recorded yet',
+      'the gate writes ' + (recorder.db_path || 'booth_activity.db') + ' on its first read'));
+  } else if (recorder.error) {
+    tiles.push(healthTile('Activity recorder', 'serious', 'Disabled', recorder.error));
+  } else if ((recorder.dropped || 0) > 0) {
+    tiles.push(healthTile('Activity recorder', 'warning',
+      'Recording, ' + recorder.dropped + ' rows dropped',
+      'the queue filled — the history below has gaps'));
+  } else {
+    tiles.push(healthTile('Activity recorder', 'good', 'Recording',
+      (recorder.db_size_bytes ? (recorder.db_size_bytes / 1048576).toFixed(1) + ' MB · ' : '') +
+      (recorder.written !== undefined ? recorder.written + ' rows this session' : 'on disk')));
+  }
+
+  if (!plaza.resolved || plaza.error) {
+    tiles.push(healthTile('Plaza / lane', plaza.resolved ? 'warning' : 'critical',
+      plaza.resolved ? 'Resolved with a problem' : 'Not resolved',
+      plaza.error || ''));
+  }
+  $('health-grid').innerHTML = tiles.join('');
+
+  /* Activity tiles. */
+  const activity = data.activity || {};
+  const stages = activity.stages || {};
+  const results = activity.results || {};
+  const windowMinutes = Math.round((activity.window_seconds || 3600) / 60);
+  $('activity-window').textContent = 'last ' + windowMinutes + ' minutes';
+  $('activity-tiles').innerHTML = [
+    statTile('Tag reads', activity.reads || 0, '', (activity.distinct_tags || 0) + ' distinct tags'),
+    statTile('Reached the barrier', stages.open || 0, '', (stages.detect || 0) + ' in range, ' + (stages.ignore || 0) + ' below detect'),
+    statTile('Barrier openings', activity.barrier_opens || 0, '', (results.ok || 0) + ' vehicles cleared'),
+    statTile('Refusals', results.denied || 0, '',
+      (activity.min_rssi !== null && activity.min_rssi !== undefined)
+        ? 'RSSI seen ' + num(activity.min_rssi) + ' to ' + num(activity.max_rssi) + ' dBm'
+        : 'no signal recorded'),
+  ].join('');
+
+  /* Processes. */
+  const rows = (pm2.processes || []);
+  $('pm2-body').innerHTML = rows.map((proc) => {
+    const online = proc.status === 'online';
+    return '<tr>' +
+      '<td><b>' + esc(proc.name) + '</b></td>' +
+      '<td><span class="badge ' + (online ? 'ok' : 'denied') + '">' + esc(proc.status) + '</span></td>' +
+      '<td class="num">' + duration(proc.uptime_seconds) + '</td>' +
+      '<td class="num">' + (proc.restarts || 0) + '</td>' +
+      '<td class="num">' + (proc.cpu !== undefined && proc.cpu !== null ? proc.cpu + '%' : '—') + '</td>' +
+      '<td class="num">' + (proc.memory_mb !== null && proc.memory_mb !== undefined ? proc.memory_mb + ' MB' : '—') + '</td>' +
+      '</tr>';
+  }).join('');
+  $('pm2-note').innerHTML = pm2.available
+    ? (rows.length ? '' : '<div class="note warn"><div>pm2 answered but is running no apps. The lane is not up.</div></div>')
+    : '<div class="note warn"><div><b>pm2 could not be read.</b> ' + esc(pm2.error || '') +
+      ' The gate may still be running — this only means the web process cannot see pm2, usually because it was started with a PATH that does not include it.</div></div>';
+
+  /* Identity detail. */
+  const identityRows = [
+    ['Config file', (state.config && state.config.path) || 'rfid_config.ini'],
+    ['Mode', identity.mode],
+    ['Plaza id (config)', identity.plaza_id],
+    ['Plaza row (master)', plaza.plaza_row_id],
+    ['Lane number', identity.lane_number],
+    ['Lane row (master)', plaza.lane_id],
+    ['Reader', (identity.reader_host || '') + ':' + (identity.reader_port || '')],
+    ['Antenna power', identity.antenna_power + ' dBm'],
+    ['Scan interval', identity.scan_interval + ' s'],
+    ['Tag cooldown', identity.tag_cooldown + ' s'],
+    ['RSSI detect', rssiText(identity.rssi_detect)],
+    ['RSSI open band', rssiText(identity.rssi_open_min) + ' … ' + rssiText(identity.rssi_open_max)],
+    ['RSSI window / hysteresis', identity.rssi_window + ' reads / ' + identity.rssi_hysteresis + ' dB'],
+    ['Barrier', identity.barrier_port + ' @ ' + identity.barrier_baudrate + ' · open ' + identity.barrier_open_seconds + 's'],
+    ['Barrier route', route === 'service' ? 'barrier service (' + identity.barrier_service_url + ')' : 'serial'],
+    ['Display', identity.display_ip || '—'],
+    ['Query timeout', identity.statement_timeout_ms + ' ms'],
+  ];
+  $('identity-kv').innerHTML = identityRows
+    .map((pair) => '<dt>' + esc(pair[0]) + '</dt><dd>' + esc(pair[1] === undefined || pair[1] === null || pair[1] === '' ? '—' : pair[1]) + '</dd>')
+    .join('');
+
+  renderBarrierRouteNote(route, service, serial);
+  applyRoleGates();
+}
+
+function rssiText(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed === 0) return 'off';
+  return parsed.toFixed(0) + ' dBm';
+}
+
+function statTile(label, value, unit, foot) {
+  return '<div class="tile"><div class="label">' + esc(label) + '</div>' +
+    '<div class="value">' + esc(value) + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '') + '</div>' +
+    '<div class="foot">' + esc(foot || '') + '</div></div>';
+}
+
+function renderBarrierRouteNote(route, service, serial) {
+  let html;
+  if (route === 'service') {
+    html = '<div class="note"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.8 3.3h1.6v1.5H7.2V4.3Zm0 2.9h1.6v4.5H7.2V7.2Z"/></svg><div>' +
+      'The barrier service at <b>' + esc(service.service_url || '') + '</b> holds the serial port, so the gate asks it over HTTP and never writes to ' +
+      esc(serial.target || 'the tty') + '. An <b>open</b> through it is one pulse that the service closes itself.</div></div>';
+  } else {
+    html = '<div class="note warn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' +
+      'No barrier service answered, so the gate drives <b>' + esc(serial.target || 'the serial port') + '</b> directly. ' +
+      '<b>Open via barrier service</b> will fail here — use <b>Open via gate</b>.</div></div>';
+  }
+  $('barrier-route-note').innerHTML = html;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Detections.
+
+   The chart answers one question: where, in signal terms, is each tag, relative
+   to the bands the gate is judging it against? So the thresholds are drawn as
+   zones rather than left to the reader to hold in their head, and they come down
+   with the readings from the same endpoint — the bands can never disagree with
+   the gate that produced the points.
+
+   Two marks per tag, because the gate uses two numbers. The dots are the raw
+   reads the reader reported; the line is the rolling median the gate actually
+   decides on. Seeing them apart is how you tell a noisy lane from a misplaced
+   threshold.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const SERIES_SLOTS = ['--series-1', '--series-2', '--series-3'];
+const MAX_SERIES = 3;   /* never cycled — a fourth tag folds into "Other" */
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function shortTid(tid) {
+  if (!tid) return '(none)';
+  return tid.length > 8 ? '…' + tid.slice(-8) : tid;
+}
+
+function filteredReads() {
+  const tagWanted = $('tag-filter').value;
+  const stageWanted = $('stage-filter').value;
+  return state.reads.filter((row) =>
+    (!tagWanted || row.tid === tagWanted) &&
+    (!stageWanted || row.stage === stageWanted));
+}
+
+/* Which tags get a colour, and which fold into "Other". Ordered by most recent
+   activity, so the tag in front of the boom right now is always slot 1 and
+   keeps its colour for as long as it is the subject. */
+function buildSeries(rows) {
+  const byTag = new Map();
+  rows.forEach((row) => {
+    if (!byTag.has(row.tid)) byTag.set(row.tid, []);
+    byTag.get(row.tid).push(row);
+  });
+  const ordered = Array.from(byTag.entries())
+    .sort((a, b) => b[1][b[1].length - 1].ts - a[1][a[1].length - 1].ts);
+
+  const series = ordered.slice(0, MAX_SERIES).map((entry, index) => ({
+    tid: entry[0],
+    rows: entry[1],
+    color: cssVar(SERIES_SLOTS[index]),
+    isOther: false,
+  }));
+  const rest = ordered.slice(MAX_SERIES);
+  if (rest.length) {
+    series.push({
+      tid: 'Other',
+      label: 'Other (' + rest.length + ' tag' + (rest.length === 1 ? '' : 's') + ')',
+      rows: rest.reduce((all, entry) => all.concat(entry[1]), []).sort((a, b) => a.ts - b.ts),
+      color: cssVar('--series-other'),
+      isOther: true,
+    });
+  }
+  return series;
+}
+
+function renderChart() {
+  const svg = $('rssi-chart');
+  const holder = $('chart-holder');
+  const width = Math.max(340, holder.clientWidth - 8);
+  const height = width < 620 ? 250 : 320;
+  const margin = { top: 14, right: width < 620 ? 16 : 96, bottom: 28, left: 48 };
+  const plotW = width - margin.left - margin.right;
+  const plotH = height - margin.top - margin.bottom;
+
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+  svg.setAttribute('height', height);
+
+  const windowSec = Number($('chart-window').value) || 120;
+  const tMax = nowSec();
+  const tMin = tMax - windowSec;
+  const rows = filteredReads().filter((row) => row.ts >= tMin && row.rssi !== null && row.rssi !== undefined);
+
+  const th = state.thresholds;
+  const banded = !!(th.open_min || th.open_max);
+  const staging = !!(th.detect || banded);
+
+  renderStagingNote(staging, banded, th);
+
+  if (!rows.length) {
+    svg.innerHTML = '<text x="' + (width / 2) + '" y="' + (height / 2) +
+      '" text-anchor="middle" class="tick">' +
+      (state.reads.length ? 'No reads in this window or filter.' : 'Waiting for the first tag read…') +
+      '</text>';
+    $('chart-legend').innerHTML = '';
+    $('chart-status').textContent = '';
+    state.chartPoints = [];
+    return;
+  }
+
+  /* Y domain: the readings, plus every active threshold, plus 4 dB of air.
+     A floor of 15 dB keeps a parked tag's 1 dB wobble from filling the plot. */
+  let lo = Infinity, hi = -Infinity;
+  rows.forEach((row) => {
+    lo = Math.min(lo, row.rssi, row.median === null || row.median === undefined ? row.rssi : row.median);
+    hi = Math.max(hi, row.rssi, row.median === null || row.median === undefined ? row.rssi : row.median);
+  });
+  [th.detect, th.open_min, th.open_max].forEach((value) => {
+    if (value) { lo = Math.min(lo, value); hi = Math.max(hi, value); }
+  });
+  lo -= 4; hi += 4;
+  if (hi - lo < 15) { const mid = (hi + lo) / 2; lo = mid - 7.5; hi = mid + 7.5; }
+
+  const xOf = (ts) => margin.left + ((ts - tMin) / (tMax - tMin)) * plotW;
+  const yOf = (dbm) => margin.top + (1 - (dbm - lo) / (hi - lo)) * plotH;
+
+  const parts = [];
+
+  /* Zones. Recessive surface tints, not status colours: "inside the open band"
+     is a position, not a health state, and status hues are reserved. */
+  const clampY = (value) => Math.max(margin.top, Math.min(margin.top + plotH, yOf(value)));
+  function zone(fromDbm, toDbm, fill, label) {
+    const y1 = clampY(toDbm), y2 = clampY(fromDbm);
+    if (y2 - y1 < 1) return;
+    parts.push('<rect x="' + margin.left + '" y="' + y1 + '" width="' + plotW +
+      '" height="' + (y2 - y1) + '" fill="' + fill + '"></rect>');
+    if (label && y2 - y1 > 16) {
+      parts.push('<text x="' + (margin.left + 7) + '" y="' + (y1 + 13) +
+        '" class="zone-label">' + esc(label) + '</text>');
+    }
+  }
+  if (staging) {
+    if (banded) {
+      zone(th.open_min || lo, th.open_max || hi, cssVar('--zone-open'), 'opens the barrier');
+      if (th.detect) zone(th.detect, th.open_min || hi, cssVar('--zone-detect'), 'in range — balance shown');
+    } else if (th.detect) {
+      zone(th.detect, hi, cssVar('--zone-open'), 'opens the barrier');
+    }
+  }
+
+  /* Grid + y axis. Hairlines, solid, one shade off the surface. */
+  const yStep = niceStep((hi - lo) / 5);
+  for (let value = Math.ceil(lo / yStep) * yStep; value <= hi; value += yStep) {
+    const y = yOf(value);
+    parts.push('<line class="gridline" x1="' + margin.left + '" y1="' + y +
+      '" x2="' + (margin.left + plotW) + '" y2="' + y + '"></line>');
+    parts.push('<text x="' + (margin.left - 8) + '" y="' + (y + 3.5) +
+      '" text-anchor="end" class="tick tabular">' + Math.round(value) + '</text>');
+  }
+  parts.push('<text x="' + (margin.left - 8) + '" y="' + (margin.top - 3) +
+    '" text-anchor="end" class="tick">dBm</text>');
+
+  /* Threshold rules — darker than the grid, so they read as boundaries. The
+     rule goes under the data; its label is held back and drawn last, because
+     SVG paints in document order and a dot at that dBm would otherwise sit on
+     top of the text. */
+  const thresholdLabels = [];
+  function rule(value, label) {
+    if (!value) return;
+    const y = yOf(value);
+    if (y < margin.top || y > margin.top + plotH) return;
+    parts.push('<line class="threshold-rule" x1="' + margin.left + '" y1="' + y +
+      '" x2="' + (margin.left + plotW) + '" y2="' + y + '"></line>');
+    thresholdLabels.push('<text x="' + (margin.left + plotW - 6) + '" y="' + (y - 6) +
+      '" text-anchor="end" class="threshold-label">' + esc(label) + ' ' + value.toFixed(0) + '</text>');
+  }
+  if (staging) {
+    rule(th.detect, 'detect');
+    rule(th.open_min, 'open min');
+    rule(th.open_max, 'open max');
+  }
+
+  /* X axis. */
+  parts.push('<line class="axisline" x1="' + margin.left + '" y1="' + (margin.top + plotH) +
+    '" x2="' + (margin.left + plotW) + '" y2="' + (margin.top + plotH) + '"></line>');
+  const xTicks = width < 620 ? 3 : 6;
+  for (let i = 0; i <= xTicks; i++) {
+    const ts = tMin + (windowSec * i) / xTicks;
+    const x = xOf(ts);
+    parts.push('<text x="' + x + '" y="' + (margin.top + plotH + 16) +
+      '" text-anchor="' + (i === 0 ? 'start' : i === xTicks ? 'end' : 'middle') +
+      '" class="tick tabular">' + (i === xTicks ? 'now' : clockTime(ts)) + '</text>');
+  }
+
+  /* Series. */
+  const series = buildSeries(rows);
+  const points = [];
+  const endLabels = [];
+  series.forEach((entry) => {
+    const sorted = entry.rows.slice().sort((a, b) => a.ts - b.ts);
+
+    if (!entry.isOther && sorted.length > 1) {
+      const line = sorted.map((row, index) => {
+        const value = (row.median === null || row.median === undefined) ? row.rssi : row.median;
+        return (index ? 'L' : 'M') + xOf(row.ts).toFixed(1) + ' ' + yOf(value).toFixed(1);
+      }).join(' ');
+      parts.push('<path class="series-line" d="' + line + '" stroke="' + entry.color + '"></path>');
+    }
+
+    sorted.forEach((row) => {
+      const x = xOf(row.ts), y = yOf(row.rssi);
+      points.push({ x: x, y: y, row: row, color: entry.color, label: entry.label || entry.tid });
+      parts.push('<circle class="series-dot" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) +
+        '" r="' + (entry.isOther ? 2.5 : 3.2) + '" fill="' + entry.color +
+        '" fill-opacity="' + (entry.isOther ? 0.5 : 0.62) + '"></circle>');
+    });
+
+    /* Direct labels are collected rather than drawn, so they can be pushed
+       apart below — two tags a decibel apart put their labels on top of each
+       other, which is worse than no label at all. */
+    if (!entry.isOther && margin.right > 40 && sorted.length) {
+      const last = sorted[sorted.length - 1];
+      const value = (last.median === null || last.median === undefined) ? last.rssi : last.median;
+      endLabels.push({ y: yOf(value), color: entry.color, text: shortTid(entry.tid) });
+    }
+  });
+
+  /* Direct labels, nudged apart. This is also what discharges the light-mode
+     contrast warning on slot 3 — identity is never carried by colour alone. */
+  const LABEL_GAP = 14;
+  endLabels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < endLabels.length; i++) {
+    if (endLabels[i].y - endLabels[i - 1].y < LABEL_GAP) {
+      endLabels[i].y = endLabels[i - 1].y + LABEL_GAP;
+    }
+  }
+  /* If pushing down ran them off the bottom, push the whole stack back up. */
+  const overshoot = endLabels.length
+    ? endLabels[endLabels.length - 1].y - (margin.top + plotH)
+    : 0;
+  if (overshoot > 0) endLabels.forEach((label) => { label.y -= overshoot; });
+  endLabels.forEach((label) => {
+    parts.push('<text x="' + (margin.left + plotW + 7) + '" y="' + (label.y + 4) +
+      '" class="end-label" fill="' + label.color + '">' + esc(label.text) + '</text>');
+  });
+
+  /* Last, so they sit above the marks — with their surface halo knocking a gap
+     out of whatever passes behind. */
+  parts.push.apply(parts, thresholdLabels);
+
+  svg.innerHTML = parts.join('');
+  state.chartPoints = points;
+  state.chartGeometry = { left: margin.left, top: margin.top, width: plotW, height: plotH };
+
+  /* A legend for two or more series; for one, the status line names it —
+     a legend box for a single entry is chrome with no job. */
+  if (series.length >= 2) {
+    $('chart-legend').innerHTML = series.map((entry) =>
+      '<span class="legend-item"><span class="swatch' + (entry.isOther ? '' : ' line') +
+      '" style="background:' + entry.color + '"></span>' +
+      esc(entry.label || shortTid(entry.tid)) + '</span>').join('') +
+      '<span class="legend-item" style="color:var(--text-muted)">dots = raw read · line = median the gate judges on</span>';
+    $('chart-status').textContent = rows.length + ' reads · ' + series.length + ' tags';
+  } else {
+    $('chart-legend').innerHTML =
+      '<span class="legend-item" style="color:var(--text-muted)">dots = raw read · line = median the gate judges on</span>';
+    $('chart-status').textContent = rows.length + ' reads · tag ' + shortTid(series[0].tid);
+  }
+}
+
+function niceStep(raw) {
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 0.001))));
+  const norm = raw / pow;
+  const step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return step * pow;
+}
+
+function renderStagingNote(staging, banded, th) {
+  const holder = $('rssi-note-holder');
+  if (!staging) {
+    holder.innerHTML = '<div class="note warn">' +
+      '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg>' +
+      '<div><b>RSSI staging is off on this lane.</b> Every threshold is 0, so the gate ' +
+      'opens the barrier on the first read of any tag — including one several metres out, ' +
+      'or one in the next lane. The readings below are still recorded, which is what you ' +
+      'tune from: watch a vehicle come in, note the dBm at the boom, then set the band in ' +
+      '<b>Reader Config</b>. The median line follows the dots exactly until a window is set.</div></div>';
+    return;
+  }
+  if (!banded) {
+    holder.innerHTML = '<div class="note">' +
+      '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.8 3.3h1.6v1.5H7.2V4.3Zm0 2.9h1.6v4.5H7.2V7.2Z"/></svg>' +
+      '<div><b>Detect threshold only.</b> Anything at or above ' + th.detect.toFixed(0) +
+      ' dBm opens the barrier; there is no separate approach stage. Set an open band to ' +
+      'show a balance far out and charge only at the boom.</div></div>';
+    return;
+  }
+  holder.innerHTML = '';
+}
+
+/* ── Hover: crosshair + tooltip ─────────────────────────────────────────── */
+(function wireChartHover() {
+  const holder = $('chart-holder');
+  const tip = $('chart-tooltip');
+
+  function move(event) {
+    const points = state.chartPoints;
+    const geom = state.chartGeometry;
+    if (!points || !points.length || !geom) return;
+    const rect = $('rssi-chart').getBoundingClientRect();
+    const scale = rect.width / ($('rssi-chart').viewBox.baseVal.width || rect.width);
+    const x = (event.clientX - rect.left) / scale;
+    const y = (event.clientY - rect.top) / scale;
+
+    /* Nearest point over the whole plot rather than a hit box on each dot: at
+       3px a dot is far smaller than any reasonable target, and a dense lane
+       puts dozens of them within a few pixels. */
+    let best = null, bestDist = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const dx = points[i].x - x, dy = points[i].y - y;
+      const dist = dx * dx * 1.0 + dy * dy * 0.35;
+      if (dist < bestDist) { bestDist = dist; best = points[i]; }
+    }
+    if (!best) return;
+
+    const row = best.row;
+    tip.innerHTML = '<div class="tt-title" style="color:' + best.color + '">' + esc(row.tid || '(no tid)') + '</div>' +
+      ttRow('Time', clockTime(row.ts)) +
+      ttRow('RSSI', num(row.rssi) + ' dBm') +
+      ttRow('Median', num(row.median) + ' dBm') +
+      ttRow('Window', (row.samples || 1) + ' read' + ((row.samples || 1) === 1 ? '' : 's')) +
+      ttRow('Stage', stageWord(row.stage)) +
+      (row.epc ? ttRow('EPC', row.epc) : '');
+    tip.classList.add('on');
+
+    const tipW = tip.offsetWidth || 170, tipH = tip.offsetHeight || 110;
+    let left = best.x * scale + 14;
+    if (left + tipW > rect.width) left = best.x * scale - tipW - 14;
+    let top = best.y * scale - tipH / 2;
+    top = Math.max(2, Math.min(rect.height - tipH - 2, top));
+    tip.style.left = Math.max(2, left) + 'px';
+    tip.style.top = top + 'px';
+
+    const svg = $('rssi-chart');
+    const existing = svg.querySelector('.crosshair');
+    if (existing) existing.remove();
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('class', 'crosshair');
+    line.setAttribute('x1', best.x); line.setAttribute('x2', best.x);
+    line.setAttribute('y1', geom.top); line.setAttribute('y2', geom.top + geom.height);
+    svg.appendChild(line);
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ring.setAttribute('class', 'crosshair');
+    ring.setAttribute('cx', best.x); ring.setAttribute('cy', best.y); ring.setAttribute('r', 6);
+    ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', best.color);
+    ring.setAttribute('stroke-width', '2');
+    svg.appendChild(ring);
+  }
+
+  function leave() {
+    tip.classList.remove('on');
+    $('rssi-chart').querySelectorAll('.crosshair').forEach((node) => node.remove());
+  }
+
+  holder.addEventListener('mousemove', move);
+  holder.addEventListener('mouseleave', leave);
+})();
+
+function ttRow(label, value) {
+  return '<div class="tt-row"><span>' + esc(label) + '</span><b>' + esc(value) + '</b></div>';
+}
+
+function stageWord(stage) {
+  if (stage === 'open') return 'At barrier';
+  if (stage === 'detect') return 'In range';
+  if (stage === 'ignore') return 'Below detect';
+  return stage || '—';
+}
+
+/* ── Detection + event tables ───────────────────────────────────────────── */
+function stageBadge(stage) {
+  return '<span class="badge stage-' + esc(stage || 'ignore') + '">' + esc(stageWord(stage)) + '</span>';
+}
+
+function renderReadsTable() {
+  const rows = filteredReads().slice(-300).reverse();
+  $('reads-empty').hidden = rows.length > 0;
+  $('reads-body').innerHTML = rows.map((row) =>
+    '<tr>' +
+      '<td class="mono">' + clockTime(row.ts) + '</td>' +
+      '<td class="mono">' + esc(row.tid || '—') + '</td>' +
+      '<td class="mono">' + esc(row.epc || '—') + '</td>' +
+      '<td class="num">' + num(row.rssi) + '</td>' +
+      '<td class="num">' + num(row.median) + '</td>' +
+      '<td class="num">' + (row.samples || 1) + '</td>' +
+      '<td>' + stageBadge(row.stage) + '</td>' +
+    '</tr>').join('');
+  $('count-detections').textContent = state.reads.length;
+
+  /* Keep the tag filter in step with what has actually been seen, without
+     losing the operator's current choice. */
+  const select = $('tag-filter');
+  const seen = Array.from(new Set(state.reads.map((row) => row.tid))).filter(Boolean).sort();
+  const present = Array.from(select.options).map((option) => option.value);
+  if (seen.length + 1 !== present.length || seen.some((tid) => present.indexOf(tid) === -1)) {
+    const chosen = select.value;
+    select.innerHTML = '<option value="">All tags</option>' +
+      seen.map((tid) => '<option value="' + esc(tid) + '">' + esc(shortTid(tid)) + '</option>').join('');
+    select.value = seen.indexOf(chosen) === -1 ? '' : chosen;
+  }
+}
+
+function renderEventsTable() {
+  const rows = state.events.slice(-150).reverse();
+  $('events-empty').hidden = rows.length > 0;
+  $('events-body').innerHTML = rows.map((row) => {
+    const denied = row.result === 'denied';
+    return '<tr>' +
+      '<td class="mono">' + clockTime(row.ts) + '</td>' +
+      '<td>' + esc(row.kind) + (row.offline ? ' <span class="badge neutral">offline</span>' : '') + '</td>' +
+      '<td class="mono">' + esc(shortTid(row.tid)) + '</td>' +
+      '<td>' + esc(row.plate || '—') + '</td>' +
+      '<td><span class="badge ' + (denied ? 'denied' : 'ok') + '">' + esc(row.result || '—') + '</span></td>' +
+      '<td class="num">' + (row.charge ? esc(row.charge) : '—') + '</td>' +
+      '<td class="num">' + (row.balance ? esc(row.balance) : '—') + '</td>' +
+      '<td style="color:var(--text-secondary)">' + esc(row.reason || '') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+$('export-reads').addEventListener('click', () => {
+  const rows = filteredReads();
+  if (!rows.length) { toast('info', 'Nothing to export', 'No reads match the current filter.'); return; }
+  const header = 'timestamp,iso_time,tid,epc,rssi_dbm,median_dbm,window_samples,stage\n';
+  const body = rows.map((row) => [
+    row.ts, new Date(row.ts * 1000).toISOString(), row.tid, row.epc,
+    row.rssi, row.median, row.samples, row.stage,
+  ].join(',')).join('\n');
+  const blob = new Blob([header + body], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'booth-detections-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '') + '.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+['chart-window', 'tag-filter', 'stage-filter'].forEach((id) => {
+  $(id).addEventListener('change', () => { renderChart(); renderReadsTable(); });
+});
+
+/* ── Barrier ─────────────────────────────────────────────────────────────── */
+function renderBarrier() {
+  const rows = state.barrier.slice(-200).reverse();
+  $('barrier-empty').hidden = rows.length > 0;
+  $('barrier-body').innerHTML = rows.map((row) =>
+    '<tr>' +
+      '<td class="mono">' + clockTime(row.ts) + '</td>' +
+      '<td><b>' + esc(row.action) + '</b></td>' +
+      '<td>' + esc(row.source || '—') + '</td>' +
+      '<td>' + esc(row.backend || '—') + '</td>' +
+      '<td><span class="badge ' + (row.ok ? 'ok' : 'denied') + '">' + (row.ok ? 'sent' : 'failed') + '</span></td>' +
+      '<td class="mono" style="color:var(--text-secondary)">' + esc(row.detail || '') + '</td>' +
+    '</tr>').join('');
+  $('count-barrier').textContent = state.barrier.length;
+
+  const portal = state.portalRequests;
+  $('portal-empty').hidden = portal.length > 0;
+  $('portal-body').innerHTML = portal.map((row) => {
+    const waiting = !row.executed_at;
+    const stale = waiting && (nowSec() - row.created_at) > 30;
+    return '<tr>' +
+      '<td class="mono">' + clockTime(row.created_at) + ' <span style="color:var(--text-muted)">' + agoText(row.created_at) + '</span></td>' +
+      '<td>' + (row.lane === null ? '—' : esc(row.lane)) + '</td>' +
+      '<td class="mono">' + (row.executed_at ? clockTime(row.executed_at) : '—') + '</td>' +
+      '<td><span class="badge ' + (row.executed_at ? 'ok' : (stale ? 'denied' : 'neutral')) + '">' +
+        (row.executed_at ? 'claimed' : (stale ? 'never claimed' : 'pending')) + '</span></td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function openBarrier(via) {
+  const button = via === 'gate' ? $('open-via-gate') : $('open-via-service');
+  button.disabled = true;
+  try {
+    const result = await api(API + '/barrier/open/', { body: { via: via } });
+    toast('ok', via === 'gate' ? 'Open queued for the gate' : 'Barrier service accepted the open',
+      via === 'gate'
+        ? 'Command #' + result.id + ' at ' + result.plaza + '. The gate claims it within a second.'
+        : 'Round trip ' + num(result.latency_ms) + ' ms.');
+    pollBarrier();
+  } catch (err) {
+    reportError('Barrier open failed', err);
+  } finally {
+    button.disabled = false;
+    applyRoleGates();
+  }
+}
+$('open-via-gate').addEventListener('click', () => openBarrier('gate'));
+$('open-via-service').addEventListener('click', () => openBarrier('service'));
+
+/* ── Camera ──────────────────────────────────────────────────────────────── */
+async function loadCameraInfo() {
+  try {
+    const data = await api(API + '/camera/');
+    const rows = [
+      ['RTSP URL', data.rtsp_url || 'not configured'],
+      ['Transport', data.transport],
+      ['HTTP snapshot', data.snapshot_url || '—'],
+      ['ffmpeg', data.tools.ffmpeg ? 'installed' : 'MISSING'],
+      ['ffprobe', data.tools.ffprobe ? 'installed' : 'MISSING'],
+    ];
+    $('camera-kv').innerHTML = rows
+      .map((pair) => '<dt>' + esc(pair[0]) + '</dt><dd>' + esc(pair[1]) + '</dd>').join('');
+
+    const notes = [];
+    if (!data.configured) {
+      notes.push('<div class="note warn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' +
+        '<b>No camera configured.</b> Set <code>rtsp_url</code> under <code>[camera]</code> in ' +
+        '<b>Reader Config</b> — for example <code>rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101</code>.</div></div>');
+    }
+    if (!data.tools.ffmpeg) {
+      notes.push('<div class="note severe"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' +
+        '<b>ffmpeg is not installed on this booth</b>, so no frame can be decoded. ' +
+        'Install it with <code>sudo apt-get install -y ffmpeg</code>, or point ' +
+        '<code>snapshot_url</code> at a JPEG the camera serves over HTTP.</div></div>');
+    }
+    notes.push('<div class="note"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.8 3.3h1.6v1.5H7.2V4.3Zm0 2.9h1.6v4.5H7.2V7.2Z"/></svg><div>' +
+      'A browser cannot play RTSP, so the booth decodes a single frame with ffmpeg and serves it as a still. ' +
+      esc(data.anpr_note) + '</div></div>');
+    $('camera-notes').innerHTML = notes.join('');
+  } catch (err) { reportError('Could not read the camera settings', err); }
+}
+
+async function grabFrame() {
+  const frame = $('camera-frame');
+  const status = $('camera-status');
+  status.textContent = 'grabbing…';
+  try {
+    const response = await fetch(API + '/camera/snapshot/?t=' + Date.now(), { credentials: 'same-origin' });
+    if (response.status === 401) { setAuthed(false); return; }
+    if (!response.ok) {
+      const reason = response.headers.get('X-Camera-Error') || await response.text();
+      frame.innerHTML = '<div class="placeholder"><b>No frame.</b><br>' + esc(reason) + '</div>';
+      status.textContent = 'failed';
+      return;
+    }
+    const blob = await response.blob();
+    let img = frame.querySelector('img');
+    if (!img) { frame.innerHTML = ''; img = document.createElement('img'); frame.appendChild(img); }
+    const previous = img.src;
+    img.src = URL.createObjectURL(blob);
+    if (previous && previous.startsWith('blob:')) URL.revokeObjectURL(previous);
+    status.textContent = 'frame at ' + clockTime(nowSec()) + ' · ' + Math.round(blob.size / 1024) + ' kB';
+  } catch (err) {
+    frame.innerHTML = '<div class="placeholder"><b>No frame.</b><br>' + esc(err.message) + '</div>';
+    status.textContent = 'failed';
+  }
+}
+
+$('camera-grab').addEventListener('click', grabFrame);
+$('camera-auto').addEventListener('change', (event) => {
+  clearInterval(state.cameraTimer);
+  state.cameraTimer = null;
+  if (event.target.checked) { grabFrame(); state.cameraTimer = setInterval(grabFrame, 2000); }
+});
+
+$('camera-probe').addEventListener('click', async () => {
+  const out = $('camera-probe-out');
+  out.innerHTML = '<div class="empty" style="padding:20px 0">Opening the stream…</div>';
+  try {
+    const data = await api(API + '/camera/probe/');
+    if (!data.ok) {
+      out.innerHTML = '<div class="note severe"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div><b>Could not open the stream.</b><br>' +
+        esc(data.error) + '</div></div>';
+      return;
+    }
+    const video = data.streams.filter((s) => s.type === 'video')[0] || {};
+    const rows = [
+      ['URL', data.format.url],
+      ['Container', data.format.name],
+      ['Codec', (video.codec || '?') + (video.profile ? ' (' + video.profile + ')' : '')],
+      ['Resolution', video.width ? video.width + ' × ' + video.height : '—'],
+      ['Frame rate', fpsText(video.frame_rate)],
+      ['Bit rate', video.bit_rate ? Math.round(video.bit_rate / 1000) + ' kbps' : (data.format.bit_rate ? Math.round(data.format.bit_rate / 1000) + ' kbps' : '—')],
+      ['Streams', data.streams.map((s) => s.type + '/' + s.codec).join(', ')],
+      ['Time to open', num(data.elapsed_ms, 0) + ' ms'],
+    ];
+    out.innerHTML = '<dl class="kv">' + rows
+      .map((pair) => '<dt>' + esc(pair[0]) + '</dt><dd>' + esc(pair[1] || '—') + '</dd>').join('') + '</dl>';
+  } catch (err) { reportError('Probe failed', err); out.innerHTML = ''; }
+});
+
+function fpsText(raw) {
+  if (!raw || raw.indexOf('/') === -1) return raw || '—';
+  const parts = raw.split('/');
+  const value = Number(parts[0]) / Number(parts[1]);
+  return Number.isFinite(value) ? value.toFixed(value % 1 ? 2 : 0) + ' fps' : raw;
+}
+
+/* ── Balance validator ───────────────────────────────────────────────────── */
+async function lookupBalance() {
+  const query = $('balance-query').value.trim();
+  if (!query) return;
+  const out = $('balance-result');
+  out.innerHTML = '<div class="empty">Looking up…</div>';
+  try {
+    const data = await api(API + '/balance/?tid=' + encodeURIComponent(query));
+    out.innerHTML = renderBalance(data);
+  } catch (err) {
+    reportError('Lookup failed', err);
+    out.innerHTML = '<div class="note severe"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' + esc(err.message) + '</div></div>';
+  }
+}
+
+function renderBalance(data) {
+  if (!data.found) {
+    return '<div class="note severe"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3 9-1 1-2-2-2 2-1-1 2-2-2-2 1-1 2 2 2-2 1 1-2 2 2 2Z"/></svg>' +
+      '<div><b>Nothing matches “' + esc(data.query) + '”.</b><br>' +
+      'No tag with that chip TID or serial, and no vehicle with that plate. ' +
+      'At the barrier this reads as <b>Tag not found</b> and the boom stays down.</div></div>';
+  }
+
+  const verdict = data.verdict || {};
+  const account = data.account;
+  const tag = data.tag || {};
+  const vehicle = data.vehicle;
+
+  const head = verdict.success
+    ? '<div class="note"><span class="s-good">' + ICONS.good + '</span><div><b>This tag would be accepted.</b> ' +
+      'Matched on ' + esc(data.matched_on) + '. ' +
+      (verdict.sufficient === false
+        ? 'Its balance is below the Rs.' + esc(data.minimum_balance) + ' minimum, so an <b>entry</b> would be refused — an exit is charged against the fare of the moment.'
+        : 'Balance is above the Rs.' + esc(data.minimum_balance) + ' minimum.') + '</div></div>'
+    : '<div class="note severe"><span class="s-critical">' + ICONS.critical + '</span><div><b>This tag would be refused: ' +
+      esc(verdict.reason || 'denied') + '.</b> Matched on ' + esc(data.matched_on) + '. ' +
+      'The barrier stays down and the driver is shown nothing.</div></div>';
+
+  const rows = [
+    ['Chip TID', tag.tid || '(none registered)'],
+    ['Tag serial', tag.tag_serial],
+    ['EPC', tag.epc || '—'],
+    ['Tag status', tag.status],
+    ['Expires', tag.expiry_date || '—'],
+    ['Last scanned', tag.last_scanned_at ? clockTime(tag.last_scanned_at) + ' · ' + agoText(tag.last_scanned_at) : 'never'],
+    ['Vehicle', vehicle ? vehicle.plate_number + ' (' + vehicle.vehicle_type + ')' : 'not assigned'],
+    ['Vehicle status', vehicle ? vehicle.status : '—'],
+    ['Balance', account ? 'Rs. ' + account.balance : 'no account'],
+    ['Minimum for entry', 'Rs. ' + data.minimum_balance],
+    ['Open trip', data.active_trip
+      ? 'entered ' + esc(data.active_trip.entry_plaza) + ' at ' + clockTime(data.active_trip.entry_time)
+      : 'none'],
+  ];
+
+  const balanceTile = account ? statTile(
+    'Wallet balance', 'Rs. ' + account.balance, '',
+    (account.sufficient ? 'above' : 'below') + ' the Rs.' + data.minimum_balance + ' entry minimum · updated ' + agoText(account.updated_at)) : '';
+
+  return head +
+    (balanceTile ? '<div style="margin-top:14px">' + balanceTile + '</div>' : '') +
+    '<dl class="kv" style="margin-top:14px">' + rows
+      .map((pair) => '<dt>' + esc(pair[0]) + '</dt><dd>' + esc(pair[1] === undefined || pair[1] === null || pair[1] === '' ? '—' : pair[1]) + '</dd>')
+      .join('') + '</dl>';
+}
+
+$('balance-go').addEventListener('click', lookupBalance);
+$('balance-query').addEventListener('keydown', (event) => { if (event.key === 'Enter') lookupBalance(); });
+$('balance-last').addEventListener('click', () => {
+  const last = state.reads.filter((row) => row.tid).slice(-1)[0];
+  if (!last) { toast('info', 'No tag detected yet', 'Nothing has been read on this lane since the console opened.'); return; }
+  $('balance-query').value = last.tid;
+  lookupBalance();
+});
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Reader configuration.
+
+   Every field maps to one key in rfid_config.ini. The help text is where the
+   non-obvious behaviour lives — most of all antenna_power, which the gate reads
+   and then deliberately does not send to the reader. Someone who changes it
+   expecting the field to widen, and is not told, will spend an afternoon on it.
+   ─────────────────────────────────────────────────────────────────────────── */
+const CONFIG_GROUPS = [
+  { title: 'Reader', fields: [
+    { key: 'scanner.reader_host', label: 'Reader host',
+      help: 'LAN address of the UHF reader. The gate opens a TCP socket to it and reconnects every 5s while it is down.' },
+    { key: 'scanner.reader_port', label: 'Reader port', help: 'Default 9090.' },
+    { key: 'scanner.antenna_power', label: 'Antenna power (dBm)',
+      help: 'NOT APPLIED BY THE GATE. run_gate reads this value and deliberately never sends it to the reader — setting RW_RFIDAntPower was found to stop TID reads, so the gate leaves the reader on its own saved power and only enables the extended TID read. Change the power in the reader’s own utility; use the RSSI band below to control lane reach.',
+      warn: true },
+    { key: 'scanner.scan_interval', label: 'Scan interval (s)',
+      help: 'Pause between inventory passes. 1.0 is normal; lower means faster pickup and more load on the reader.' },
+    { key: 'scanner.tag_cooldown', label: 'Tag cooldown (s)',
+      help: 'How long one tag is ignored after it has been charged, so a vehicle sitting in the field is not billed twice.' },
+  ]},
+  { title: 'RSSI staging — how close a vehicle must be', fields: [
+    { key: 'scanner.rssi_detect', label: 'Detect threshold (dBm)',
+      help: 'The weakest read worth reacting to. At or above this the driver is shown their balance and nothing else happens. 0 turns staging off entirely. Negative, e.g. -70.' },
+    { key: 'scanner.rssi_open_min', label: 'Open band, lower (dBm)',
+      help: 'The barrier opens and the trip is charged only inside the band. Must be at or above detect — e.g. -55.' },
+    { key: 'scanner.rssi_open_max', label: 'Open band, upper (dBm)',
+      help: 'The top of the band. Rejects a tag held right against the antenna. e.g. -45. 0 means no upper limit.' },
+    { key: 'scanner.rssi_window', label: 'Median window (reads)',
+      help: 'The gate decides on the median of the last N reads, so one outlier cannot flip a stage. 5 is the default; at least 1.' },
+    { key: 'scanner.rssi_hysteresis', label: 'Hysteresis (dB)',
+      help: 'A tag already at the barrier must fall this far clear of the band before it is let go. Stops a parked tag flapping between stages.' },
+  ]},
+  { title: 'Barrier', fields: [
+    { key: 'barrier.port', label: 'Serial port', help: 'e.g. /dev/ttyUSB0. Only used when no barrier service is running.' },
+    { key: 'barrier.baudrate', label: 'Baud rate', help: '115200 on these relays.' },
+    { key: 'barrier.open_seconds', label: 'Open window (s)',
+      help: 'How long the boom stays up for one vehicle. Each further approved vehicle extends the same opening rather than pulsing again; 60s of continuous opening is the hard ceiling.' },
+    { key: 'barrier.mode', label: 'Mode',
+      help: '"auto" uses the barrier service when it answers and falls back to serial. "serial" pins the serial path on a booth where the service must not be used.' },
+    { key: 'barrier.service_url', label: 'Barrier service URL', help: 'Default http://127.0.0.1:3005.' },
+  ]},
+  { title: 'Customer display', fields: [
+    { key: 'display.display_ip', label: 'Display IP',
+      help: 'The UFD. Updates are fire-and-forget HTTP GETs, so a wrong address fails silently.' },
+  ]},
+  { title: 'LPR camera', fields: [
+    { key: 'camera.rtsp_url', label: 'RTSP URL',
+      help: 'e.g. rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101. Used by this console only; plate recognition itself runs in quick-toll-system. The password is redacted everywhere it is displayed — leave the field blank to keep the one already saved.' },
+    { key: 'camera.transport', label: 'Transport', help: '"tcp" or "udp". tcp unless you have a reason.' },
+    { key: 'camera.snapshot_url', label: 'HTTP snapshot URL (optional)',
+      help: 'If the camera serves a JPEG over HTTP, it is far cheaper than spinning up ffmpeg per frame.' },
+  ]},
+];
+
+async function loadConfig() {
+  try {
+    const data = await api(API + '/config/');
+    state.config = data;
+    state.configDraft = {};
+    $('config-path').textContent = data.path || '';
+    $('config-raw').textContent = data.raw || '(empty)';
+
+    const notes = [];
+    if (data.error) {
+      notes.push('<div class="note severe"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' + esc(data.error) + '</div></div>');
+    }
+    const scanner = (data.sections && data.sections.scanner) || {};
+    if (scanner.rssi_filter !== undefined || scanner.rssi_filter_max !== undefined) {
+      notes.push('<div class="note warn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' +
+        '<b>This booth still uses the old single-band keys.</b> <code>rssi_filter=' + esc(scanner.rssi_filter || '0') +
+        '</code> and <code>rssi_filter_max=' + esc(scanner.rssi_filter_max || '0') + '</code> are honoured as fallbacks for detect and open-max, ' +
+        'which is why the fields below may look empty while the gate is filtering. Writing the three new keys here takes precedence over them.</div></div>');
+    }
+    notes.push('<div class="note"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.8 3.3h1.6v1.5H7.2V4.3Zm0 2.9h1.6v4.5H7.2V7.2Z"/></svg><div>' +
+      '<b>Plaza, lane and entry/exit mode are not editable here.</b> They decide which plaza a vehicle is billed against, so changing one is a deployment decision made over SSH. ' +
+      'Everything written here is validated against the gate’s own start-up rules first — a set of thresholds it would refuse to boot on is rejected before it reaches the file, and a <code>.bak</code> is kept either way.</div></div>');
+    $('config-notes').innerHTML = notes.join('');
+
+    const sections = data.sections || {};
+    $('config-form').innerHTML = CONFIG_GROUPS.map((group) =>
+      '<fieldset><legend>' + esc(group.title) + '</legend>' +
+      group.fields.map((field) => {
+        const parts = field.key.split('.');
+        const value = (sections[parts[0]] || {})[parts[1]] || '';
+        return '<div class="field" data-key="' + esc(field.key) + '">' +
+          '<label for="cfg-' + esc(field.key) + '">' + esc(field.label) + '</label>' +
+          '<input type="text" id="cfg-' + esc(field.key) + '" value="' + esc(value) +
+          '" data-original="' + esc(value) + '" spellcheck="false" autocomplete="off">' +
+          '<span class="help"' + (field.warn ? ' style="color:var(--warning)"' : '') + '>' + field.help + '</span>' +
+          '</div>';
+      }).join('') + '</fieldset>').join('');
+
+    $('config-form').querySelectorAll('input').forEach((input) => {
+      input.addEventListener('input', () => {
+        const wrapper = input.closest('.field');
+        const changed = input.value.trim() !== input.dataset.original.trim();
+        wrapper.classList.toggle('changed', changed);
+        if (changed) state.configDraft[wrapper.dataset.key] = input.value.trim();
+        else delete state.configDraft[wrapper.dataset.key];
+      });
+    });
+  } catch (err) { reportError('Could not read the config', err); }
+}
+
+async function submitConfig(dryRun) {
+  const changes = state.configDraft;
+  if (!Object.keys(changes).length) {
+    toast('info', 'Nothing to apply', 'No field has been changed.');
+    return;
+  }
+  const out = $('config-result');
+  out.innerHTML = '<div class="empty">Validating…</div>';
+  try {
+    const result = await api(API + '/config/', {
+      body: { changes: changes, dry_run: !!dryRun, restart: !dryRun && $('config-restart').checked },
+    });
+    const applied = result.applied || result.would_apply || {};
+    const lines = Object.keys(applied).map((key) => key + ' = ' + applied[key]);
+    out.innerHTML = '<div class="note"><span class="s-good">' + ICONS.good + '</span><div><b>' +
+      (dryRun ? 'Valid. Nothing written.' : (result.restarted ? 'Written and mtag-gate restarted.' : 'Written.')) +
+      '</b>' + (lines.length ? '<br><code>' + esc(lines.join(' · ')) + '</code>' : '') +
+      (!dryRun && !result.restarted && !$('config-restart').checked
+        ? '<br>The gate reads this file only at startup — restart it to apply.' : '') +
+      (result.backup ? '<br><span style="color:var(--text-muted)">Previous file kept at ' + esc(result.backup) + '</span>' : '') +
+      '</div></div>';
+    toast('ok', dryRun ? 'Configuration is valid' : 'Configuration written', lines.join(' · '));
+    if (!dryRun) { await loadConfig(); pollNow(); }
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 422) {
+      const problems = (err.payload.errors && err.payload.errors.validation) || [err.message];
+      out.innerHTML = '<div class="note severe"><span class="s-critical">' + ICONS.critical + '</span><div>' +
+        '<b>Refused — the gate would not start on these values.</b><ul style="margin:6px 0 0;padding-left:18px">' +
+        problems.map((line) => '<li>' + esc(line) + '</li>').join('') + '</ul></div></div>';
+      return;
+    }
+    reportError('Could not write the config', err);
+    out.innerHTML = '';
+  }
+}
+
+$('config-validate').addEventListener('click', () => submitConfig(true));
+$('config-apply').addEventListener('click', () => submitConfig(false));
+$('config-reload').addEventListener('click', loadConfig);
+$('config-restore').addEventListener('click', async () => {
+  if (!window.confirm('Restore rfid_config.ini from its .bak and restart mtag-gate?\n\nThe lane stops for a few seconds.')) return;
+  try {
+    const result = await api(API + '/config/restore/', { body: { restart: true } });
+    toast('ok', 'Restored from backup', result.restarted ? 'mtag-gate restarted.' : 'Restart the gate to apply.');
+    await loadConfig();
+  } catch (err) { reportError('Restore failed', err); }
+});
+
+/* ── Logs ────────────────────────────────────────────────────────────────── */
+async function loadLog() {
+  const box = $('log-box');
+  try {
+    const data = await api(API + '/logs/?process=' + encodeURIComponent($('log-process').value) +
+      '&lines=' + encodeURIComponent($('log-lines').value));
+    if (!data.ok) { box.textContent = data.error || 'No log available.'; return; }
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+    box.textContent = (data.lines || []).join('\n') || '(log is empty)';
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  } catch (err) { reportError('Could not read the log', err); }
+}
+
+$('log-refresh').addEventListener('click', loadLog);
+$('log-process').addEventListener('change', loadLog);
+$('log-lines').addEventListener('change', loadLog);
+$('log-auto').addEventListener('change', (event) => {
+  clearInterval(state.logTimer);
+  state.logTimer = null;
+  if (event.target.checked) { loadLog(); state.logTimer = setInterval(loadLog, 3000); }
+});
+$('gate-restart').addEventListener('click', async () => {
+  if (!window.confirm('Restart mtag-gate?\n\nThe lane stops for a few seconds while the gate reconnects to the reader.')) return;
+  try {
+    const result = await api(API + '/restart/', { body: { process: 'mtag-gate' } });
+    toast('ok', 'mtag-gate restarted', (result.output || '').slice(0, 160));
+    setTimeout(pollNow, 2500);
+  } catch (err) { reportError('Restart failed', err); }
+});
+
+/* ── Polling ─────────────────────────────────────────────────────────────── */
+function mergeRows(existing, incoming, cap) {
+  /* Deduplicated by row id. `since` normally makes that impossible — the server
+     only returns what the caller has not seen — but a retry, a clock step, or a
+     poll that overlaps its predecessor can hand back a row twice, and a chart
+     that plots the same read twice reports a lane as busier than it is. The id
+     is the server's primary key, so it is the right thing to key on. */
+  const seen = new Set();
+  const cutoff = nowSec() - READ_MAX_AGE;
+  const fresh = [];
+  for (const row of existing.concat(incoming)) {
+    if (row.ts < cutoff) continue;
+    if (row.id !== undefined) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+    }
+    fresh.push(row);
+  }
+  fresh.sort((a, b) => a.ts - b.ts);
+  return fresh.length > cap ? fresh.slice(fresh.length - cap) : fresh;
+}
+
+async function pollOverview() {
+  if (state.paused) return;
+  try {
+    renderOverview(await api(API + '/overview/'));
+    markLive(true);
+  } catch (err) { markLive(false); }
+}
+
+async function pollDetections() {
+  if (state.paused || state.isBooth === false) return;
+  try {
+    const data = await api(API + '/detections/?since=' + state.lastReadId + '&limit=600');
+    if (data.server_time) state.clockOffset = data.server_time - Date.now() / 1000;
+    state.thresholds = data.thresholds || state.thresholds;
+    if (data.reads && data.reads.length) {
+      state.reads = mergeRows(state.reads, data.reads, READ_BUFFER);
+      state.lastReadId = data.last_id;
+    } else {
+      /* Still drop what has aged out, so a quiet lane's chart empties instead
+         of freezing on the last vehicle of an hour ago. */
+      state.reads = mergeRows(state.reads, [], READ_BUFFER);
+    }
+    renderChart();
+    renderReadsTable();
+    markLive(true);
+  } catch (err) { markLive(false); }
+}
+
+async function pollEvents() {
+  if (state.paused || state.isBooth === false) return;
+  try {
+    const data = await api(API + '/events/?since=' + state.lastEventId + '&limit=150');
+    if (data.events && data.events.length) {
+      state.events = mergeRows(state.events, data.events, 400);
+      state.lastEventId = data.last_id;
+      renderEventsTable();
+    }
+  } catch (err) { /* the overview poll owns the live indicator */ }
+}
+
+async function pollBarrier() {
+  if (state.paused || state.isBooth === false) return;
+  try {
+    const data = await api(API + '/barrier/?since=' + state.lastBarrierId + '&limit=150');
+    if (data.commands && data.commands.length) {
+      state.barrier = mergeRows(state.barrier, data.commands, 400);
+      state.lastBarrierId = data.last_id;
+    }
+    state.portalRequests = data.portal_requests || [];
+    renderBarrier();
+  } catch (err) { /* as above */ }
+}
+
+function markLive(ok) {
+  const dot = $('live-dot');
+  dot.className = 'live-dot ' + (state.paused ? 'paused' : ok ? 'on' : 'off');
+  document.querySelectorAll('main .card').forEach((card) => card.classList.toggle('stale', !ok && !state.paused));
+}
+
+function pollNow() {
+  pollOverview(); pollDetections(); pollEvents(); pollBarrier();
+}
+
+$('pause-btn').addEventListener('click', () => {
+  state.paused = !state.paused;
+  $('pause-btn').textContent = state.paused ? 'Resume' : 'Pause';
+  markLive(true);
+  if (!state.paused) pollNow();
+});
+
+/* ── Tabs & theme ────────────────────────────────────────────────────────── */
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', () => selectTab(tab.dataset.tab));
+});
+
+function selectTab(name) {
+  state.tab = name;
+  document.querySelectorAll('.tab').forEach((tab) =>
+    tab.setAttribute('aria-selected', tab.dataset.tab === name ? 'true' : 'false'));
+  document.querySelectorAll('.panel').forEach((panel) =>
+    { panel.hidden = panel.id !== 'panel-' + name; });
+  if (name === 'detections') renderChart();
+  if (name === 'camera' && !$('camera-kv').children.length) loadCameraInfo();
+  if (name === 'reader' && !state.config) loadConfig();
+  if (name === 'logs' && $('log-box').textContent === 'Press Refresh.') loadLog();
+  try { history.replaceState(null, '', '#' + name); } catch (err) { /* file:// */ }
+}
+
+$('theme-btn').addEventListener('click', () => {
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark' ||
+    (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  try { localStorage.setItem('booth-console-theme', isDark ? 'light' : 'dark'); } catch (err) { /* private mode */ }
+  renderChart();  /* the series hexes are per-theme, so the SVG must be redrawn */
+});
+
+/* ── Boot ────────────────────────────────────────────────────────────────── */
+(function init() {
+  try {
+    const saved = localStorage.getItem('booth-console-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+  } catch (err) { /* private mode — the OS setting still applies */ }
+
+  const hash = (location.hash || '').replace('#', '');
+  if (document.getElementById('panel-' + hash)) selectTab(hash);
+  else selectTab('overview');
+
+  window.addEventListener('resize', () => { if (state.tab === 'detections') renderChart(); });
+  window.matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => renderChart());
+
+  pollNow();
+  setInterval(pollOverview, POLL.overview);
+  setInterval(pollDetections, POLL.detections);
+  setInterval(pollEvents, POLL.events);
+  setInterval(pollBarrier, POLL.barrier);
+})();
+</script>
+</body>
+</html>

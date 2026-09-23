@@ -38,6 +38,8 @@ class DisplayTestCase(SimpleTestCase):
             serial_port='/dev/null', serial_baud=115200, open_secs=2.0,
             display_ip=DISPLAY_IP, tag_cooldown=5.0, stdout=_Sink(),
             barrier_mode='serial',
+            # No writer thread and no booth_activity.db in the test tree.
+            record_activity=False,
         )
         self.gate._running = False  # stop the portal-poll thread promptly
 
