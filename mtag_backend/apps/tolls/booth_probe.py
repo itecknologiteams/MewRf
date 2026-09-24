@@ -82,7 +82,12 @@ def is_booth() -> bool:
 # carries no secret today, but it used to hold an [api] operator_token and a
 # camera URL routinely carries a password in its userinfo.
 _SECRET_KEY_RE = re.compile(r'token|password|secret|passwd|_key$', re.I)
-_URL_USERINFO_RE = re.compile(r'(?P<scheme>[a-z][a-z0-9+.\-]*://)(?P<user>[^/:@\s]+):(?P<pw>[^/@\s]+)@')
+# The password group is greedy and excludes only '/' and whitespace, so it runs
+# to the LAST '@' before the path. That matters for a password someone wrote
+# without percent-encoding: in `rtsp://admin:Iteck@123@host/s`, a non-greedy
+# group stops at the first '@' and redacts only `Iteck`, printing the rest of
+# the password to the page as if it were the hostname.
+_URL_USERINFO_RE = re.compile(r'(?P<scheme>[a-z][a-z0-9+.\-]*://)(?P<user>[^/:@\s]+):(?P<pw>[^/\s]+)@')
 
 REDACTED = '********'
 
@@ -105,6 +110,24 @@ def redact_value(key: str, value: str) -> str:
     if _SECRET_KEY_RE.search(key or ''):
         return REDACTED if value else ''
     return redact_url(value)
+
+
+def _new_parser() -> configparser.ConfigParser:
+    """A parser that treats '%' as data.
+
+    configparser's default BasicInterpolation reads '%' as the start of a
+    substitution and raises InterpolationSyntaxError on any value containing a
+    bare one. A camera URL carries exactly that: a URL-encoded password such as
+    `Iteck%40123` (which is `Iteck@123`).
+
+    The failure was quiet and misleading. `_get` catches configparser.Error and
+    returns its fallback, so the console reported a fully configured camera as
+    "not configured" and the snapshot endpoint answered 502 — pointing at the
+    camera, the network and ffmpeg, none of which were at fault.
+
+    Nothing in rfid_config.ini has ever used interpolation, so it is off.
+    """
+    return configparser.ConfigParser(interpolation=None)
 
 
 def read_config(path=None) -> dict:
@@ -135,7 +158,7 @@ def read_config(path=None) -> dict:
         result['error'] = f"Cannot read {path}: {exc}"
         return result
 
-    parser = configparser.ConfigParser()
+    parser = _new_parser()
     try:
         parser.read_string(raw)
     except configparser.Error as exc:
@@ -145,10 +168,18 @@ def read_config(path=None) -> dict:
         result['raw'] = _redact_raw(raw)
         return result
 
-    result['sections'] = {
-        section: {key: redact_value(key, value) for key, value in parser[section].items()}
-        for section in parser.sections()
-    }
+    # Inside its own try: values are only resolved when they are read, so a
+    # parse that succeeded says nothing about whether reading it will. This
+    # comprehension sat outside and turned a bad value into a 500 on the one
+    # page whose job is to explain bad values.
+    try:
+        result['sections'] = {
+            section: {key: redact_value(key, value)
+                      for key, value in parser[section].items()}
+            for section in parser.sections()
+        }
+    except configparser.Error as exc:
+        result['error'] = f"{CONFIG_FILENAME} has a value that cannot be read: {exc}"
     result['raw'] = _redact_raw(raw)
     return result
 
@@ -170,7 +201,7 @@ def _redact_raw(raw: str) -> str:
 
 def raw_config_parser(path=None) -> configparser.ConfigParser:
     """The unredacted config, for internal use (probing, camera URLs)."""
-    parser = configparser.ConfigParser()
+    parser = _new_parser()
     parser.read(path or config_path())
     return parser
 
@@ -216,6 +247,15 @@ def gate_identity(parser=None) -> dict:
         'camera_rtsp_url': _get(parser, 'camera', 'rtsp_url'),
         'camera_transport': _get(parser, 'camera', 'transport', 'tcp'),
         'camera_snapshot_url': _get(parser, 'camera', 'snapshot_url'),
+        # The live view's own knobs. A separate stream_url is the single biggest
+        # saving available: most cameras publish a low-resolution sub-stream
+        # beside the main one, and transcoding 640x360 costs a fraction of
+        # transcoding 1080p. Falls back to rtsp_url when unset.
+        'camera_stream_url': _get(parser, 'camera', 'stream_url') or
+                             _get(parser, 'camera', 'rtsp_url'),
+        'camera_stream_width': _get(parser, 'camera', 'stream_width', '640'),
+        'camera_stream_fps': _get(parser, 'camera', 'stream_fps', '6'),
+        'camera_stream_quality': _get(parser, 'camera', 'stream_quality', '7'),
     }
 
 
@@ -234,7 +274,8 @@ EDITABLE = {
     'barrier': {'port', 'baudrate', 'open_seconds', 'mode',
                 'service_url', 'service_cycle_seconds'},
     'display': {'display_ip'},
-    'camera': {'rtsp_url', 'transport', 'snapshot_url'},
+    'camera': {'rtsp_url', 'transport', 'snapshot_url', 'stream_url',
+               'stream_width', 'stream_fps', 'stream_quality'},
 }
 
 _HOST_RE = re.compile(r'^[A-Za-z0-9](?:[A-Za-z0-9.\-]{0,253}[A-Za-z0-9])?$')
@@ -360,6 +401,17 @@ def validate_changes(changes: dict, current: dict) -> list:
     snapshot = value_of('camera', 'snapshot_url')
     if snapshot and not snapshot.startswith(('http://', 'https://')):
         errors.append(f"camera snapshot_url must be http(s)://, got '{snapshot}'.")
+    stream = value_of('camera', 'stream_url')
+    if stream and not stream.startswith(('rtsp://', 'rtsps://', 'http://', 'https://')):
+        errors.append(
+            f"camera stream_url must start with rtsp:// (or http://), got '{stream}'.")
+    # Bounded because these decide how much CPU the live view can take on a
+    # booth PC that also has a lane to run. 1280px at 15fps is already more than
+    # a diagnostic view needs and about as much as the hardware will give.
+    _as_int('stream_width', value_of('camera', 'stream_width', '640'), errors, 160, 1920)
+    _as_float('stream_fps', value_of('camera', 'stream_fps', '6'), errors, 0.5, 15.0)
+    # ffmpeg's -q:v scale: 2 is best, 31 is worst.
+    _as_int('stream_quality', value_of('camera', 'stream_quality', '7'), errors, 2, 31)
     transport = value_of('camera', 'transport', 'tcp').lower()
     if transport and transport not in ('tcp', 'udp'):
         errors.append(f"camera transport must be 'tcp' or 'udp', got '{transport}'.")
@@ -455,7 +507,7 @@ def write_changes(changes: dict, path=None) -> dict:
 
     # Verify the result parses BEFORE it replaces the live file. The gate reads
     # this on every start; a file that configparser chokes on is a dead lane.
-    check = configparser.ConfigParser()
+    check = _new_parser()
     check.read_string(body)
 
     shutil.copy2(path, path + BACKUP_SUFFIX)

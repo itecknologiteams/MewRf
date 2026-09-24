@@ -25,7 +25,7 @@ import logging
 import os
 import time
 
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import render
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
@@ -34,7 +34,7 @@ from apps.users.permissions import IsAdmin, IsOperator
 from utils.code_version import get_code_version
 from utils.response import error_response, success_response
 
-from . import booth_activity, booth_probe
+from . import booth_activity, booth_probe, booth_stream
 from .models import PendingGateOpen, Plaza, TollLane
 
 logger = logging.getLogger(__name__)
@@ -646,12 +646,21 @@ class BoothCameraView(BoothReadView):
     def get(self, request):
         identity = booth_probe.gate_identity() if booth_probe.is_booth() else {}
         url = identity.get('camera_rtsp_url', '')
+        stream_url = identity.get('camera_stream_url', '')
         return success_response(data={
             'configured': bool(url),
             'rtsp_url': booth_probe.redact_url(url),
             'transport': identity.get('camera_transport', 'tcp'),
             'snapshot_url': booth_probe.redact_url(
                 identity.get('camera_snapshot_url', '')),
+            'stream_url': booth_probe.redact_url(stream_url),
+            'stream_is_separate': bool(stream_url) and stream_url != url,
+            'stream_settings': {
+                'width': identity.get('camera_stream_width', '640'),
+                'fps': identity.get('camera_stream_fps', '6'),
+                'quality': identity.get('camera_stream_quality', '7'),
+            },
+            'stream': booth_stream.get_stream().status(),
             'tools': booth_probe.camera_available(),
             # The plate feed itself belongs to quick-toll-system, not to this
             # process; run_anpr_gate subscribes to its WebSocket. Named here so
@@ -688,10 +697,29 @@ class BoothCameraSnapshotView(BoothReadView):
 
     def get(self, request):
         identity = booth_probe.gate_identity() if booth_probe.is_booth() else {}
+
+        # A live stream is already decoding this camera. Taking its newest frame
+        # costs nothing, where starting a second ffmpeg against the same RTSP
+        # source costs a whole extra transcode — and some cameras cap concurrent
+        # sessions, so the second one can fail outright.
+        live = booth_stream.get_stream().latest_frame()
+        if live is not None:
+            response = HttpResponse(live, content_type='image/jpeg')
+            response['Cache-Control'] = 'no-store, max-age=0'
+            response['X-Frame-Source'] = 'live-stream'
+            return response
+
         frame, error = booth_probe.camera_snapshot(
             identity.get('camera_rtsp_url', ''),
             identity.get('camera_transport', 'tcp'))
         if frame is None:
+            # Logged as well as returned. Django logs the bare status for a 502
+            # ("Bad Gateway: /booth/api/camera/snapshot/"), which says nothing
+            # about whether ffmpeg is missing, the URL is wrong or the camera is
+            # simply off — and that log line is often the only thing anyone sees,
+            # because the browser shows the reason and nobody screenshots it.
+            # Already redacted by camera_snapshot, so no password reaches pm2.
+            logger.warning('[booth] Camera snapshot failed: %s', error or 'no frame')
             response = HttpResponse(error or 'no frame', status=502,
                                     content_type='text/plain; charset=utf-8')
             response['X-Camera-Error'] = (error or 'no frame')[:200].replace('\n', ' ')
@@ -700,7 +728,99 @@ class BoothCameraSnapshotView(BoothReadView):
         # Every request is a fresh grab; a cached still would quietly show a
         # lane as it was ten minutes ago.
         response['Cache-Control'] = 'no-store, max-age=0'
+        response['X-Frame-Source'] = 'one-shot'
         return response
+
+
+class BoothCameraStreamView(BoothReadView):
+    """Live MJPEG, for an <img> to play directly.
+
+    multipart/x-mixed-replace rather than HLS or WebRTC. The camera is H.265,
+    which Chrome on Linux will not decode, so the picture is being transcoded
+    either way; what that leaves is the choice of container, and this is the
+    only one that needs no player library — a booth has no internet to fetch
+    hls.js from, and vendoring a megabyte of JavaScript to look at a lane is
+    not a trade worth making.
+
+    The response holds one of the booth's four request threads for as long as
+    the browser watches, which is why booth_stream caps viewers, lingers only
+    briefly, and ends the session on its own after ten minutes.
+    """
+
+    def get(self, request):
+        if not booth_probe.is_booth():
+            return error_response(
+                'This host is not a booth — there is no camera to stream.',
+                status_code=404)
+
+        identity = booth_probe.gate_identity()
+        url = identity.get('camera_stream_url', '')
+        if not url:
+            return error_response(
+                'No camera configured — set [camera] rtsp_url (or stream_url for '
+                'the low-resolution sub-stream).', status_code=409)
+        if not booth_probe.camera_available()['ffmpeg']:
+            return error_response(
+                'ffmpeg is not installed on this booth, so the stream cannot be '
+                'transcoded. Install it with: sudo apt-get install -y ffmpeg',
+                status_code=503)
+
+        stream = booth_stream.get_stream()
+        settings = {
+            'width': identity.get('camera_stream_width', '640'),
+            'fps': identity.get('camera_stream_fps', '6'),
+            'quality': identity.get('camera_stream_quality', '7'),
+            'transport': identity.get('camera_transport', 'tcp'),
+        }
+        # Attach BEFORE building the response, so a refusal is still a status
+        # code. Doing it inside the generator meant the body had already begun.
+        try:
+            viewer = stream.attach(url, settings)
+        except RuntimeError as exc:
+            # 429, not 503: the booth is healthy, there are simply more people
+            # pointed at it than it will carry, and the caller should back off.
+            return error_response(str(exc), status_code=429)
+
+        # attach() starts the pipeline; if ffmpeg would not start at all, say so
+        # now rather than returning a 200 that never produces a picture.
+        state = stream.status()
+        if state['error'] and not state['running']:
+            stream.detach(viewer)
+            return error_response(
+                f"The camera stream could not be started: {state['error']}",
+                status_code=502)
+
+        response = StreamingHttpResponse(
+            stream.frames_for(viewer),
+            content_type=f'multipart/x-mixed-replace; boundary={booth_stream.BOUNDARY}',
+        )
+        # Django registers the generator's own close() here, which is what runs
+        # the detach in its finally. This second closer covers the one case that
+        # misses: a generator that is closed before it was ever iterated never
+        # runs its body, so its finally never fires and the viewer would stay
+        # counted against the cap for the life of the process. detach() is
+        # idempotent, so both firing is harmless.
+        response._resource_closers.append(lambda: stream.detach(viewer))
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+        # Only relevant if a proxy is ever put in front of a booth, but a
+        # buffering proxy turns a live view into a stall with no clue why.
+        response['X-Accel-Buffering'] = 'no'
+        return response
+
+
+class BoothCameraStreamStopView(BoothWriteView):
+    """Kill the transcode now, for whoever is watching.
+
+    A browser that was closed without the connection being noticed leaves the
+    pipeline lingering; this is the manual way out, and the reason it is an
+    admin action is that it interrupts anyone else looking at the same lane.
+    """
+
+    def post(self, request):
+        booth_stream.get_stream().stop()
+        return success_response(
+            data=booth_stream.get_stream().status(),
+            message='Stream stopped and ffmpeg killed.')
 
 
 # ── Processes and logs ───────────────────────────────────────────────────────

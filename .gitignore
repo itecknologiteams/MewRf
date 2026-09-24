@@ -73,6 +73,11 @@ deploy_booths.sh
 deploy_booth.sh
 deploy_master.sh
 
+# Per-booth camera URLs for set_camera.sh — one line per lane, and every
+# line carries a camera password.
+cameras.txt
+*.cameras
+
 # Bundled Python wheels for offline booth installs (rebuilt by deploy_booths.sh)
 mtag_backend/wheelhouse/
 

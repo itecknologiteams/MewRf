@@ -81,6 +81,12 @@
   --zone-detect: rgba(255, 255, 255, 0.025);
 }
 
+/* `hidden` only sets display:none at user-agent specificity, so any class that
+   sets a display wins and the element stays visible. `.badge` is inline-flex,
+   which is how a "live" pill ended up on screen while nothing was streaming.
+   Declared first so a component can still override it deliberately. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
@@ -367,6 +373,10 @@ pre.logbox {
   max-width: 860px; margin: 0 auto;
 }
 .camera-frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* The MJPEG source is deliberately small (640px by default) so the transcode
+   stays cheap; letting the browser scale it up smoothly beats sending a bigger
+   picture the panel does not need. */
+.camera-frame img.live { image-rendering: auto; }
 .camera-frame .placeholder { color: #a7a7a0; font-size: 13px; padding: 20px; text-align: center; }
 
 /* ── Login overlay ──────────────────────────────────────────────────────── */
@@ -639,15 +649,18 @@ footer {
   <section class="panel" id="panel-camera" role="tabpanel" hidden>
     <div class="card">
       <div class="filterbar">
-        <button class="btn sm primary" id="camera-grab">Grab frame</button>
-        <label><input type="checkbox" id="camera-auto"> Auto-refresh every 2s</label>
+        <button class="btn sm primary" id="camera-live">Start live view</button>
+        <button class="btn sm" id="camera-grab">Grab frame</button>
         <button class="btn sm" id="camera-probe">Probe stream</button>
         <span class="spacer" style="flex:1 1 auto"></span>
+        <span class="badge neutral" id="camera-live-badge" hidden>
+          <span class="swatch" style="background:var(--good)"></span><span id="camera-live-text">live</span>
+        </span>
         <span style="font-size:12px;color:var(--text-muted)" id="camera-status"></span>
       </div>
       <div class="card-body">
         <div class="camera-frame" id="camera-frame">
-          <div class="placeholder" id="camera-placeholder">No frame yet — press <b>Grab frame</b>.</div>
+          <div class="placeholder" id="camera-placeholder">Press <b>Start live view</b>.</div>
         </div>
         <div style="margin-top:14px" id="camera-notes"></div>
       </div>
@@ -795,7 +808,11 @@ const READ_MAX_AGE = 15 * 60;  // seconds
 
 const state = {
   paused: false,
-  authed: false,
+  /* null = not yet known, true = signed in, false = signed out.
+     Two states are not enough. With a plain `false` start, the first 401 was
+     a no-op transition, the overlay was never unhidden, and the page polled a
+     booth it had no credentials for until someone closed the tab. */
+  authed: null,
   role: '',
   isBooth: null,
   clockOffset: 0,
@@ -882,18 +899,42 @@ async function api(path, options) {
   let payload = null;
   try { payload = await response.json(); } catch (err) { payload = null; }
 
-  if (response.status === 401) {
-    setAuthed(false);
-    throw new ApiError(401, 'Sign in to continue.', payload);
-  }
   if (!response.ok) {
-    const detail = payload && payload.errors && payload.errors.validation
-      ? payload.errors.validation.join(' ')
-      : (payload && payload.message) || ('HTTP ' + response.status);
+    const detail = failureText(payload) || ('HTTP ' + response.status);
+    if (response.status === 401) {
+      /* A 401 from the login endpoint means "those credentials are wrong", not
+         "your session went away" — but it is still a 401, so the overlay stays
+         up and the caller gets the server's actual wording to show in it. */
+      setAuthed(false);
+      throw new ApiError(401, detail || 'Sign in to continue.', payload);
+    }
     throw new ApiError(response.status, detail, payload);
   }
   setAuthed(true);
   return payload && payload.data !== undefined ? payload.data : payload;
+}
+
+/* Pull the most specific sentence out of an error envelope.
+
+   Three shapes reach here: {errors: {validation: [...]}} from a refused config
+   write, {errors: {non_field_errors: [...]}} from a DRF serializer — which is
+   what a wrong password produces — and a bare {message}. The generic `message`
+   on a login failure is the useless "Login failed"; the reason is in `errors`,
+   so that is looked at first. */
+function failureText(payload) {
+  if (!payload) return '';
+  const errors = payload.errors;
+  if (errors) {
+    if (Array.isArray(errors.validation)) return errors.validation.join(' ');
+    const collected = [];
+    Object.keys(errors).forEach((key) => {
+      const value = errors[key];
+      if (Array.isArray(value)) collected.push(value.join(' '));
+      else if (typeof value === 'string') collected.push(value);
+    });
+    if (collected.length) return collected.join(' ');
+  }
+  return payload.message || '';
 }
 
 /* Report a failed action without tearing the page down over it. */
@@ -908,13 +949,33 @@ function reportError(what, err) {
 
 /* ── Auth ────────────────────────────────────────────────────────────────── */
 function setAuthed(value) {
-  if (state.authed === value) return;
+  const changed = state.authed !== value;
   state.authed = value;
-  $('login-overlay').hidden = value;
-  $('signout-btn').hidden = !value;
-  if (value) {
+
+  /* Reconciled on EVERY call, not only on a change. The overlay has to appear
+     on the first 401 of the session, and at that point the flag has not moved
+     from its starting value — an early return keyed on equality skipped it. */
+  $('login-overlay').hidden = value !== false;
+  $('signout-btn').hidden = value !== true;
+
+  if (!changed) return;
+
+  if (value === true) {
+    $('login-error').textContent = '';
     whoAmI();
     pollNow();
+    return;
+  }
+  if (value === false) {
+    /* Signed out: the pollers stand down (see their guard) so the page stops
+       filling the booth's log with 401s, and the header says why nothing is
+       updating rather than sitting on "connecting…" for ever. */
+    state.role = '';
+    applyRoleGates();
+    $('brand-sub').textContent = 'sign in to continue';
+    $('live-dot').className = 'live-dot paused';
+    const phone = $('login-phone');
+    if (phone && !phone.value) { try { phone.focus(); } catch (err) { /* hidden */ } }
   }
 }
 
@@ -957,9 +1018,11 @@ $('login-form').addEventListener('submit', async (event) => {
     $('login-password').value = '';
     setAuthed(true);
   } catch (err) {
+    /* api() has already put the page back into the signed-out state; all that
+       is left is to say why. Setting state.authed by hand here would step
+       around setAuthed and desynchronise the overlay from the flag. */
     $('login-error').textContent = err.message || 'Sign in failed.';
-    state.authed = false;
-    $('login-overlay').hidden = false;
+    $('login-password').select();
   } finally {
     button.disabled = false;
   }
@@ -1702,10 +1765,21 @@ $('open-via-service').addEventListener('click', () => openBarrier('service'));
 async function loadCameraInfo() {
   try {
     const data = await api(API + '/camera/');
+    const settings = data.stream_settings || {};
+    const running = (data.stream || {}).running;
     const rows = [
       ['RTSP URL', data.rtsp_url || 'not configured'],
       ['Transport', data.transport],
       ['HTTP snapshot', data.snapshot_url || '—'],
+      ['Live-view source', data.stream_is_separate
+        ? data.stream_url + '  (sub-stream)'
+        : 'same as the RTSP URL above'],
+      ['Live-view output', settings.width + 'px @ ' + settings.fps + 'fps, q' + settings.quality],
+      ['Transcode', running
+        ? 'running · ' + (data.stream.viewers || 0) + '/' + (data.stream.max_viewers || 2) +
+          ' viewers · ' + (data.stream.frames || 0) + ' frames · stops in ' +
+          duration(Math.round(data.stream.seconds_remaining || 0))
+        : 'idle — no ffmpeg running'],
       ['ffmpeg', data.tools.ffmpeg ? 'installed' : 'MISSING'],
       ['ffprobe', data.tools.ffprobe ? 'installed' : 'MISSING'],
     ];
@@ -1724,12 +1798,131 @@ async function loadCameraInfo() {
         'Install it with <code>sudo apt-get install -y ffmpeg</code>, or point ' +
         '<code>snapshot_url</code> at a JPEG the camera serves over HTTP.</div></div>');
     }
+    const live = data.stream || {};
     notes.push('<div class="note"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.8 3.3h1.6v1.5H7.2V4.3Zm0 2.9h1.6v4.5H7.2V7.2Z"/></svg><div>' +
-      'A browser cannot play RTSP, so the booth decodes a single frame with ffmpeg and serves it as a still. ' +
+      'No browser plays RTSP, and Chrome does not decode H.265, so the booth transcodes to MJPEG ' +
+      'with ffmpeg and an &lt;img&gt; plays it. <b>One shared transcode</b> however many people watch, ' +
+      'at most ' + (live.max_viewers || 2) + ' viewers, and any stream ends after ' +
+      duration(live.max_session_seconds || 600) + ' — the booth has a lane to run on the same CPU. ' +
       esc(data.anpr_note) + '</div></div>');
+
+    /* The single biggest saving available, and easy to miss. */
+    if (data.configured && !data.stream_is_separate) {
+      notes.push('<div class="note warn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15 14H1L8 1.5Zm-.7 4.6h1.4v3.6H7.3V6.1Zm0 4.5h1.4V12H7.3v-1.4Z"/></svg><div>' +
+        '<b>The live view is transcoding the full-resolution stream.</b> Most cameras publish a ' +
+        'low-resolution sub-stream beside it, and pointing <code>stream_url</code> at that costs a ' +
+        'fraction of the CPU — the panel cannot show the difference. On this camera try ' +
+        '<code>/profile2</code>; on a Hikvision <code>/Streaming/Channels/102</code>, on a Dahua ' +
+        '<code>&amp;subtype=1</code>. Set it in <b>Reader Config</b>.</div></div>');
+    }
     $('camera-notes').innerHTML = notes.join('');
   } catch (err) { reportError('Could not read the camera settings', err); }
 }
+
+/* ── Live view ────────────────────────────────────────────────────────────
+   An <img> pointed at a multipart/x-mixed-replace endpoint plays MJPEG with no
+   player library, which is what a booth with no internet can actually run.
+
+   Everything below exists to make sure the stream ENDS. It holds one of the
+   booth's four request threads and an ffmpeg transcode for as long as it is
+   open, so it is stopped when the tab is hidden, when the operator leaves the
+   camera panel, and when the page is closed. The server has its own ceiling
+   underneath all of that; these just mean it is rarely reached. */
+let liveTimer = null;
+
+function liveActive() {
+  const img = $('camera-frame').querySelector('img.live');
+  return !!img;
+}
+
+function startLive() {
+  stopLive(false);
+  const frame = $('camera-frame');
+  frame.innerHTML = '';
+  const img = document.createElement('img');
+  img.className = 'live';
+  img.alt = 'Live view of the lane';
+  img.onerror = () => {
+    /* An <img> cannot report WHY it failed, so ask the endpoint that can. */
+    stopLive(false);
+    api(API + '/camera/').then((data) => {
+      const reason = (data.stream && data.stream.error) || '';
+      frame.innerHTML = '<div class="placeholder"><b>Stream stopped.</b><br>' +
+        esc(reason || 'The booth ended the stream, or it reached its time limit.') +
+        '</div>';
+    }).catch(() => {
+      frame.innerHTML = '<div class="placeholder"><b>Stream stopped.</b></div>';
+    });
+    $('camera-status').textContent = 'stopped';
+  };
+  /* Cache-busted: without it a reload can be served the finished response of
+     the previous stream and sit on a single frozen frame. */
+  img.src = API + '/camera/stream/?t=' + Date.now();
+  frame.appendChild(img);
+
+  $('camera-live').textContent = 'Stop live view';
+  $('camera-live').classList.remove('primary');
+  $('camera-live').classList.add('danger');
+  $('camera-live-badge').hidden = false;
+  $('camera-status').textContent = 'connecting…';
+  clearInterval(liveTimer);
+  liveTimer = setInterval(refreshLiveStatus, 4000);
+  setTimeout(refreshLiveStatus, 1500);
+}
+
+function stopLive(reportToServer) {
+  clearInterval(liveTimer);
+  liveTimer = null;
+  const frame = $('camera-frame');
+  const img = frame.querySelector('img.live');
+  if (img) {
+    /* Point the <img> away BEFORE removing it: Chrome keeps an in-flight
+       multipart response alive for a detached node, which leaves ffmpeg
+       transcoding for a viewer nobody can see. */
+    img.onerror = null;
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    img.remove();
+  }
+  $('camera-live').textContent = 'Start live view';
+  $('camera-live').classList.add('primary');
+  $('camera-live').classList.remove('danger');
+  $('camera-live-badge').hidden = true;
+  if (reportToServer) {
+    $('camera-status').textContent = 'stopped';
+    loadCameraInfo();
+  }
+}
+
+async function refreshLiveStatus() {
+  if (!liveActive()) { clearInterval(liveTimer); liveTimer = null; return; }
+  try {
+    const data = await api(API + '/camera/');
+    const live = data.stream || {};
+    if (!live.running && live.frames) { stopLive(true); return; }
+    const left = Math.round(live.seconds_remaining || 0);
+    $('camera-live-text').textContent =
+      'live · ' + live.viewers + '/' + live.max_viewers + ' viewers';
+    $('camera-status').textContent = live.running
+      ? (live.frames + ' frames · ' + Math.round(live.settings.width || 0) + 'px @ ' +
+         (live.settings.fps || '?') + 'fps · stops in ' + duration(left))
+      : 'starting…';
+  } catch (err) { /* the badge is cosmetic; the picture is the real signal */ }
+}
+
+$('camera-live').addEventListener('click', () => {
+  if (liveActive()) stopLive(true); else startLive();
+});
+
+/* A hidden tab still receives the stream, so a console left on a second monitor
+   would transcode all day. Give the frames up when nobody is looking. */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && liveActive()) {
+    stopLive(false);
+    $('camera-status').textContent = 'paused — tab was hidden';
+  }
+});
+/* Leaving the camera panel, or the page, counts as stopping watching. */
+window.addEventListener('pagehide', () => stopLive(false));
 
 async function grabFrame() {
   const frame = $('camera-frame');
@@ -1757,12 +1950,7 @@ async function grabFrame() {
   }
 }
 
-$('camera-grab').addEventListener('click', grabFrame);
-$('camera-auto').addEventListener('change', (event) => {
-  clearInterval(state.cameraTimer);
-  state.cameraTimer = null;
-  if (event.target.checked) { grabFrame(); state.cameraTimer = setInterval(grabFrame, 2000); }
-});
+$('camera-grab').addEventListener('click', () => { stopLive(false); grabFrame(); });
 
 $('camera-probe').addEventListener('click', async () => {
   const out = $('camera-probe-out');
@@ -1919,10 +2107,28 @@ const CONFIG_GROUPS = [
   ]},
   { title: 'LPR camera', fields: [
     { key: 'camera.rtsp_url', label: 'RTSP URL',
-      help: 'e.g. rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101. Used by this console only; plate recognition itself runs in quick-toll-system. The password is redacted everywhere it is displayed — leave the field blank to keep the one already saved.' },
+      help: 'e.g. rtsp://admin:Iteck%40123@192.168.78.21:554/Streaming/Channels/101 &mdash; ' +
+            '<b>percent-encode the password</b>: a literal @ ends the userinfo and the rest ' +
+            'parses as the host, so Iteck@123 is written Iteck%40123 (@ = %40, : = %3A, / = %2F, ' +
+            'space = %20). ffmpeg decodes it again before authenticating. Used by this console ' +
+            'only; plate recognition runs in quick-toll-system. The password is redacted ' +
+            'everywhere it is shown.' },
     { key: 'camera.transport', label: 'Transport', help: '"tcp" or "udp". tcp unless you have a reason.' },
     { key: 'camera.snapshot_url', label: 'HTTP snapshot URL (optional)',
       help: 'If the camera serves a JPEG over HTTP, it is far cheaper than spinning up ffmpeg per frame.' },
+    { key: 'camera.stream_url', label: 'Live-view URL (optional)',
+      help: 'Used for the live view only; falls back to the RTSP URL above. <b>Point this at the ' +
+            'camera\u2019s sub-stream</b> if it has one &mdash; on a Hikvision that is ' +
+            '/Streaming/Channels/102, on a Dahua subtype=1, on an ONVIF camera usually /profile2. ' +
+            'Transcoding a 640x360 sub-stream costs a fraction of transcoding 1080p, and the ' +
+            'panel cannot show the difference.' },
+    { key: 'camera.stream_width', label: 'Live-view width (px)',
+      help: 'Output width; height follows the aspect ratio. 640 is plenty to see whether a lane ' +
+            'is in frame and in focus. Higher costs CPU on a booth that also has a lane to run.' },
+    { key: 'camera.stream_fps', label: 'Live-view frame rate',
+      help: '6 is smooth enough to watch a vehicle through the lane. 0.5 to 15 allowed.' },
+    { key: 'camera.stream_quality', label: 'Live-view JPEG quality',
+      help: 'ffmpeg -q:v: 2 is best and largest, 31 is worst and smallest. 7 is a good booth default.' },
   ]},
 ];
 
@@ -2077,7 +2283,7 @@ function mergeRows(existing, incoming, cap) {
 }
 
 async function pollOverview() {
-  if (state.paused) return;
+  if (state.paused || state.authed === false) return;
   try {
     renderOverview(await api(API + '/overview/'));
     markLive(true);
@@ -2085,7 +2291,7 @@ async function pollOverview() {
 }
 
 async function pollDetections() {
-  if (state.paused || state.isBooth === false) return;
+  if (state.paused || state.authed === false || state.isBooth === false) return;
   try {
     const data = await api(API + '/detections/?since=' + state.lastReadId + '&limit=600');
     if (data.server_time) state.clockOffset = data.server_time - Date.now() / 1000;
@@ -2105,7 +2311,7 @@ async function pollDetections() {
 }
 
 async function pollEvents() {
-  if (state.paused || state.isBooth === false) return;
+  if (state.paused || state.authed === false || state.isBooth === false) return;
   try {
     const data = await api(API + '/events/?since=' + state.lastEventId + '&limit=150');
     if (data.events && data.events.length) {
@@ -2117,7 +2323,7 @@ async function pollEvents() {
 }
 
 async function pollBarrier() {
-  if (state.paused || state.isBooth === false) return;
+  if (state.paused || state.authed === false || state.isBooth === false) return;
   try {
     const data = await api(API + '/barrier/?since=' + state.lastBarrierId + '&limit=150');
     if (data.commands && data.commands.length) {
@@ -2130,6 +2336,7 @@ async function pollBarrier() {
 }
 
 function markLive(ok) {
+  if (state.authed === false) return;  /* setAuthed owns the indicator there */
   const dot = $('live-dot');
   dot.className = 'live-dot ' + (state.paused ? 'paused' : ok ? 'on' : 'off');
   document.querySelectorAll('main .card').forEach((card) => card.classList.toggle('stale', !ok && !state.paused));
@@ -2143,7 +2350,7 @@ $('pause-btn').addEventListener('click', () => {
   state.paused = !state.paused;
   $('pause-btn').textContent = state.paused ? 'Resume' : 'Pause';
   markLive(true);
-  if (!state.paused) pollNow();
+  if (!state.paused && state.authed !== false) pollNow();
 });
 
 /* ── Tabs & theme ────────────────────────────────────────────────────────── */
@@ -2159,6 +2366,7 @@ function selectTab(name) {
     { panel.hidden = panel.id !== 'panel-' + name; });
   if (name === 'detections') renderChart();
   if (name === 'camera' && !$('camera-kv').children.length) loadCameraInfo();
+  if (name !== 'camera') stopLive(false);
   if (name === 'reader' && !state.config) loadConfig();
   if (name === 'logs' && $('log-box').textContent === 'Press Refresh.') loadLog();
   try { history.replaceState(null, '', '#' + name); } catch (err) { /* file:// */ }

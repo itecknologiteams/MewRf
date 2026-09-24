@@ -278,6 +278,34 @@ lane band ho jati. Har write ke sath `rfid_config.ini.bak` chhoot jata hai.
 - **Plaza / lane / mode console se edit nahi hote.** Yeh decide karte hain kis
   plaza pe billing hogi — SSH ka kaam hai, browser ka nahi.
 
+### Fleet-wide camera setup — `set_camera.sh`
+
+`[camera]` ek hi baar sab booths pe daalne ke liye, `set_rssi.sh` wale andaz mein.
+Booth list master ki DB se aati hai; har booth pe `.bak` chhoot jata hai.
+
+```bash
+./set_camera.sh --dry-run                       # dekho, kuch likha nahi jayega
+./set_camera.sh                                 # blank [camera] sab booths pe
+./set_camera.sh --url-map cameras.txt           # aur har booth ka apna URL
+./set_camera.sh 192.168.78.19 --url 'rtsp://admin:Iteck%40123@192.168.78.21:554/profile1'
+```
+
+**Lane band nahi hoti.** `run_gate` `[camera]` parhta hi nahi, is liye yeh script
+`mtag-gate` ko haath nahi lagati — sirf `mtag-web` restart hota hai taake console
+nayi values uthaye. Barrier chalti rehti hai.
+
+Idempotent hai: jo values booth pe pehle se hain wo rehti hain, comment block
+refresh ho jata hai, aur doosri baar chalao to "unchanged" bolta hai.
+
+Har lane ka apna camera hai, is liye ek fleet-wide URL nahi ho sakta. Ya to
+`--url-map` do (`booth_ip  rtsp_url` lines — **git mein mat daalo**, password
+hota hai; `.gitignore` mein `cameras.txt` already hai), ya blank chhod kar har
+booth ka URL console ke **Reader Config** tab se set karo.
+
+Password **percent-encode** karna hai: `Iteck@123` → `Iteck%40123`. Script do se
+zyada `@` dekh kar mana kar deti hai, aur agar URL mein `%` hai lekin booth ka
+`booth_probe.py` purana hai to `NEEDS CODE` bol kar skip kar deti hai.
+
 ### Activity file
 
 `booth_activity.db` — booth pe local SQLite ring buffer (WAL). `mtag-gate` likhta

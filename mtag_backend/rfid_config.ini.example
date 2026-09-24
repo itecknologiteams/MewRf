@@ -142,6 +142,16 @@ display_ip = 192.168.78.72
 #
 # A browser cannot play RTSP, so the booth decodes one frame with ffmpeg and
 # serves it as a still. Leave rtsp_url blank to hide the panel.
+#
+# PERCENT-ENCODE anything special in the password. A literal '@' would end the
+# userinfo and the host would parse as the rest of the password, so a password
+# of Iteck@123 is written Iteck%40123. Verified against ffmpeg 7.0: it decodes
+# the userinfo before authenticating, so the camera receives Iteck@123.
+# Common ones: @ = %40, : = %3A, / = %2F, ? = %3F, # = %23, space = %20.
+#
+# A '%' is fine here — this file is parsed with interpolation disabled — but it
+# used to raise InterpolationSyntaxError, which the console reported as "no
+# camera configured". If you see that on a booth, it is running old code.
 rtsp_url =
 # tcp is right almost always: UDP loses packets over a booth's wiring and shows
 # as a torn frame that looks like a camera fault.
@@ -149,3 +159,26 @@ transport = tcp
 # Optional. If the camera already serves a JPEG over HTTP, the console prefers
 # it — it is far cheaper than spinning ffmpeg up for every frame.
 snapshot_url =
+
+# ── Live view ────────────────────────────────────────────────────────────────
+# The console can play a live picture, not just stills. No browser plays RTSP and
+# Chrome on Linux will not decode H.265, so the booth transcodes to MJPEG — which
+# costs CPU on a machine that also has a lane to run. These bound that cost.
+#
+# stream_url is the single biggest saving available: most cameras publish a
+# low-resolution SUB-STREAM beside the main one, and transcoding that costs a
+# fraction of transcoding 1080p. The panel cannot show the difference.
+#   Hikvision  /Streaming/Channels/102      Dahua  ...&subtype=1
+#   ONVIF      /profile2                    Uniview  /media/video2
+# Leave blank to use rtsp_url.
+stream_url =
+# Output width; the height follows the aspect ratio. 160-1920.
+stream_width = 640
+# Frames per second, 0.5-15. Six is smooth enough to watch a vehicle through.
+stream_fps = 6
+# ffmpeg -q:v — 2 is best and largest, 31 is worst and smallest.
+stream_quality = 7
+#
+# Caps enforced in code, not here: one shared ffmpeg however many people watch,
+# at most 2 viewers (each holds one of gunicorn's four threads), the transcode
+# stops 5s after the last viewer leaves, and any stream ends after 10 minutes.

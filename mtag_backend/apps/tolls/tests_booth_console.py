@@ -18,17 +18,21 @@ The activity recorder is checked for the property the gate depends on: that it
 never raises into the caller, whatever state it is in.
 """
 
+import inspect
 import os
 import shutil
 import tempfile
 import time
 from configparser import ConfigParser
+from unittest import mock
 
 from django.test import SimpleTestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.tolls import booth_activity, booth_probe
-from apps.tolls.booth_console import BoothCameraView, BoothConfigView
+from apps.tolls import booth_activity, booth_probe, booth_stream
+from apps.tolls.booth_console import (
+    BoothCameraStreamView, BoothCameraView, BoothConfigView,
+)
 
 SAMPLE_CONFIG = """[gate]
 ; Ceiling on any single database query, in milliseconds.
@@ -273,6 +277,75 @@ class ConfigWriteTests(SimpleTestCase):
         self.assertFalse(booth_probe.restore_backup(path=self.path))
 
 
+class PercentInAValueTests(SimpleTestCase):
+    """A '%' in a value must be data, not a configparser substitution.
+
+    Found on a live booth: a camera URL whose password was URL-encoded
+    (`Iteck%40123`, i.e. `Iteck@123`). configparser's default BasicInterpolation
+    raised InterpolationSyntaxError, `_get` caught it as any other
+    configparser.Error and returned its fallback, and the console reported a
+    fully configured camera as "not configured" — answering 502 and sending
+    whoever read it looking at the camera, the cabling and ffmpeg instead.
+
+    The same class of value reaches the gate, where the exception is NOT caught
+    and would crash-loop the lane under PM2.
+    """
+
+    REAL_WORLD_URL = 'rtsp://admin:Iteck%40123@192.168.78.21:554/Streaming/Channels/101'
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.path = os.path.join(self.dir, 'rfid_config.ini')
+        with open(self.path, 'w', encoding='utf-8') as handle:
+            handle.write(SAMPLE_CONFIG + f'\n[camera]\nrtsp_url = {self.REAL_WORLD_URL}\n'
+                                          'transport = tcp\n')
+
+    def test_the_url_survives_being_read_back(self):
+        parser = booth_probe.raw_config_parser(path=self.path)
+        self.assertEqual(parser.get('camera', 'rtsp_url'), self.REAL_WORLD_URL)
+
+    def test_gate_identity_reports_the_camera_as_configured(self):
+        identity = booth_probe.gate_identity(
+            booth_probe.raw_config_parser(path=self.path))
+        self.assertEqual(identity['camera_rtsp_url'], self.REAL_WORLD_URL)
+        self.assertTrue(identity['camera_rtsp_url'],
+                        'an empty URL is what produced the misleading 502')
+
+    def test_read_config_returns_sections_instead_of_raising(self):
+        config = booth_probe.read_config(path=self.path)
+        self.assertEqual(config['error'], '')
+        self.assertIn('camera', config['sections'])
+        self.assertEqual(config['sections']['camera']['transport'], 'tcp')
+
+    def test_the_encoded_password_is_still_redacted(self):
+        config = booth_probe.read_config(path=self.path)
+        shown = config['sections']['camera']['rtsp_url']
+        self.assertNotIn('Iteck%40123', shown)
+        self.assertNotIn('Iteck%40123', config['raw'])
+        self.assertIn('admin', shown)
+        self.assertIn('192.168.78.21', shown)
+
+    def test_such_a_value_can_be_written_and_read_back_unchanged(self):
+        booth_probe.write_changes(
+            _changes(camera__rtsp_url=self.REAL_WORLD_URL), path=self.path)
+        parser = booth_probe.raw_config_parser(path=self.path)
+        self.assertEqual(parser.get('camera', 'rtsp_url'), self.REAL_WORLD_URL)
+
+    def test_the_gate_parses_the_same_file_without_raising(self):
+        """run_gate does not catch InterpolationSyntaxError — it would crash."""
+        import configparser as cp
+        from apps.tolls.management.commands import run_gate as run_gate_mod
+        source = inspect.getsource(run_gate_mod.Command.handle)
+        self.assertIn('interpolation=None', source)
+
+        parser = cp.ConfigParser(interpolation=None)
+        parser.read(self.path)
+        for section, key in (('scanner', 'reader_host'), ('barrier', 'port'),
+                             ('display', 'display_ip'), ('camera', 'rtsp_url')):
+            parser.get(section, key)  # must not raise
+
+
 class RedactionTests(SimpleTestCase):
     """This page renders the config into a browser. Nothing secret may ride along."""
 
@@ -281,6 +354,25 @@ class RedactionTests(SimpleTestCase):
         self.assertNotIn('hunter2', redacted)
         self.assertIn('admin', redacted)
         self.assertIn('10.0.0.8:554/Stream', redacted)
+
+    def test_a_password_written_with_a_literal_at_sign_is_fully_redacted(self):
+        """The documented form is percent-encoded, but people will type it raw.
+
+        With a non-greedy password group the redaction stopped at the FIRST '@'
+        and printed the remainder of the password to the page as though it were
+        part of the hostname.
+        """
+        redacted = booth_probe.redact_url(
+            'rtsp://admin:Iteck@123@192.168.78.21:554/Streaming/Channels/101')
+        self.assertNotIn('Iteck', redacted)
+        self.assertNotIn('123@', redacted)
+        self.assertIn('192.168.78.21:554/Streaming/Channels/101', redacted)
+
+    def test_a_password_containing_a_colon_is_fully_redacted(self):
+        redacted = booth_probe.redact_url('rtsp://admin:p@ss:w0rd@10.0.0.8/live')
+        self.assertNotIn('p@ss', redacted)
+        self.assertNotIn('w0rd', redacted)
+        self.assertIn('10.0.0.8/live', redacted)
 
     def test_a_url_without_credentials_is_untouched(self):
         url = 'rtsp://10.0.0.8:554/Streaming/Channels/101'
@@ -461,6 +553,143 @@ class ConsolePermissionTests(SimpleTestCase):
         self.assertGreaterEqual(per_hour, 10000)
 
 
+class CameraStreamTests(SimpleTestCase):
+    """The live view holds a gunicorn thread and an ffmpeg for as long as it runs.
+
+    The booth has four request threads in total (gunicorn.conf.py) and a lane to
+    run on the same CPU, so the things worth pinning are not the picture — they
+    are the limits that stop the picture becoming the reason the booth is slow.
+
+    None of these need ffmpeg: a pipeline that fails to start still attaches its
+    viewer, which is exactly the accounting under test.
+    """
+
+    def setUp(self):
+        self.stream = booth_stream.CameraStream()
+        self.addCleanup(self.stream.stop)
+
+    def test_attach_is_separate_from_the_generator(self):
+        """Because a generator body does not run until it is first iterated.
+
+        When attach() lived inside frames(), the "too many viewers" error was
+        raised midway through the response body — after 200 had already been
+        sent — so the view could not turn it into a 429 and the browser got a
+        truncated stream instead.
+        """
+        self.assertFalse(
+            inspect.isgeneratorfunction(booth_stream.CameraStream.attach),
+            'attach() must run eagerly so the view can still choose a status code')
+        self.assertTrue(
+            inspect.isgeneratorfunction(booth_stream.CameraStream.frames_for))
+        # And frames_for takes an already-attached viewer rather than a url.
+        params = list(inspect.signature(
+            booth_stream.CameraStream.frames_for).parameters)
+        self.assertEqual(params, ['self', 'viewer'])
+
+    def test_viewers_are_capped(self):
+        for _ in range(booth_stream.MAX_VIEWERS):
+            self.stream.attach('', {})
+        with self.assertRaises(RuntimeError):
+            self.stream.attach('', {})
+        self.assertEqual(self.stream.status()['viewers'], booth_stream.MAX_VIEWERS)
+
+    def test_the_cap_is_small_enough_to_leave_the_booth_responsive(self):
+        """gunicorn runs 1 worker with 4 threads; each viewer holds one."""
+        self.assertLessEqual(booth_stream.MAX_VIEWERS, 2)
+
+    def test_detaching_frees_a_slot(self):
+        viewers = [self.stream.attach('', {})
+                   for _ in range(booth_stream.MAX_VIEWERS)]
+        self.stream.detach(viewers[0])
+        self.assertEqual(self.stream.status()['viewers'],
+                         booth_stream.MAX_VIEWERS - 1)
+        self.stream.attach('', {})  # must not raise
+
+    def test_detach_is_idempotent(self):
+        """The view registers a second closer beside the generator's own."""
+        viewer = self.stream.attach('', {})
+        self.stream.detach(viewer)
+        self.stream.detach(viewer)
+        self.assertEqual(self.stream.status()['viewers'], 0)
+
+    def test_a_session_cannot_run_indefinitely(self):
+        """A console left open on a spare monitor is the realistic failure."""
+        self.assertLessEqual(booth_stream.MAX_SESSION_SECONDS, 900)
+        self.assertGreater(booth_stream.MAX_SESSION_SECONDS, 60)
+
+    def test_a_slow_viewer_drops_frames_rather_than_blocking(self):
+        """One stalled browser must not stall the reader for everyone else."""
+        viewer = booth_stream._Viewer()
+        for index in range(5):
+            viewer.offer(b'frame%d' % index)
+        self.assertEqual(viewer.frames.qsize(), 1)
+        self.assertEqual(viewer.frames.get_nowait(), b'frame4',
+                         'the viewer should hold the NEWEST frame, not the oldest')
+        self.assertEqual(viewer.dropped, 4)
+
+    def test_a_failed_start_reports_why(self):
+        with mock.patch.object(booth_probe, '_ffmpeg_binary', lambda name='ffmpeg': ''):
+            self.stream.attach('rtsp://10.0.0.1/s', {})
+        self.assertIn('ffmpeg', self.stream.status()['error'])
+        self.assertFalse(self.stream.status()['running'])
+
+
+class CameraStreamViewTests(SimpleTestCase):
+    """Refusals must be status codes, not a 200 with a broken body."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.cfg = os.path.join(self.dir, 'rfid_config.ini')
+        with open(self.cfg, 'w', encoding='utf-8') as handle:
+            handle.write(SAMPLE_CONFIG +
+                         '\n[camera]\nrtsp_url = rtsp://10.0.0.8/profile1\n')
+        booth_stream.get_stream().stop()
+
+    def _get(self, role='operator'):
+        request = self.factory.get('/booth/api/camera/stream/')
+        force_authenticate(request, user=_StubUser(role))
+        return BoothCameraStreamView.as_view()(request)
+
+    def test_a_host_with_no_camera_configured_says_so(self):
+        blank = os.path.join(self.dir, 'blank.ini')
+        with open(blank, 'w', encoding='utf-8') as handle:
+            handle.write(SAMPLE_CONFIG)
+        with mock.patch.object(booth_probe, 'config_path', lambda: blank):
+            response = self._get()
+        self.assertEqual(response.status_code, 409)
+        self.assertIn('rtsp_url', response.data['message'])
+
+    def test_a_booth_without_ffmpeg_says_so(self):
+        with mock.patch.object(booth_probe, 'config_path', lambda: self.cfg), \
+             mock.patch.object(booth_probe, 'camera_available',
+                               lambda: {'ffmpeg': False, 'ffprobe': False}):
+            response = self._get()
+        self.assertEqual(response.status_code, 503)
+        self.assertIn('ffmpeg', response.data['message'])
+
+    def test_too_many_viewers_is_a_429_not_a_broken_stream(self):
+        with mock.patch.object(booth_probe, 'config_path', lambda: self.cfg), \
+             mock.patch.object(booth_probe, 'camera_available',
+                               lambda: {'ffmpeg': True, 'ffprobe': True}), \
+             mock.patch.object(booth_stream, 'MAX_VIEWERS', 0):
+            response = self._get()
+        self.assertEqual(response.status_code, 429)
+        self.assertTrue(hasattr(response, 'data'),
+                        'a refusal must be a response body, not a streaming one')
+
+    def test_a_pipeline_that_will_not_start_is_a_502_and_leaks_no_viewer(self):
+        with mock.patch.object(booth_probe, 'config_path', lambda: self.cfg), \
+             mock.patch.object(booth_probe, 'camera_available',
+                               lambda: {'ffmpeg': True, 'ffprobe': True}), \
+             mock.patch.object(booth_probe, '_ffmpeg_binary',
+                               lambda name='ffmpeg': '/nonexistent/ffmpeg'):
+            response = self._get()
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(booth_stream.get_stream().status()['viewers'], 0)
+
+
 class ConsolePageTests(SimpleTestCase):
     """The shell is served anonymously so it can render its own login form."""
 
@@ -471,6 +700,31 @@ class ConsolePageTests(SimpleTestCase):
         self.assertIn('Booth Console', body)
         self.assertIn('rssi-chart', body)
         self.assertIn('login-form', body)
+
+    def test_signed_out_is_distinguishable_from_not_yet_known(self):
+        """The console shipped once with `authed` starting at `false`.
+
+        The first 401 then called setAuthed(false), the equality guard inside it
+        returned early, and the login overlay — hidden in the markup — was never
+        unhidden. The page sat there polling a booth it had no credentials for,
+        four requests every two seconds, with no way for anyone to sign in. It
+        was found in a booth's own gunicorn log, as an unbroken run of 401s.
+
+        There is no JS test runner in this project, so this asserts on the
+        source. That is a weak test for most things and the right one for this:
+        the failure was a single initial value, and it is that value being
+        three-state which makes the overlay reachable at all.
+        """
+        page = self.client.get('/booth/').content.decode()
+        self.assertIn('authed: null', page,
+                      "auth state must be tri-state (null / true / false)")
+        self.assertNotIn('authed: false,', page,
+                         "a two-state flag cannot show the overlay on the first 401")
+        # And the pollers must stand down rather than hammer a booth that has
+        # already told them no.
+        self.assertGreaterEqual(
+            page.count('state.authed === false'), 4,
+            "every poller needs the signed-out guard")
 
     def test_the_page_carries_no_booth_data_of_its_own(self):
         """Every panel is filled by an authenticated call, not by the template.

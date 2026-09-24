@@ -55,7 +55,14 @@ class TollsConfig(AppConfig):
             log.error("[anpr] Import error: %s", exc)
             return
 
-        cfg = configparser.ConfigParser()
+        # interpolation=None: a '%' in a value is data, not a template.
+        # configparser's default BasicInterpolation reads it as the start of a
+        # substitution and raises InterpolationSyntaxError — which a URL-encoded
+        # password in [camera] does routinely (Iteck%40123 is Iteck@123). That
+        # exception is not caught here, so it would crash the gate on startup
+        # and leave PM2 restarting it into the same crash with the boom down.
+        # Nothing in this file has ever wanted interpolation.
+        cfg = configparser.ConfigParser(interpolation=None)
         cfg.read(cfg_path)
 
         gate_mode    = cfg.get('gate', 'mode',          fallback='entry').strip().lower()
